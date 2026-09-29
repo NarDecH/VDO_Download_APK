@@ -20,6 +20,14 @@
 - ค้าง: emulator E2E ใช้ fixture HLS ที่สร้างใน CI ก่อน build — ต้องรัน ffmpeg step ก่อน
   connectedAndroidTest เสมอ (ตาม workflow ปัจจุบันแล้วถูกต้อง)
 
+## รอบ v1.1.5 (รายงานผู้ใช้: การ์ด done แสดง 0.0%)
+- การ์ด done แสดง `0.0% · — / —` เพราะ HLS/DASH fragment downloads ไม่เคยรายงาน total
+  → เมื่อจบแล้วอ่านขนาดจากดิสก์เติม total/downloaded + percent=100 (downloader.py)
+- fallback เพิ่มชั้นถอด `atob("...")`/base64 obfuscated player URLs (test: page_fallback_obfuscated)
+- Android parity: engine คืน Unsupported URL → broadcast → MainActivity เปิดหน้าใน WebView
+  (registerReceiver ต้องใส่ RECEIVER_NOT_EXPORTED บน targetSdk 34+)
+- releases v1.1.2→v1.1.5 ทั้งหมดแนบ extension zip 1.1.2 พร้อม checksum รวม (แฮชเดียวกันทุก release)
+
 ### สิ่งที่ตรวจพบและแก้ในรอบแรก (v1.0.1)
 | ปัญหา | การแก้ |
 |---|---|
