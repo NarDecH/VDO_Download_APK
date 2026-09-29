@@ -14,7 +14,7 @@ class StreamArgsTest {
     @Test
     fun `output template matches desktop naming scheme`() {
         val t = StreamArgs.outputTemplate(File("/tmp", "x"))
-        assertTrue(t.endsWith("x%(title).120B [%(id)s].%(ext)s"))
+        assertTrue(t.endsWith("%(title).120B [%(id)s].%(ext)s"))
         assertTrue(t.contains(File.separator))
     }
 
@@ -23,7 +23,10 @@ class StreamArgsTest {
         val args = StreamArgs.optionsArgs(File("/tmp"))
         assertTrue("--no-playlist" in args)
         assertTrue("--no-mtime" in args)
-        assertEquals("-o", args[args.indexOf("-o") + 1])
+        val i = args.indexOf("-o")
+        assertEquals("-o", args[i])
+        assertTrue("the element after -o must be the output template",
+            args[i + 1].endsWith("%(title).120B [%(id)s].%(ext)s"))
         assertTrue("-P" !in args) // output path travels inside the -o template
     }
 
