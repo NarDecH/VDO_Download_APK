@@ -4,6 +4,16 @@
 
 ## [Unreleased]
 
+### เพิ่มใหม่ (Added) — Android v1.1.0: HLS/DASH ในตัว (MVP ตาม plan-android-hls.md ขั้น 1–3)
+- **เอนจิน yt-dlp บนอุปกรณ์** — `io.github.junkfood02.youtubedl-android` (library + ffmpeg) v0.17.3
+  (พิกัด/เวอร์ชันเดียวกับที่ Seal ใช้, ตรวจ artifacts บน Maven Central แล้ว)
+- **StreamDownloadService** — foreground service (dataSync) ดาวน์โหลด m3u8/mpd/หน้าเว็บที่ yt-dlp รองรับ
+  พร้อม notification แสดง % + ปุ่มยกเลิก (destroyProcessById) และ publish ไฟล์เข้า MediaStore Downloads/VDOGrabber
+- **tryDownload เลือกเอนจินอัตโนมัติ** — ไฟล์ตรง → DownloadManager เดิม, สตรีม/หน้าเว็บ → yt-dlp engine
+  (ลบ dialog "ใช้เดสก์ท็อป" เดิม)
+- เพิ่มสิทธิ์ `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` และประกาศ service ใน manifest
+- JVM tests ใหม่: `StreamArgsTest` (output template เดียวกับเดสก์ท็อป, MIME mapping, newest-file)
+
 ### เพิ่มใหม่ (Added)
 - ไดอะแกรม pipeline การตรวจจับ 4 ชั้น (`docs/assets/detection-pipeline.svg`) พร้อมหัวข้อ
   "ตรวจจับวิดีโออย่างไร" ใน README หลักของ repo

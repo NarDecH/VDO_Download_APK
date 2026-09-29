@@ -201,27 +201,19 @@ class MainActivity : AppCompatActivity() {
 
     private fun tryDownload(url: String, title: String) {
         FileLog.event("download_click", mapOf("url" to url))
-        if (Downloader.isStream(url)) {
-            FileLog.app("INFO", "dl", "stream manifest needs desktop engine: $url")
-            AlertDialog.Builder(this)
-                .setTitle(R.string.stream_title)
-                .setMessage(getString(R.string.stream_msg, url))
-                .setPositiveButton(R.string.copy_link) { _, _ ->
-                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                    cm.setPrimaryClip(ClipData.newPlainText("url", url))
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-            return
-        }
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 42)
         }
         try {
-            Downloader.enqueue(this, url, title)
+            if (Downloader.isStream(url)) {
+                // HLS/DASH or site pages: on-device yt-dlp engine (plan-android-hls.md)
+                StreamDownloadService.start(this, url, title)
+            } else {
+                Downloader.enqueue(this, url, title)
+            }
             Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
-            FileLog.app("ERROR", "dl", "enqueue failed: $e")
+            FileLog.app("ERROR", "dl", "download failed: $e")
             Toast.makeText(this, getString(R.string.download_failed, e.message), Toast.LENGTH_LONG).show()
         }
     }

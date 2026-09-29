@@ -1,5 +1,9 @@
 # VDO Grabber
 
+[![Desktop selftest + exe](https://github.com/NarDecH/VDO_Download_APK/actions/workflows/desktop.yml/badge.svg)](https://github.com/NarDecH/VDO_Download_APK/actions/workflows/desktop.yml)
+[![Android APK](https://github.com/NarDecH/VDO_Download_APK/actions/workflows/android.yml/badge.svg)](https://github.com/NarDecH/VDO_Download_APK/actions/workflows/android.yml)
+[![Release](https://img.shields.io/github/v/release/NarDecH/VDO_Download_APK)](https://github.com/NarDecH/VDO_Download_APK/releases/latest)
+
 **เปิดหน้าเว็บที่คุณต้องการ → กดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่**
 
 แอปนี้เกิดจากการวิเคราะห์ส่วนขยาย Chrome "Video Download Helper" (โฟลเดอร์ `code/`) แล้วออกแบบใหม่
@@ -8,8 +12,20 @@
 | แพลตฟอร์ม | รูปแบบ | เอนจิน |
 |---|---|---|
 | Windows | `VDOGrabber.exe` ไฟล์เดียว (PyInstaller) ไม่ต้องติดตั้ง Python | pywebview (WebView2) + yt-dlp + ffmpeg |
-| Android | `VDOGrabber-android.apk` (GitHub Actions build) | Kotlin WebView + DownloadManager |
+| Android | `VDOGrabber-android.apk` (GitHub Actions build) | Kotlin WebView + DownloadManager + yt-dlp (HLS/DASH ในตัว) |
 | Chrome | ส่วนขยาย MV3 (`extension/`, zip ใน release) | content script + MAIN-world hooks + chrome.downloads |
+
+### ฟีเจอร์แต่ละแพลตฟอร์ม
+
+| ฟีเจอร์ | Windows | Android | Chrome |
+|---|:-:|:-:|:-:|
+| ตรวจจับวิดีโอ 4 ชั้น (DOM/hooks/timing/iframe) | ✅ | ✅ | ✅ |
+| ไฟล์ตรง mp4/webm/mp3 | ✅ | ✅ | ✅ |
+| HLS/DASH (m3u8/mpd) | ✅ yt-dlp+ffmpeg | ✅ yt-dlp ในตัว (v1.1+) | ✅ hook MSE |
+| เลือกคุณภาพ/รูปแบบ | ✅ | — | — |
+| blob:/MSE capture | ✅ ผ่าน yt-dlp | — | ✅ offscreen assembler |
+| ดาวน์โหลดพร้อมกันหลายงาน + ยกเลิก | ✅ | ✅ (ต่อรายการ) | — |
+| Log 3 ไฟล์ + Export diagnostics | ✅ | ✅ | popup logs |
 
 ## ตรวจจับวิดีโออย่างไร
 

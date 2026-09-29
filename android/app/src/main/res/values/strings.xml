@@ -17,5 +17,9 @@
     <string name="stream_title">HLS/DASH Stream</string>
     <string name="stream_msg">ลิงก์นี้เป็นสตรีมแบบแบ่งส่วน (m3u8/mpd) ที่ต้องผ่านการรวมไฟล์ — ให้ใช้ VDO Grabber เวอร์ชันเดสก์ท็อป (VDOGrabber.exe) ซึ่งมี yt-dlp + ffmpeg ในตัว\n\nลิงก์: %1$s</string>
     <string name="logs_title">Logs</string>
+    <string name="stream_dl_title">กำลังดาวน์โหลดสตรีม (yt-dlp)</string>
+    <string name="stream_dl_done">ดาวน์โหลดสตรีมเสร็จแล้ว</string>
+    <string name="stream_dl_failed">ดาวน์โหลดสตรีมไม่สำเร็จ</string>
+    <string name="cancel">ยกเลิก</string>
     <string name="refresh">รีเฟรช</string>
 </resources>

@@ -37,5 +37,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    // yt-dlp engine on-device (HLS/DASH + every yt-dlp-supported site);
+    // version pinned to the same line Seal uses - verified on Maven Central
+    implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
     testImplementation("junit:junit:4.13.2")
 }
