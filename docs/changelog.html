@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber — CHANGELOG</title>
+<style>
+:root{--bg:#0b1020;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371;--grn:#16a34a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.8 'Segoe UI',system-ui,sans-serif}
+.wrap{max-width:880px;margin:0 auto;padding:0 22px 60px}
+nav.top{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;gap:4px;align-items:center;padding-top:9px;padding-bottom:9px}
+nav a{color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600}
+nav a:hover,nav a.on{background:#1a2547;color:#fff}
+nav .logo-sm{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px}
+header.hero{background:linear-gradient(140deg,#101830,#1a1130 60%,#0b1020);border-bottom:1px solid var(--line);padding:46px 0 36px}
+h1{font-size:34px;margin:6px 0 10px}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim)}
+.release{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px 26px;margin:26px 0}
+.release .vhead{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.vtag{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:800;border-radius:10px;padding:5px 14px;font-size:17px}
+.vdate{color:var(--dim);font-size:13.5px}
+.vtag-latest{background:#14532d;color:#86efac;border-radius:8px;padding:2px 10px;font-size:11.5px;font-weight:700}
+h3{font-size:15.5px;margin:18px 0 8px;color:var(--acc2)}
+h3 .en{color:var(--faint);font-weight:600;font-size:12.5px;margin-left:6px}
+ul{margin:6px 0 6px 22px;color:#c9d4e8}
+li{margin:6px 0}
+code{background:#0b1120;border:1px solid var(--line);border-radius:6px;padding:1.5px 7px;font:13px Consolas,monospace;color:#ffc371}
+.warn{border-left:4px solid var(--acc);background:#2a1420;border-radius:0 12px 12px 0;padding:14px 18px;margin:20px 0}
+.timeline{position:relative;margin:30px 0 0 10px;padding-left:26px;border-left:2px solid var(--line)}
+.timeline .dot{position:absolute;left:-8px;top:6px;width:14px;height:14px;border-radius:50%;
+  background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 0 0 4px #0b1020}
+footer{border-top:1px solid var(--line);margin-top:60px;padding:26px 0;color:var(--faint);font-size:13px;text-align:center}
+a{color:#7fb3ff}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <span class="logo-sm">▼</span><b style="font-size:14px">VDO Grabber</b>
+  <span style="flex:1"></span>
+  <a href="index.html">⬇ ดาวน์โหลด</a>
+  <a href="readme.html">README</a>
+  <a href="research.html">RESEARCH</a>
+  <a href="changelog.html" class="on">CHANGELOG</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <h1><span>CHANGELOG</span></h1>
+  <p class="sub">ประวัติการเปลี่ยนแปลงทุกเวอร์ชัน — รูปแบบอ้างอิง Keep a Changelog + Semantic Versioning<br>
+  ฉบับ Markdown: <a href="changelog.md">changelog.md</a></p>
+</div></header>
+
+<div class="wrap">
+
+<div class="timeline">
+<div class="dot" style="top:32px"></div>
+<div class="release">
+  <div class="vhead">
+    <span class="vtag">v1.0.0</span>
+    <span class="vtag-latest">LATEST</span>
+    <span class="vdate">29 กันยายน 2026</span>
+    <span style="flex:1"></span>
+    <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
+  </div>
+
+  <h3>เพิ่มใหม่ <span class="en">Added</span></h3>
+  <ul>
+    <li><b>Windows Desktop (VDOGrabber.exe)</b> — เบราว์เซอร์ในตัว (Edge WebView2) เปิดหน้าเว็บใดก็ได้
+        พร้อมแถบเครื่องมือฉีดในหน้า: ตรวจหาวิดีโอ, รายการวิดีโอที่พบ, ปุ่มดาวน์โหลด</li>
+    <li><b>ตรวจจับวิดีโอ 3 ชั้น</b> — DOM scan (<code>&lt;video&gt;</code>, og:video, JSON-LD, ลิงก์สื่อ) ·
+        hook <code>fetch</code>/<code>XMLHttpRequest</code> จับ m3u8/mpd/mp4 · performance resource-timing</li>
+    <li><b>เอนจิน yt-dlp</b> (bundle ใน exe + อัปเดตตัวเองได้) และ <b>ffmpeg</b> ดาวน์โหลดอัตโนมัติครั้งแรกเมื่อเจอ HLS/DASH</li>
+    <li><b>เลือกรูปแบบ/คุณภาพ</b> — probe ด้วย <code>yt-dlp -J</code> แสดง resolution / ขนาด / tbr ต่อรายการ</li>
+    <li><b>ระบบ log ละเอียด 3 ไฟล์</b> — <code>app.log</code> (RotatingFileHandler 5MB×5),
+        <code>downloads.log</code> (yt-dlp ทุกบรรทัด), <code>events.jsonl</code> (structured) +
+        ตัวอ่าน log ใน Control Center + Export diagnostics (.zip) + crash.log</li>
+    <li><b>Control Center</b> — แท็บดาวน์โหลด (คิว/ความคืบหน้า/ยกเลิก/เปิดไฟล์), วิดีโอที่ตรวจพบ, Logs, ตั้งค่า, เกี่ยวกับ</li>
+    <li><b>โหมด <code>--selftest</code></b> — ทดสอบ headless ครบวงจร: engine, detection JS ใน webview จริง,
+        ดาวน์โหลดไฟล์จริงผ่าน local media server (ใช้ใน CI/หลังแพ็ก exe)</li>
+    <li><b>แพ็กไฟล์เดียวด้วย PyInstaller</b> — พร้อมไอคอน (.ico หลายขนาด) และ version resource — ผู้ใช้ไม่ต้องติดตั้ง Python</li>
+    <li><b>แอป Android (Kotlin)</b> — WebView browser, ตรวจจับวิดีโอฉบับเดียวกัน + sniff ระดับ native
+        (<code>shouldInterceptRequest</code>), ดาวน์โหลดผ่าน DownloadManager ลง Downloads/VDOGrabber,
+        ตัวอ่าน log ในแอป, รับลิงก์ที่แชร์เข้ามา</li>
+    <li><b>GitHub Actions workflow</b> — ปั่น APK ทุก push/PR และแนบ release พร้อม SHA256 + อัปเดต checksums.txt เมื่อแท็ก</li>
+    <li><b>หน้าเว็บดาวน์โหลดบน GitHub Pages</b> — ดึง release ล่าสุดจาก GitHub API อัตโนมัติ
+        พร้อมปุ่มดาวน์โหลดและ checksum ที่ก๊อปได้</li>
+    <li>เอกสาร md + html ครบชุด (README / RESEARCH / CHANGELOG) พร้อมไดอะแกรม SVG และสกรีนช็อต</li>
+    <li><b>AGENT.md</b> — คู่มือสำหรับ AI agent/ผู้ดูแล: แผนที่ repo, กติกา, ขั้นตอน release, เคล็ดลับดีบัก</li>
+  </ul>
+
+  <div class="warn"><b>ข้อจำกัดที่ทราบ (Known issues):</b> ไม่รองรับ DRM; เนื้อหาหลังล็อกอินบางประเภทใช้ไม่ได้
+  (ไม่มี cookie profile) · Android ยังไม่รวมไฟล์ HLS/DASH — แนะนำใช้เดสก์ท็อป (roadmap: ฝัง youtubedl-android) ·
+  โฟลเดอร์ <code>code/</code> (ส่วนขยายต้นแบบที่ minify) ถูก gitignore — มีแต่ในเครื่องผู้พัฒนา</div>
+</div>
+</div>
+
+<p class="sub" style="margin-top:26px">เวอร์ชันถัดไป (roadmap): ฝัง yt-dlp บน Android (youtubedl-android) ·
+รองรับ playlist/queue หลายรายการ · โหมด cookie นำเข้าเพื่อเนื้อหาสมาชิก · desktop workflow บน CI</p>
+
+</div>
+<footer><div class="wrap">VDO Grabber v1.0.0 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
+<a href="https://github.com/NarDecH/VDO_Download_APK/releases">Releases</a></div></footer>
+</body>
+</html>

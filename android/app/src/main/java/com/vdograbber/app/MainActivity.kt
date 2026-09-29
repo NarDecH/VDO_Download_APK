@@ -1,0 +1,227 @@
+package com.vdograbber.app
+
+import android.annotation.SuppressLint
+import android.app.AlertDialog
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.view.KeyEvent
+import android.view.View
+import android.webkit.CookieManager
+import android.webkit.JavascriptInterface
+import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
+import android.widget.EditText
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
+
+/**
+ * VDO Grabber for Android: a WebView browser that opens any site, detects the
+ * video currently displayed (DOM scan + fetch/XHR hooks + native request
+ * sniffing) and offers a Download button for it. All activity is logged in
+ * detail (FileLog) exactly like the desktop build.
+ */
+class MainActivity : AppCompatActivity() {
+
+    private lateinit var web: WebView
+    private lateinit var urlBox: EditText
+    private lateinit var chipMedia: TextView
+    private lateinit var progressBar: View
+
+    private val bridge = Bridge()
+
+    inner class Bridge {
+        @JavascriptInterface
+        fun reportMedia(json: String) {
+            val o = Detector.parse(json) ?: return
+            val url = o.optString("url")
+            val added = MediaStore.add(
+                url = url,
+                kind = o.optString("kind", "media"),
+                label = o.optString("label", ""),
+                page = o.optString("page", ""),
+                title = o.optString("title", ""),
+            )
+            if (added) {
+                FileLog.event("media_found", mapOf("url" to url, "kind" to o.optString("kind"), "via" to "js"))
+                FileLog.app("DEBUG", "detect", "media found: $url")
+                runOnUiThread { updateChip() }
+            }
+        }
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        FileLog.init(applicationContext)
+        FileLog.app("INFO", "app", "VDO Grabber 1.0.0 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
+        setContentView(R.layout.activity_main)
+
+        web = findViewById(R.id.web)
+        urlBox = findViewById(R.id.urlBox)
+        chipMedia = findViewById(R.id.chipMedia)
+        progressBar = findViewById(R.id.progress)
+
+        setupWebView()
+        findViewById<ImageButton>(R.id.btnBack).setOnClickListener { if (web.canGoBack()) web.goBack() }
+        findViewById<ImageButton>(R.id.btnFwd).setOnClickListener { if (web.canGoForward()) web.goForward() }
+        findViewById<ImageButton>(R.id.btnReload).setOnClickListener { web.reload() }
+        findViewById<ImageButton>(R.id.btnLogs).setOnClickListener { startActivity(Intent(this, LogsActivity::class.java)) }
+        chipMedia.setOnClickListener { showMediaSheet() }
+        urlBox.setOnEditorActionListener { _, _, event ->
+            if (event == null || event.action == KeyEvent.ACTION_DOWN) {
+                navigate(urlBox.text.toString()); true
+            } else false
+        }
+
+        val start = intent?.dataString
+            ?: "https://duckduckgo.com/?q=sample+video+mp4"
+        navigate(start)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun setupWebView() {
+        web.settings.apply {
+            javaScriptEnabled = true
+            domStorageEnabled = true
+            mediaPlaybackRequiresUserGesture = false
+            userAgentString = userAgentString.replace("; wv", "")
+        }
+        CookieManager.getInstance().setAcceptCookie(true)
+        CookieManager.getInstance().setAcceptThirdPartyCookies(web, true)
+
+        web.addJavascriptInterface(bridge, "AndroidBridge")
+        web.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+                val url = request.url
+                return if (url.scheme in setOf("http", "https")) {
+                    false // keep navigation in-app
+                } else {
+                    try { startActivity(Intent(Intent.ACTION_VIEW, url)) } catch (_: Exception) {}
+                    true
+                }
+            }
+
+            // Native network sniffing (the extension's webRequest role):
+            // every request that looks like media surfaces as a candidate.
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
+                val url = request.url.toString()
+                if (Downloader.extOf(url).isNotEmpty()) {
+                    val ext = Downloader.extOf(url)
+                    if (MediaStore.add(url, ext, "network request", url.substringBeforeLast('/'), web.title ?: "")) {
+                        FileLog.event("media_found", mapOf("url" to url, "kind" to ext, "via" to "shouldInterceptRequest"))
+                        runOnUiThread { updateChip() }
+                    }
+                }
+                return null
+            }
+
+            override fun onPageFinished(view: WebView, url: String) {
+                FileLog.event("page_loaded", mapOf("url" to url))
+                FileLog.app("INFO", "nav", "page loaded: $url")
+                view.evaluateJavascript(Detector.INJECT_JS, null)
+                urlBox.setText(url)
+            }
+        }
+        web.webChromeClient = object : WebChromeClient() {
+            override fun onProgressChanged(view: WebView, newProgress: Int) {
+                progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
+            }
+        }
+    }
+
+    private fun navigate(raw: String) {
+        var url = raw.trim()
+        if (url.isEmpty()) return
+        if (!url.startsWith("http://") && !url.startsWith("https://")) {
+            url = if (url.contains('.') && !url.contains(' ')) "https://$url"
+            else "https://duckduckgo.com/?q=" + Uri.encode(url)
+        }
+        FileLog.app("INFO", "nav", "navigate -> $url")
+        FileLog.event("navigate", mapOf("url" to url))
+        web.loadUrl(url)
+    }
+
+    private fun updateChip() {
+        val n = MediaStore.list().size
+        chipMedia.text = getString(R.string.found_chip, n)
+        chipMedia.visibility = if (n > 0) View.VISIBLE else View.GONE
+    }
+
+    private fun showMediaSheet() {
+        val items = MediaStore.list()
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.no_media, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(48, 32, 48, 32)
+        }
+        for (m in items.take(15)) {
+            val row = layoutInflater.inflate(R.layout.item_media, container, false)
+            row.findViewById<TextView>(R.id.mLabel).text =
+                "${m.label.ifEmpty { m.kind }}  ·  ${m.kind}"
+            row.findViewById<TextView>(R.id.mUrl).text = m.url
+            row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
+            row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
+                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                cm.setPrimaryClip(ClipData.newPlainText("url", m.url))
+                Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
+            }
+            container.addView(row)
+        }
+        AlertDialog.Builder(this)
+            .setTitle(getString(R.string.found_title, items.size))
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun tryDownload(url: String, title: String) {
+        FileLog.event("download_click", mapOf("url" to url))
+        if (Downloader.isStream(url)) {
+            FileLog.app("INFO", "dl", "stream manifest needs desktop engine: $url")
+            AlertDialog.Builder(this)
+                .setTitle(R.string.stream_title)
+                .setMessage(getString(R.string.stream_msg, url))
+                .setPositiveButton(R.string.copy_link) { _, _ ->
+                    val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    cm.setPrimaryClip(ClipData.newPlainText("url", url))
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+            return
+        }
+        if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
+            requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 42)
+        }
+        try {
+            Downloader.enqueue(this, url, title)
+            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            FileLog.app("ERROR", "dl", "enqueue failed: $e")
+            Toast.makeText(this, getString(R.string.download_failed, e.message), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onBackPressed() {
+        if (web.canGoBack()) web.goBack() else super.onBackPressed()
+    }
+
+    override fun onDestroy() {
+        FileLog.event("app_exit")
+        web.destroy()
+        super.onDestroy()
+    }
+}

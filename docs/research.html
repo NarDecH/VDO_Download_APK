@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber — RESEARCH: วิเคราะห์ส่วนขยายต้นแบบ</title>
+<style>
+:root{--bg:#0b1020;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.8 'Segoe UI',system-ui,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:0 22px 60px}
+nav.top{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;gap:4px;align-items:center;padding-top:9px;padding-bottom:9px}
+nav a{color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600}
+nav a:hover,nav a.on{background:#1a2547;color:#fff}
+nav .logo-sm{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px}
+header.hero{background:linear-gradient(140deg,#101830,#1a1130 60%,#0b1020);border-bottom:1px solid var(--line);padding:46px 0 36px}
+h1{font-size:34px;line-height:1.25;margin:6px 0 10px}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);max-width:720px}
+h2{font-size:24px;margin:50px 0 14px;padding-top:6px}
+h2 .n{color:var(--acc2);font-family:Consolas,monospace;margin-right:8px}
+h3{font-size:17px;margin:24px 0 8px;color:var(--acc2)}
+p{margin:10px 0;color:#c9d4e8}
+ul{margin:10px 0 10px 24px;color:#c9d4e8}
+li{margin:5px 0}
+code{background:#0b1120;border:1px solid var(--line);border-radius:6px;padding:1.5px 7px;font:13px Consolas,monospace;color:#ffc371}
+pre{background:#070b16;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow:auto;margin:14px 0}
+pre code{background:none;border:0;padding:0;color:#b7c4de;font-size:13px;line-height:1.6}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th{text-align:left;color:var(--faint);font-weight:600;border-bottom:1px solid var(--line);padding:8px 10px}
+td{border-bottom:1px solid #1a2340;padding:9px 10px;vertical-align:top;color:#c9d4e8}
+.full img{width:100%;border-radius:12px;border:1px solid var(--line);margin:14px 0;display:block}
+figcaption,.cap{color:var(--faint);font-size:12.5px;text-align:center;margin-top:4px}
+.note{border-left:4px solid var(--acc2);background:#161d3a;border-radius:0 12px 12px 0;padding:14px 18px;margin:16px 0;color:#c9d4e8}
+.flow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:14px 0}
+.flow .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 14px;font-size:13px;font-weight:600}
+.flow .arr{color:var(--acc2);font-size:18px;font-weight:700}
+footer{border-top:1px solid var(--line);margin-top:60px;padding:26px 0;color:var(--faint);font-size:13px;text-align:center}
+a{color:#7fb3ff}
+@media(max-width:760px){h1{font-size:26px}}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <span class="logo-sm">▼</span><b style="font-size:14px">VDO Grabber</b>
+  <span style="flex:1"></span>
+  <a href="index.html">⬇ ดาวน์โหลด</a>
+  <a href="readme.html">README</a>
+  <a href="research.html" class="on">RESEARCH</a>
+  <a href="changelog.html">CHANGELOG</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <h1>RESEARCH — <span>ผ่าเครื่องใน</span> "Video Download Helper" v10.5.49.2</h1>
+  <p class="sub">ผลการวิเคราะห์เชิงโครงสร้างจากซอร์สโค้ดจริงในโฟลเดอร์ <code>code/</code>
+  (Chrome Extension, Manifest V3 — โค้ดถูก minify จึงวิเคราะห์ด้วยการไล่สตริง/ชื่อฟังก์ชัน)
+  และการแปลงแนวคิดเหล่านั้นเป็น VDO Grabber ที่ไม่พึ่ง browser extension APIs</p>
+</div></header>
+
+<div class="wrap">
+
+<h2><span class="n">01</span>สถาปัตยกรรม 5 บริบท + บัสเดียว</h2>
+<p>ส่วนขยายจัดการงานผ่าน <b>5 บริบท</b> ที่คุยกันผ่าน <code>BroadcastChannel("worker_service")</code>
+โดยใช้ซองข้อความ <code>{msg, channel}</code> และ enum ช่องทาง
+<code>FromInjectedToService:0 … FromServiceToService:8</code> — แพตเทิร์นนี้ปรากฏเหมือนกันใน
+<code>injected/youtube_untrusted.js</code>, <code>service/main.js</code> และ <code>download_worker/main.js</code></p>
+
+<table>
+<tr><th>ส่วน</th><th>บทบาท (พบหลักฐานจาก)</th></tr>
+<tr><td><code>service/main.js</code> (554 KB)</td><td>สมองกล — ดัก network, parse m3u8/MPD, เก็บสถานะ, คิวดาวน์โหลด, DNR rules, สิทธิการใช้งาน (bundle QuickJS WASM สำหรับ license/SmartNaming — สตริง <code>qjs_result</code>)</td></tr>
+<tr><td><code>content/</code></td><td>Sidebar UI แบบ Lit web components (<code>com-main</code>, <code>com-media-discovered/downloading/downloaded</code>, <code>com-media-selector</code>) + smartnaming.js (DSL ตั้งชื่อไฟล์: <code>filename_change_ext</code>, <code>filename_merge</code>) + history.js (<code>transient_history</code>, <code>history_days</code>)</td></tr>
+<tr><td><code>injected/</code></td><td>สคริปต์เฉพาะเว็บ ISOLATED world + คู่ <code>*_untrusted.js</code> ที่รัน MAIN world (ประกาศใน manifest.json)</td></tr>
+<tr><td><code>factory/factory.js</code></td><td>Offscreen document (<code>offscreen.createDocument({reason: WORKERS})</code>) ทำหน้าที่เดียว: spawn <code>new Worker("/download_worker/main.js")</code> — และฝัง anti-repackaging เช็ค hash ของ extension ID</td></tr>
+<tr><td><code>download_worker/main.js</code></td><td>Module worker + libav.js 6.5.7.1 (<code>libav-6.5.7.1-h264-aac-mp3.wasm</code>) สำหรับ demux/remux</td></tr>
+</table>
+
+<div class="full"><img src="assets/extension-flow.svg" alt="ผังข้อมูลส่วนขยายต้นแบบ">
+<figcaption>ผังข้อมูลของต้นแบบ (producer → parser → state/UI → worker → saved file) และการแปลงเป็น VDO Grabber</figcaption></div>
+
+<h2><span class="n">02</span>การตรวจจับวิดีโอ — ดัก network ไม่ใช่แค่ DOM</h2>
+<p>ใน <code>service/main.js</code>: <code>$f()</code> ลงทะเบียน <code>webRequest.onSendHeaders</code>
+(เก็บ headers ตาม <code>requestId</code>, TTL 600 วิ) และ <code>webRequest.onResponseStarted</code> →
+<code>RS()</code> สำหรับ types <code>xmlhttprequest|media|main_frame|sub_frame|other</code> บน <code>&lt;all_urls&gt;</code>
+จากนั้นแยกประเภท:</p>
+<ul>
+  <li><b>HLS</b> — content-type <code>/mpegurl/i</code> หรือ URL ตรง <code>/hls|m3u8/i</code> → <code>zf()</code>: refetch playlist ด้วย headers ที่จับได้ แล้ว broadcast <code>on_media</code> เป็น <code>m3u8_playlist</code> (parse ย่อย: <code>Um</code>, ดึง subtitle <code>Fm</code>, ตรวจ DRM <code>Ef</code>)</li>
+  <li><b>DASH</b> — <code>.mpd</code> หรือ <code>/dash/i</code> → <code>$S()</code> เป็น <code>mpd_playlist</code> (เว็บที่มีทั้งคู่ มีการลองสลับ <code>.mpd</code> → <code>.m3u8</code>)</li>
+  <li><b>Direct</b> — นอกเหนือจากนี้ <code>NS()</code>: ดู content-type/disposition, ข้ามไฟล์ &lt; 500 KB, เช็ค <code>accept-ranges</code> → <code>http_playlist</code></li>
+  <li><b>YouTube</b> — ยกเว้นจากการ sniff; <code>youtube.js</code> parse <code>streamingData.formats/adaptiveFormats</code>, <code>itag</code>, <code>signatureTimestamp</code>, <code>po_token</code> เป็น <code>youtube_format</code></li>
+  <li><b>Aggregation</b> — <code>em()</code> เก็บใน <code>state.discovered: Map&lt;tab_id, {media: Map&lt;media_hash&gt;}&gt;</code> (LRU 30)</li>
+</ul>
+<p>ข้าม segment <code>.ts/.m4s/.m2ts</code> ไว้ก่อน และมีกรณีพิเศษ <code>player.vimeo.com/…/config</code>,
+<code>intl-api.iq.com/…/dash</code> ที่แปลง JSON config เป็น event (<code>vimeo_on_config</code>, <code>iqyi_on_config</code>)</p>
+
+<h2><span class="n">03</span>สคริปต์เฉพาะเว็บ (injected)</h2>
+<ul>
+  <li><code>*_untrusted.js</code> (MAIN world) ส่วนใหญ่ <b>poll global</b> — vimeo: <code>window.playerConfig</code>, bilibili: <code>__initialState</code>, youtube: <code>ytcfg.data_.VISITOR_DATA</code></li>
+  <li>ยกเว้น <code>xgplayer_crypto_untrusted.js</code>/<code>javrank_untrusted.js</code> ที่ <b>hook</b> <code>XMLHttpRequest.prototype.open</code> และ <code>window.fetch</code> — จุดนี้เองที่ VDO Grabber ขยายเป็นแนวทางหลัก</li>
+  <li>ISOLATED เป็นตัว extractor เต็มรูปแบบ: <code>kick.js</code> POST <code>api/v1/stream/{id}/playback</code>, <code>api/v2/channels/…</code> แล้ว emit <code>on_media</code> เอง; <code>youtube.js</code> (1 MB) เป็น parser ระดับ yt-dlp</li>
+  <li>ช่องทาง MAIN ↔ ISOLATED: <code>BroadcastChannel("injected-" + fnv64(location.href))</code> ต่อหนึ่ง URL</li>
+</ul>
+
+<h2><span class="n">04</span>ท่อดาวน์โหลด + remux ด้วย WASM</h2>
+<div class="flow">
+  <span class="box">do_download (UI)</span><span class="arr">→</span>
+  <span class="box">Gy() dedupe+entitlement</span><span class="arr">→</span>
+  <span class="box">Pn limiter (max_concurrent, youtube_throttle=1)</span><span class="arr">→</span>
+  <span class="box">Worker 16 strategies</span><span class="arr">→</span>
+  <span class="box">libav WASM → OPFS</span><span class="arr">→</span>
+  <span class="box">chrome.downloads + rename</span>
+</div>
+<ul>
+  <li>Args ต่องาน (<code>cp()</code>): <code>{download_id, muxer, strategy, url/url_audio, headers, good_basename, subdir, will_use_jsfetch, carry_get_params, throttle}</code></li>
+  <li>Strategy ตัวอย่าง: <code>m3u8_audio_video_two_sources</code>, <code>mpd_video_preview</code>, <code>http_strip_audio_jsfetch</code>, <code>youtube_audio_only</code></li>
+  <li>เขียนไฟล์ผ่าน libav (<code>avformat_alloc_output_context2</code>, <code>write_header</code>, <code>av_interleaved_write_frame</code>, <code>write_trailer</code>) ลง <b>OPFS</b> → <code>URL.createObjectURL</code> → <code>download_result</code></li>
+  <li>ตั้งชื่อไฟล์ด้วย <code>downloads.onDeterminingFilename</code> (<code>eu()</code>, conflictAction: <code>uniquify</code>) แล้วส่ง <code>revoke_blob_url</code> คืน</li>
+</ul>
+
+<h2><span class="n">05</span>UI flow ของต้นแบบ</h2>
+<p><code>panel.js</code> mirror สถานะ (<code>discovered.get</code>, <code>invalidateState</code>, ช่องทาง
+<code>FromContentToService</code>/<code>FromServiceToContent</code>) ทุกการ์ด <code>com-media</code> มีตัวเลือก variant
+(<code>media_selector</code>, <code>update_media_preferred_entry</code>), ป้ายคุณภาพ (<code>quality_highest</code>…),
+preview (<code>request_preview</code> → strategies <code>*_video_preview</code>) และปุ่ม <code>do_download</code> ที่แนบ
+<code>{download_args, meta, media}</code> — รองรับ download / download_as / audio-only</p>
+
+<h2><span class="n">06</span>สรุป: แปลงเป็นแอปสแตนด์อโลนอย่างไร</h2>
+<table>
+<tr><th>เทคนิคของ extension</th><th>ใน VDO Grabber</th></tr>
+<tr><td>webRequest sniffer (MV3)</td><td><b>Desktop:</b> hook <code>fetch</code>/<code>XHR</code> + performance resource-timing ในหน้า (เหมือนแนวทาง <code>*_untrusted.js</code>) · <b>Android:</b> <code>shouldInterceptRequest</code> — ดักแบบ native ได้แม้กระทั่ง request ก่อน hook</td></tr>
+<tr><td>BroadcastChannel bus</td><td>pywebview <code>js_api</code> bridge (JS↔Python) / <code>JavascriptInterface</code> (JS↔Kotlin)</td></tr>
+<tr><td>libav WASM muxer</td><td><b>yt-dlp + ffmpeg</b> แบบ subprocess — เครื่องมือมาตรฐาน ทดสอบกับ upstream ตลอดเวลา อัปเดตด้วย <code>-U</code> ได้</td></tr>
+<tr><td>chrome.downloads + rename</td><td>เขียนลง <code>~/Downloads/VDOGrabber</code> เป็น <code>%(title)s [%(id)s].%(ext)s</code> / Android: <code>DownloadManager</code></td></tr>
+<tr><td>Sidebar UI (Lit)</td><td>Toolbar+panel ฉีดในหน้า (Shadow DOM แยกสไตล์) + หน้าต่าง Control Center</td></tr>
+<tr><td>entitlement / ตัวจำกัด (lsd counter, 7200 วิ)</td><td>ไม่มี — MIT โอเพนซอร์ส จำกัดเพียงจำนวนดาวน์โหลดคู่ขนาน (settings)</td></tr>
+</table>
+<div class="note"><b>ข้อจำกัดที่ยอมรับไว้:</b> ไม่แตะ DRM (Widevine), เนื้อหาหลังล็อกอินบางประเภท
+(ไม่มี cookie profile ของเบราว์เซอร์ผู้ใช้), และ YouTube บางช่วงต้องรอ yt-dlp อัปเดต —
+ทั้งหมดระบุไว้ใน README และแก้ได้ด้วยปุ่มอัปเดต engine</div>
+
+<h2><span class="n">07</span>หลักฐาน/สตริงอ้างอิงในซอร์ส</h2>
+<pre><code>service/main.js   : $f(), RS(), zf(), $S(), NS(), em(), Gy(), Pn(), cp(), vt()/oo() (DNR modifyHeaders)
+                    "state.discovered", "on_media", "m3u8_playlist", "mpd_playlist", "http_playlist",
+                    "youtube_format", "media_hash_", "qjs_result"
+content/panel.js  : "do_download", "media_selector", "update_media_preferred_entry", "quality_highest",
+                    "request_preview", "invalidateState", "transient_history", "history_days"
+factory/factory.js: "offscreen.createDocument", "downloadhelper.net:443/v2/entitlements/validate"
+download_worker   : "avformat_alloc_output_context2", "write_header", "av_interleaved_write_frame",
+                    "write_trailer", "navigator.storage.getDirectory()" (OPFS)
+injected/         : BroadcastChannel("injected-" + fnv64(location.href)),
+                    window.playerConfig (vimeo), __initialState (bilibili), ytcfg.data_.VISITOR_DATA (youtube)</code></pre>
+<p class="cap">ฟังก์ชัน/สตริงข้างต้นค้นพบได้จากไฟล์จริงภายใต้ <code>code/</code> (เก็บไว้ในเครื่องผู้พัฒนา — gitignored)</p>
+
+</div>
+<footer><div class="wrap">VDO Grabber v1.0.0 · <a href="readme.html">README</a> · <a href="index.html">ดาวน์โหลด</a> ·
+<a href="https://github.com/NarDecH/VDO_Download_APK">GitHub</a></div></footer>
+</body>
+</html>

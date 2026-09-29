@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber — README</title>
+<style>
+:root{--bg:#0b1020;--bg2:#101830;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371;--grn:#16a34a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.75 'Segoe UI',system-ui,sans-serif}
+.wrap{max-width:960px;margin:0 auto;padding:0 22px 60px}
+header.hero{background:linear-gradient(140deg,#101830 20%,#1a1130 60%,#0b1020);border-bottom:1px solid var(--line);padding:54px 0 40px}
+.badge{display:inline-flex;align-items:center;gap:8px;background:#1a2547;border:1px solid var(--line);border-radius:99px;padding:5px 14px;color:var(--dim);font-size:12.5px;margin-bottom:18px}
+.logo{width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:20px;vertical-align:middle}
+h1{font-size:40px;line-height:1.2;margin:14px 0 10px}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);font-size:17px;max-width:640px}
+.cta{margin-top:24px;display:flex;gap:12px;flex-wrap:wrap}
+.btn{all:unset;cursor:pointer;padding:11px 22px;border-radius:11px;font-weight:700;font-size:14.5px}
+.btn.grn{background:var(--grn);color:#fff}.btn.grn:hover{background:#15803d}
+.btn.ghost{background:var(--card);border:1px solid var(--line);color:var(--txt)}.btn.ghost:hover{background:#1b2547}
+nav.top{position:sticky;top:0;z-index:50;background:rgba(11,16,32,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+nav.top .wrap{display:flex;gap:4px;align-items:center;padding-top:9px;padding-bottom:9px}
+nav a{color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600}
+nav a:hover,nav a.on{background:#1a2547;color:#fff}
+nav .logo-sm{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px}
+h2{font-size:26px;margin:52px 0 16px;padding-top:8px}
+h2 .n{color:var(--acc2);font-family:Consolas,monospace;margin-right:8px}
+h3{font-size:18px;margin:26px 0 10px;color:var(--acc2)}
+p{margin:10px 0;color:#c9d4e8}
+.lead{color:var(--dim)}
+ul,ol{margin:10px 0 10px 24px;color:#c9d4e8}
+li{margin:5px 0}
+code{background:#0b1120;border:1px solid var(--line);border-radius:6px;padding:1.5px 7px;font:13px Consolas,monospace;color:#ffc371}
+pre{background:#070b16;border:1px solid var(--line);border-radius:12px;padding:16px 18px;overflow:auto;margin:14px 0}
+pre code{background:none;border:0;padding:0;color:#b7c4de;font-size:13px;line-height:1.6}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:16px 0}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid2 img,.full img{width:100%;border-radius:10px;border:1px solid var(--line);display:block}
+.full img{margin:14px 0}
+figcaption,.cap{color:var(--faint);font-size:12.5px;margin-top:6px;text-align:center}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px}
+th{text-align:left;color:var(--faint);font-weight:600;border-bottom:1px solid var(--line);padding:8px 10px}
+td{border-bottom:1px solid #1a2340;padding:9px 10px;vertical-align:top;color:#c9d4e8}
+.kbd{background:#0b1120;border:1px solid var(--line);border-bottom-width:3px;border-radius:6px;padding:1px 8px;font:12.5px Consolas,monospace}
+.note{border-left:4px solid var(--acc2);background:#161d3a;border-radius:0 12px 12px 0;padding:14px 18px;margin:16px 0;color:#c9d4e8}
+.warn{border-left:4px solid var(--acc);background:#2a1420;border-radius:0 12px 12px 0;padding:14px 18px;margin:16px 0}
+footer{border-top:1px solid var(--line);margin-top:60px;padding:26px 0;color:var(--faint);font-size:13px;text-align:center}
+a{color:#7fb3ff}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}h1{font-size:30px}}
+</style>
+</head>
+<body>
+
+<nav class="top"><div class="wrap">
+  <span class="logo-sm">▼</span><b style="font-size:14px">VDO Grabber</b>
+  <span style="flex:1"></span>
+  <a href="index.html" class="on">⬇ ดาวน์โหลด</a>
+  <a href="readme.html">README</a>
+  <a href="research.html">RESEARCH</a>
+  <a href="changelog.html">CHANGELOG</a>
+</div></nav>
+
+<header class="hero"><div class="wrap">
+  <span class="badge">◆ v1.0.0 · 29 กันยายน 2026 · Windows + Android</span>
+  <h1>เปิดหน้าเว็บที่ต้องการ<br>แล้ว <span>กดดาวน์โหลดวิดีโอ</span> ที่กำลังแสดงอยู่</h1>
+  <p class="sub">VDO Grabber ออกแบบจากการวิเคราะห์ส่วนขยาย "Video Download Helper" — มาพร้อมเบราว์เซอร์ในตัว,
+  ตรวจจับวิดีโอ 3 ชั้น, เอนจิน yt-dlp + ffmpeg และระบบ log ละเอียดสำหรับดีบัก ทั้งไฟล์ exe เดียวบน Windows
+  และแอป Android</p>
+  <div class="cta">
+    <a class="btn grn" href="index.html">⬇ ดาวน์โหลดเวอร์ชันล่าสุด</a>
+    <a class="btn ghost" href="research.html">วิเคราะห์ต้นแบบ (RESEARCH)</a>
+  </div>
+</div></header>
+
+<div class="wrap">
+
+<h2><span class="n">01</span>มันทำอะไรได้บ้าง</h2>
+<div class="grid2">
+  <div class="card"><h3>🌐 เบราว์เซอร์ในตัว</h3><p>พิมพ์ URL ได้เลย แอปฉีดแถบเครื่องมือของตัวเองไว้บนทุกหน้าเว็บ (Shadow DOM แยกสไตล์จากเว็บ)
+  พร้อมปุ่มย้อน/ไป/รีโหลด/ค้นหา</p></div>
+  <div class="card"><h3>🎬 ตรวจจับวิดีโออัตโนมัติ</h3><p>สามชั้นพร้อมกัน: scan แท็ก <code>&lt;video&gt;</code> · hook <code>fetch</code>/<code>XHR</code>
+  จับ <code>.m3u8/.mpd/.mp4</code> · อ่าน performance resource-timing — เทคนิคเดียวกับส่วนขยายต้นแบบ</p></div>
+  <div class="card"><h3>⬇ ปุ่มดาวน์โหลดในหน้าเว็บ</h3><p>เลือก "ดาวน์โหลดอัตโนมัติ (ดีที่สุด)" หรือกด "รูปแบบ/คุณภาพ"
+  เพื่อเลือกความละเอียด/ขนาดไฟล์จริงจากข้อมูลของ yt-dlp</p></div>
+  <div class="card"><h3>📜 Log ละเอียด 3 ชั้น</h3><p><code>app.log</code> (หมุนเวียน 5MB×5) ·
+  <code>downloads.log</code> (output ของ yt-dlp ทุกบรรทัด) · <code>events.jsonl</code> (structured)
+  ดูย้อนได้ในแอป + ส่งออก diagnostics เป็น zip</p></div>
+</div>
+
+<h2><span class="n">02</span>ดูภาพจริงก่อนใช้</h2>
+<div class="grid2">
+  <figure><img src="assets/screenshot-browser-toolbar.png" alt="แถบเครื่องมือฉีดในหน้าเว็บ">
+  <figcaption>แถบเครื่องมือ + รายการวิดีโอที่ตรวจพบ (ฉีดในหน้าเว็บ)</figcaption></figure>
+  <figure><img src="assets/screenshot-control-center.png" alt="Control Center">
+  <figcaption>Control Center — คิวดาวน์โหลด, ความคืบหน้า, ยกเลิก</figcaption></figure>
+</div>
+<div class="grid2">
+  <figure><img src="assets/screenshot-logs.png" alt="Logs viewer">
+  <figcaption>ตัวอ่าน Logs — app.log / downloads.log / events.jsonl</figcaption></figure>
+  <figure><img src="assets/screenshot-android.png" alt="แอป Android">
+  <figcaption>แอป Android — WebView + ชิป "พบวิดีโอ" + bottom sheet</figcaption></figure>
+</div>
+
+<h2><span class="n">03</span>สถาปัตยกรรม</h2>
+<div class="full"><img src="assets/architecture.svg" alt="สถาปัตยกรรมระบบ">
+<figcaption>ทั้งสองแพลตฟอร์มใช้แนวคิดเดียวกัน: ตรวจจับในหน้าเว็บ → รายงานเข้า store → เอนจินดาวน์โหลด → log ทุกขั้น</figcaption></div>
+
+<h2><span class="n">04</span>ดาวน์โหลดและติดตั้ง</h2>
+<ol>
+  <li>ไปที่ <a href="index.html">หน้าดาวน์โหลด</a> — หน้านี้ดึง release ล่าสุดจาก GitHub API อัตโนมัติ พร้อมปุ่มดาวน์โหลดและ SHA256 checksum</li>
+  <li>เลือกไฟล์:
+    <ul>
+      <li><b>Windows:</b> <code>VDOGrabber-&lt;เวอร์ชัน&gt;-windows-x64.exe</code> — ดับเบิลคลิกใช้ได้เลย ไม่ต้องติดตั้ง Python (ต้องมี WebView2 Runtime ซึ่งมีในตัว Windows 10/11)</li>
+      <li><b>Android:</b> <code>VDOGrabber-&lt;เวอร์ชัน&gt;-android.apk</code> — ติดตั้งแบบ "อนุญาตแหล่งที่ไม่รู้จัก" ตามปกติ</li>
+    </ul></li>
+  <li>ครั้งแรกที่ดาวน์โหลดสตรีม HLS/DASH แอปจะดาวน์โหลด ffmpeg.exe ให้อัตโนมัติ (มี progress แสดง)</li>
+</ol>
+<div class="note">ตรวจความถูกต้องไฟล์: <code>certutil -hashfile VDOGrabber.exe SHA256</code> แล้วเทียบกับ checksum บนหน้าดาวน์โหลด</div>
+
+<h2><span class="n">05</span>วิธีใช้</h2>
+<ol>
+  <li>เปิดโปรแกรม → พิมพ์ URL (หรือค้นหาคำ จะเด้งไป DuckDuckGo ให้)</li>
+  <li>เล่นวิดีโอในหน้านั้น หรือกด <span class="kbd">🔍 ตรวจหาวิดีโอ</span> — ชิป <span class="kbd">🎬 วิดีโอ N</span> จะโชว์จำนวนที่พบ</li>
+  <li>กด <span class="kbd">⬇ ดาวน์โหลด</span> หรือ <span class="kbd">รูปแบบ/คุณภาพ</span> เพื่อเลือกเอง</li>
+  <li>ติดตามใน <span class="kbd">⚙️</span> → Control Center; ไฟล์จะอยู่ที่ <code>Downloads\VDOGrabber</code></li>
+</ol>
+
+<h2><span class="n">06</span>สร้างจากซอร์ส (สำหรับนักพัฒนา)</h2>
+<pre><code># Windows Desktop
+pip install -r requirements.txt
+python app/main.py              # รันจากซอร์ส
+python app/main.py --selftest   # ทดสอบ headless: engine + detection + ดาวน์โหลดจริง
+python scripts/make_icon.py     # สร้างไอคอน (Pillow)
+python scripts/build_exe.py     # แพ็ก dist/VDOGrabber.exe
+
+# Android (หรือใช้ GitHub Actions ปั่นให้อัตโนมัติ)
+cd android &amp;&amp; ./gradlew assembleDebug</code></pre>
+<p class="lead">โครงสร้าง repo: <code>app/</code> เดสก์ท็อป · <code>android/</code> แอป Kotlin ·
+<code>docs/</code> เอกสาร+หน้าเว็บ · <code>scripts/</code> เครื่องมือ build · <code>code/</code> ต้นแบบศึกษา (ไม่ publish)</p>
+
+<h2><span class="n">07</span>ข้อจำกัดที่ควรรู้</h2>
+<div class="warn"><b>ไม่รองรับ DRM</b> (Widevine/Netflix ฯลฯ) และเนื้อหาหลังล็อกอินบางประเภท ·
+บน Android ไฟล์ตรง (mp4/webm/mp3) ใช้ได้เต็มที่ ส่วน HLS/DASH แนะนำเดสก์ท็อป ·
+YouTube เปลี่ยนบ่อย ให้กด "อัปเดต yt-dlp" ในแท็บตั้งค่าเมื่อเจอปัญหา</div>
+<p>โปรดใช้ตามกฎหมายลิขสิทธิ์ของเนื้อหาที่ดาวน์โหลด · ซอร์สโค้ด MIT</p>
+
+</div>
+<footer><div class="wrap">VDO Grabber v1.0.0 · เอกสารชุดนี้อยู่ใน <code>docs/</code> ของ
+<a href="https://github.com/NarDecH/VDO_Download_APK">github.com/NarDecH/VDO_Download_APK</a></div></footer>
+</body>
+</html>

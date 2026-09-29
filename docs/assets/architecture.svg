@@ -1,0 +1,112 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 640" font-family="Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="hdr" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5f6d"/><stop offset="1" stop-color="#ffc371"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8db1"/>
+    </marker>
+  </defs>
+  <rect width="1180" height="640" fill="#0b1020" rx="14"/>
+  <text x="30" y="46" fill="#e8ecf4" font-size="24" font-weight="700">VDO Grabber — System Architecture</text>
+  <text x="30" y="70" fill="#7d8db1" font-size="13">เปิดเว็บ → ตรวจจับวิดีโอ → กดปุ่มดาวน์โหลด (เดสก์ท็อป + Android)</text>
+
+  <!-- ================= WINDOWS DESKTOP ================= -->
+  <rect x="28" y="96" width="680" height="512" rx="12" fill="#101830" stroke="#25335a"/>
+  <rect x="28" y="96" width="680" height="40" rx="12" fill="url(#hdr)"/>
+  <text x="44" y="122" fill="#fff" font-size="15" font-weight="700">Windows Desktop — VDOGrabber.exe (PyInstaller, ไม่ต้องติดตั้ง Python)</text>
+
+  <!-- browser window -->
+  <rect x="52" y="156" width="300" height="216" rx="10" fill="#0b1120" stroke="#2a3a5c"/>
+  <text x="68" y="180" fill="#ffc371" font-size="13" font-weight="700">Browser Window (WebView2)</text>
+  <rect x="68" y="192" width="268" height="26" rx="6" fill="#16213e"/>
+  <text x="78" y="210" fill="#93a4c3" font-size="11">←  →  ⟳  [ URL ของผู้ใช้ ]   🔍  🎬 2  ⚙</text>
+  <rect x="68" y="226" width="268" height="132" rx="6" fill="#131c33"/>
+  <text x="80" y="246" fill="#93a4c3" font-size="11">เว็บเป้าหมายที่กำลังเปิดอยู่</text>
+  <rect x="86" y="256" width="232" height="86" rx="6" fill="#1c2a4a"/>
+  <text x="100" y="278" fill="#8fb7ff" font-size="11">▶ วิดีโอที่กำลังแสดง (video tag / MSE)</text>
+  <text x="100" y="296" fill="#7d8db1" font-size="10.5">injected: DETECT_JS + TOOLBAR_JS</text>
+  <text x="100" y="314" fill="#7d8db1" font-size="10.5">DOM scan · fetch/XHR hooks · resource timing</text>
+  <text x="100" y="332" fill="#7d8db1" font-size="10.5">รายงานเข้า pywebview.api.report_media()</text>
+
+  <!-- control center -->
+  <rect x="52" y="392" width="300" height="190" rx="10" fill="#0b1120" stroke="#2a3a5c"/>
+  <text x="68" y="416" fill="#ffc371" font-size="13" font-weight="700">Control Center (HTML UI)</text>
+  <text x="68" y="438" fill="#93a4c3" font-size="11">⬇ Downloads: คิว/ความคืบหน้า/ยกเลิก</text>
+  <text x="68" y="458" fill="#93a4c3" font-size="11">🎬 วิดีโอที่ตรวจพบทั้งหมด (dedupe)</text>
+  <text x="68" y="478" fill="#93a4c3" font-size="11">📜 Logs viewer: app.log / downloads.log</text>
+  <text x="68" y="498" fill="#93a4c3" font-size="11">⚙ Settings: โฟลเดอร์/UA/คู่ขนาน/ระดับ log</text>
+  <text x="68" y="530" fill="#5c6b8c" font-size="10.5">สื่อสารกับ Python ผ่าน window.pywebview.api</text>
+
+  <!-- python core -->
+  <rect x="392" y="156" width="292" height="250" rx="10" fill="#0b1120" stroke="#2a3a5c"/>
+  <text x="408" y="180" fill="#ffc371" font-size="13" font-weight="700">Python Core (app/core/)</text>
+  <rect x="408" y="192" width="260" height="46" rx="6" fill="#16213e"/>
+  <text x="420" y="211" fill="#e8ecf4" font-size="11.5" font-weight="600">main.py — App + Api bridge</text>
+  <text x="420" y="228" fill="#7d8db1" font-size="10.5">watchdog re-inject · push events → UI</text>
+  <rect x="408" y="246" width="260" height="46" rx="6" fill="#16213e"/>
+  <text x="420" y="265" fill="#e8ecf4" font-size="11.5" font-weight="600">detector.py — สคริปต์ตรวจจับวิดีโอ</text>
+  <text x="420" y="282" fill="#7d8db1" font-size="10.5">MediaStore dedupe (300 รายการ)</text>
+  <rect x="408" y="300" width="260" height="46" rx="6" fill="#16213e"/>
+  <text x="420" y="319" fill="#e8ecf4" font-size="11.5" font-weight="600">downloader.py — DownloadManager</text>
+  <text x="420" y="336" fill="#7d8db1" font-size="10.5">คิวพร้อมกัน · progress parser · cancel</text>
+  <rect x="408" y="354" width="260" height="40" rx="6" fill="#16213e"/>
+  <text x="420" y="373" fill="#e8ecf4" font-size="11.5" font-weight="600">logger.py / settings.py / ytdlp_mgr.py</text>
+
+  <!-- engines -->
+  <rect x="392" y="424" width="292" height="158" rx="10" fill="#0b1120" stroke="#2a3a5c"/>
+  <text x="408" y="448" fill="#ffc371" font-size="13" font-weight="700">Download Engines</text>
+  <rect x="408" y="460" width="126" height="52" rx="6" fill="#14532d"/>
+  <text x="420" y="482" fill="#bbf7d0" font-size="11.5" font-weight="700">yt-dlp.exe</text>
+  <text x="420" y="500" fill="#86efac" font-size="10">bundle ใน exe →</text>
+  <text x="420" y="514" fill="#86efac" font-size="10">%APPDATA% + อัปเดตได้</text>
+  <rect x="544" y="460" width="126" height="52" rx="6" fill="#78350f"/>
+  <text x="556" y="482" fill="#fde68a" font-size="11.5" font-weight="700">ffmpeg.exe</text>
+  <text x="556" y="500" fill="#fcd34d" font-size="10">ดาวน์โหลดอัตโนมัติ</text>
+  <text x="556" y="514" fill="#fcd34d" font-size="10">ครั้งแรกเมื่อจำเป็น (HLS/DASH)</text>
+  <text x="408" y="540" fill="#7d8db1" font-size="10.5">ปลายทาง: ~/Downloads/VDOGrabber/ · รองรับ mp4 · m3u8 · mpd · YouTube ฯลฯ</text>
+  <text x="408" y="560" fill="#5c6b8c" font-size="10.5">โหมดบันทึก: --selftest สำหรับ CI/packaging</text>
+
+  <!-- logs box -->
+  <rect x="52" y="596" width="632" height="0" fill="none"/>
+
+  <!-- ================= ANDROID ================= -->
+  <rect x="736" y="96" width="416" height="330" rx="12" fill="#101830" stroke="#25335a"/>
+  <rect x="736" y="96" width="416" height="40" rx="12" fill="url(#hdr)"/>
+  <text x="752" y="122" fill="#fff" font-size="15" font-weight="700">Android App (Kotlin) — CI ปั่น APK</text>
+
+  <rect x="760" y="156" width="368" height="120" rx="10" fill="#0b1120" stroke="#2a3a5c"/>
+  <text x="776" y="178" fill="#ffc371" font-size="12.5" font-weight="700">MainActivity (WebView)</text>
+  <text x="776" y="198" fill="#93a4c3" font-size="10.5">URL bar · แชร์ลิงก์เข้าแอป · back-stack</text>
+  <text x="776" y="216" fill="#7d8db1" font-size="10.5">Detector.INJECT_JS (DOM scan + fetch/XHR hooks)</text>
+  <text x="776" y="234" fill="#7d8db1" font-size="10.5">shouldInterceptRequest = ดัก request สื่อระดับ native</text>
+  <text x="776" y="252" fill="#7d8db1" font-size="10.5">AndroidBridge.reportMedia → MediaStore → chip "พบวิดีโอ N"</text>
+  <text x="776" y="268" fill="#7d8db1" font-size="10.5">bottom sheet: ดาวน์โหลด / คัดลอกลิงก์</text>
+
+  <rect x="760" y="292" width="176" height="70" rx="10" fill="#14532d"/>
+  <text x="776" y="316" fill="#bbf7d0" font-size="12" font-weight="700">DownloadManager</text>
+  <text x="776" y="334" fill="#86efac" font-size="10">ไฟล์ตรง mp4/webm/mp3…</text>
+  <text x="776" y="350" fill="#86efac" font-size="10">→ Downloads/VDOGrabber</text>
+  <rect x="952" y="292" width="176" height="70" rx="10" fill="#78350f"/>
+  <text x="968" y="316" fill="#fde68a" font-size="12" font-weight="700">m3u8/mpd</text>
+  <text x="968" y="334" fill="#fcd34d" font-size="10">แจ้งให้ใช้เวอร์ชันเดสก์ท็อป</text>
+  <text x="968" y="350" fill="#fcd34d" font-size="10">(roadmap: ฝัง yt-dlp)</text>
+
+  <rect x="760" y="378" width="368" height="36" rx="8" fill="#16213e"/>
+  <text x="776" y="401" fill="#93a4c3" font-size="10.5">FileLog.kt — app.log · downloads.log · events.jsonl + LogsActivity</text>
+
+  <!-- ================= LOGS ================= -->
+  <rect x="736" y="450" width="416" height="158" rx="12" fill="#101830" stroke="#25335a"/>
+  <rect x="736" y="450" width="416" height="36" rx="12" fill="#1f2c52"/>
+  <text x="752" y="474" fill="#fff" font-size="14" font-weight="700">ระบบ Log ละเอียด (สองแพลตฟอร์มเหมือนกัน)</text>
+  <text x="752" y="502" fill="#93a4c3" font-size="11">app.log — เหตุการณ์ทุกขั้น DEBUG หมุนเวียน 5MB × 5</text>
+  <text x="752" y="522" fill="#93a4c3" font-size="11">downloads.log — บรรทัด output ของ yt-dlp ทุกบรรทัด</text>
+  <text x="752" y="542" fill="#93a4c3" font-size="11">events.jsonl — เหตุการณ์ structured (วิเคราะห์/ดีบัก)</text>
+  <text x="752" y="562" fill="#5c6b8c" font-size="10.5">+ Export diagnostics (zip) · เปิดโฟลเดอร์ log จาก UI</text>
+  <text x="752" y="588" fill="#5c6b8c" font-size="10.5">Windows: %APPDATA%\VDOGrabber\logs · Android: filesDir/logs</text>
+
+  <!-- arrows -->
+  <path d="M352 264 L392 264" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)" fill="none"/>
+  <path d="M392 470 C 380 470 372 470 352 470" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)" fill="none"/>
+  <path d="M538 570 C 620 620 700 560 752 520" stroke="#7d8db1" stroke-width="1.5" stroke-dasharray="4 4" fill="none" opacity="0.6"/>
+</svg>

@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 700" font-family="Segoe UI, sans-serif">
+  <defs>
+    <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#ff9f6d"/>
+    </marker>
+  </defs>
+  <rect width="1180" height="700" fill="#0b1020" rx="14"/>
+  <text x="30" y="46" fill="#e8ecf4" font-size="24" font-weight="700">Reference Extension — "Video Download Helper" v10.5.49.2 (MV3)</text>
+  <text x="30" y="70" fill="#7d8db1" font-size="13">ผังข้อมูลที่วิเคราะห์ได้จากโฟลเดอร์ code/ — ใช้เป็นต้นแบบของ VDO Grabber (รายละเอียดใน docs/research)</text>
+
+  <!-- sources -->
+  <rect x="30" y="110" width="250" height="270" rx="10" fill="#131c33" stroke="#25335a"/>
+  <text x="46" y="136" fill="#ffc371" font-size="14" font-weight="700">แหล่งตรวจจับ (producers)</text>
+  <rect x="46" y="150" width="218" height="40" rx="6" fill="#1c2a4a"/>
+  <text x="56" y="167" fill="#e8ecf4" font-size="11" font-weight="600">service/main.js — webRequest sniffer</text>
+  <text x="56" y="183" fill="#7d8db1" font-size="10">onSendHeaders + onResponseStarted</text>
+  <rect x="46" y="198" width="218" height="40" rx="6" fill="#1c2a4a"/>
+  <text x="56" y="215" fill="#e8ecf4" font-size="11" font-weight="600">injected/*_untrusted.js (MAIN world)</text>
+  <text x="56" y="231" fill="#7d8db1" font-size="10">poll page config: playerConfig, ytcfg…</text>
+  <rect x="46" y="246" width="218" height="40" rx="6" fill="#1c2a4a"/>
+  <text x="56" y="263" fill="#e8ecf4" font-size="11" font-weight="600">injected/*.js (ISOLATED extractors)</text>
+  <text x="56" y="279" fill="#7d8db1" font-size="10">youtube/vimeo/kick/bilibili API calls</text>
+  <rect x="46" y="294" width="218" height="40" rx="6" fill="#1c2a4a"/>
+  <text x="56" y="311" fill="#e8ecf4" font-size="11" font-weight="600">xgplayer/javrank _untrusted</text>
+  <text x="56" y="327" fill="#7d8db1" font-size="10">hook XMLHttpRequest.open / fetch</text>
+  <text x="46" y="358" fill="#5c6b8c" font-size="10">แชร์บัส: BroadcastChannel("worker_service")</text>
+
+  <!-- parser -->
+  <rect x="330" y="110" width="250" height="270" rx="10" fill="#131c33" stroke="#25335a"/>
+  <text x="346" y="136" fill="#ffc371" font-size="14" font-weight="700">ตัวแยกประเภท (service worker)</text>
+  <rect x="346" y="150" width="218" height="46" rx="6" fill="#14532d"/>
+  <text x="356" y="168" fill="#bbf7d0" font-size="11" font-weight="600">HLS: .m3u8 / content-type mpegurl</text>
+  <text x="356" y="186" fill="#86efac" font-size="10">refetch ด้วย header ที่จับได้ → parse playlist</text>
+  <rect x="346" y="204" width="218" height="46" rx="6" fill="#78350f"/>
+  <text x="356" y="222" fill="#fde68a" font-size="11" font-weight="600">DASH: .mpd / /dash/</text>
+  <text x="356" y="240" fill="#fcd34d" font-size="10">parse MPD (บางเว็บสลับเป็น .m3u8 ให้)</text>
+  <rect x="346" y="258" width="218" height="46" rx="6" fill="#1e3a5f"/>
+  <text x="356" y="276" fill="#bfdbfe" font-size="11" font-weight="600">Direct: http_playlist</text>
+  <text x="356" y="294" fill="#93c5fd" font-size="10">content-type/disposition · &gt;500KB · byte-ranges</text>
+  <rect x="346" y="312" width="218" height="46" rx="6" fill="#3b1e5f"/>
+  <text x="356" y="330" fill="#ddd6fe" font-size="11" font-weight="600">YouTube: youtube_format</text>
+  <text x="356" y="348" fill="#c4b5fd" font-size="10">streamingData.formats · itag · po_token</text>
+
+  <!-- aggregate -->
+  <rect x="630" y="110" width="220" height="270" rx="10" fill="#131c33" stroke="#25335a"/>
+  <text x="646" y="136" fill="#ffc371" font-size="14" font-weight="700">รวมสถานะ + UI</text>
+  <rect x="646" y="150" width="188" height="56" rx="6" fill="#1c2a4a"/>
+  <text x="656" y="170" fill="#e8ecf4" font-size="11" font-weight="600">state.discovered</text>
+  <text x="656" y="188" fill="#7d8db1" font-size="10">Map&lt;tab, Map&lt;media_hash&gt;&gt; (LRU 30)</text>
+  <rect x="646" y="214" width="188" height="56" rx="6" fill="#1c2a4a"/>
+  <text x="656" y="234" fill="#e8ecf4" font-size="11" font-weight="600">content/panel.js (sidebar)</text>
+  <text x="656" y="252" fill="#7d8db1" font-size="10">com-media-discovered · เลือกคุณภาพ</text>
+  <rect x="646" y="278" width="188" height="56" rx="6" fill="#1c2a4a"/>
+  <text x="656" y="298" fill="#e8ecf4" font-size="11" font-weight="600">เมนู: download / download_as</text>
+  <text x="656" y="316" fill="#7d8db1" font-size="10">audio-only · preview · history</text>
+  <text x="646" y="364" fill="#5c6b8c" font-size="10">จำกัดสิทธิ: lsd counter + entitlement (QuickJS)</text>
+
+  <!-- worker -->
+  <rect x="900" y="110" width="250" height="270" rx="10" fill="#131c33" stroke="#25335a"/>
+  <text x="916" y="136" fill="#ffc371" font-size="14" font-weight="700">ดาวน์โหลด + remux</text>
+  <rect x="916" y="150" width="218" height="46" rx="6" fill="#1c2a4a"/>
+  <text x="926" y="168" fill="#e8ecf4" font-size="11" font-weight="600">factory (offscreen) → Worker</text>
+  <text x="926" y="186" fill="#7d8db1" font-size="10">16 strategies: m3u8_audio_video_two_sources…</text>
+  <rect x="916" y="204" width="218" height="46" rx="6" fill="#4a1d24"/>
+  <text x="926" y="222" fill="#fecaca" font-size="11" font-weight="600">libav WASM (6.5.7.1 h264-aac-mp3)</text>
+  <text x="926" y="240" fill="#fca5a5" font-size="10">avformat_alloc_output… write_frame</text>
+  <rect x="916" y="258" width="218" height="46" rx="6" fill="#1c2a4a"/>
+  <text x="926" y="276" fill="#e8ecf4" font-size="11" font-weight="600">เขียนลง OPFS → blob URL</text>
+  <text x="926" y="294" fill="#7d8db1" font-size="10">navigator.storage.getDirectory()</text>
+  <rect x="916" y="312" width="218" height="46" rx="6" fill="#14532d"/>
+  <text x="926" y="330" fill="#bbf7d0" font-size="11" font-weight="600">chrome.downloads.download</text>
+  <text x="926" y="348" fill="#86efac" font-size="10">onDeterminingFilename → เปลี่ยนชื่อไฟล์</text>
+
+  <!-- arrows across -->
+  <path d="M280 245 L330 245" stroke="#ff9f6d" stroke-width="2" marker-end="url(#arr2)" fill="none"/>
+  <path d="M580 245 L630 245" stroke="#ff9f6d" stroke-width="2" marker-end="url(#arr2)" fill="none"/>
+  <path d="M850 245 L900 245" stroke="#ff9f6d" stroke-width="2" marker-end="url(#arr2)" fill="none"/>
+
+  <!-- mapping to VDO Grabber -->
+  <rect x="30" y="420" width="1120" height="240" rx="12" fill="#101830" stroke="#25335a"/>
+  <rect x="30" y="420" width="1120" height="38" rx="12" fill="#1f2c52"/>
+  <text x="46" y="445" fill="#fff" font-size="14" font-weight="700">แปลงเป็น VDO Grabber (standalone ไม่มี browser APIs)</text>
+
+  <text x="46" y="486" fill="#7d8db1" font-size="11">webRequest sniffer (MV3)</text>
+  <text x="300" y="486" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="486" fill="#ffc371" font-size="11" font-weight="600">Desktop: fetch/XHR hooks + resource timing ในหน้า</text>
+  <text x="800" y="486" fill="#93a4c3" font-size="11">|</text>
+  <text x="830" y="486" fill="#ffc371" font-size="11" font-weight="600">Android: shouldInterceptRequest (native)</text>
+
+  <text x="46" y="516" fill="#7d8db1" font-size="11">BroadcastChannel bus</text>
+  <text x="300" y="516" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="516" fill="#ffc371" font-size="11" font-weight="600">pywebview.api bridge (JS ↔ Python) / JavascriptInterface (JS ↔ Kotlin)</text>
+
+  <text x="46" y="546" fill="#7d8db1" font-size="11">libav WASM muxer</text>
+  <text x="300" y="546" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="546" fill="#ffc371" font-size="11" font-weight="600">yt-dlp + ffmpeg (subprocess) — แข็งแรงกว่า, อัปเดตตาม upstream ได้</text>
+
+  <text x="46" y="576" fill="#7d8db1" font-size="11">chrome.downloads + rename</text>
+  <text x="300" y="576" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="576" fill="#ffc371" font-size="11" font-weight="600">โฟลเดอร์ ~/Downloads/VDOGrabber + ตั้งชื่อ "%(title)s [%(id)s].%(ext)s" / DownloadManager บน Android</text>
+
+  <text x="46" y="606" fill="#7d8db1" font-size="11">sidebar UI (Lit)</text>
+  <text x="300" y="606" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="606" fill="#ffc371" font-size="11" font-weight="600">toolbar+panel แบบ inject ในหน้า (Shadow DOM) + Control Center window</text>
+
+  <text x="46" y="636" fill="#7d8db1" font-size="11">entitlement/limiter</text>
+  <text x="300" y="636" fill="#93a4c3" font-size="11">→</text>
+  <text x="330" y="636" fill="#ffc371" font-size="11" font-weight="600">ไม่มี — MIT, ไม่จำกัดจำนวน (คิวคู่ขนานตาม settings.max_concurrent)</text>
+</svg>

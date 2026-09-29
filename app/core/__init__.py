@@ -1,0 +1,1 @@
+"""VDO Grabber core package."""

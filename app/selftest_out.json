@@ -1,0 +1,102 @@
+{
+  "ytdlp": {
+    "ok": true,
+    "version": "2026.08.19"
+  },
+  "detection": {
+    "ok": true,
+    "found": [
+      {
+        "kind": "mp4",
+        "via": "video element",
+        "url": "http://127.0.0.1:56092/dom-video.mp4"
+      },
+      {
+        "kind": "m3u8",
+        "via": "link: linked playlist",
+        "url": "http://127.0.0.1:56092/linked.m3u8"
+      },
+      {
+        "kind": "m3u8",
+        "via": "network (timing)",
+        "url": "http://127.0.0.1:56092/hooked/master.m3u8"
+      },
+      {
+        "kind": "mpd",
+        "via": "network (timing)",
+        "url": "http://127.0.0.1:56092/hooked/manifest.mpd"
+      }
+    ]
+  },
+  "events": [
+    [
+      "download_update",
+      {
+        "id": "f609a6a3ff17",
+        "url": "http://127.0.0.1:56092/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 0.0,
+        "speed": "",
+        "eta": "",
+        "downloaded": 0,
+        "total": 0,
+        "filepath": "",
+        "error": "",
+        "created": 1790644244.1058402,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "f609a6a3ff17",
+        "url": "http://127.0.0.1:56092/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "done",
+        "percent": 100.0,
+        "speed": "35.72MiB/s",
+        "eta": "NA",
+        "downloaded": 262144,
+        "total": 0,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790644244.1058402,
+        "finished": 1790644246.1227615,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "f609a6a3ff17",
+        "url": "http://127.0.0.1:56092/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "done",
+        "percent": 100.0,
+        "speed": "35.72MiB/s",
+        "eta": "NA",
+        "downloaded": 262144,
+        "total": 0,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790644244.1058402,
+        "finished": 1790644246.1227615,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ]
+  ],
+  "download": {
+    "ok": true,
+    "status": "done",
+    "file": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+    "error": ""
+  }
+}

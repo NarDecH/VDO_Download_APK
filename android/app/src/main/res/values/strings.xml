@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">VDO Grabber</string>
+    <string name="back">ย้อนกลับ</string>
+    <string name="forward">ไปหน้าถัดไป</string>
+    <string name="reload">รีโหลด</string>
+    <string name="url_hint">ป้อน URL หรือค้นหา…</string>
+    <string name="found_chip">🎬 พบวิดีโอ %1$d</string>
+    <string name="found_title">วิดีโอที่ตรวจพบ (%1$d)</string>
+    <string name="no_media">ยังไม่พบวิดีโอ — เล่นวิดีโอในหน้าเว็บสักครู่ แล้วแตะปุ่มอีกครั้ง</string>
+    <string name="download">⬇ ดาวน์โหลด</string>
+    <string name="copy_link">คัดลอกลิงก์</string>
+    <string name="copied">คัดลอกลิงก์แล้ว</string>
+    <string name="download_started">เริ่มดาวน์โหลดแล้ว — ดูความคืบหน้าในแถบแจ้งเตือน</string>
+    <string name="download_failed">ดาวน์โหลดไม่สำเร็จ: %1$s</string>
+    <string name="stream_title">HLS/DASH Stream</string>
+    <string name="stream_msg">ลิงก์นี้เป็นสตรีมแบบแบ่งส่วน (m3u8/mpd) ที่ต้องผ่านการรวมไฟล์ — ให้ใช้ VDO Grabber เวอร์ชันเดสก์ท็อป (VDOGrabber.exe) ซึ่งมี yt-dlp + ffmpeg ในตัว\n\nลิงก์: %1$s</string>
+    <string name="logs_title">Logs</string>
+    <string name="refresh">รีเฟรช</string>
+</resources>

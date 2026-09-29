@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>VDO Grabber — Android demo (docs screenshot)</title>
+<style>
+  html,body{margin:0;height:100%;background:#12182a;display:flex;align-items:center;justify-content:center;
+    font-family:'Segoe UI',system-ui,sans-serif}
+  .phone{width:390px;height:800px;border-radius:38px;border:10px solid #05070d;background:#0B1020;
+    box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden;display:flex;flex-direction:column;position:relative}
+  .cam{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:90px;height:16px;border-radius:9px;background:#05070d;z-index:5}
+  .bar{display:flex;align-items:center;gap:4px;height:50px;padding:22px 8px 0;background:#101830;color:#e8ecf4;font-size:12px;flex-shrink:0}
+  .bar .ico{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#cdd6e6}
+  .bar .url{flex:1;background:#0B1120;border:1px solid #2a3a5c;border-radius:8px;height:36px;display:flex;align-items:center;padding:0 10px;color:#e8ecf4;font-size:11.5px}
+  .page{flex:1;background:#fff;padding:52px 16px 16px;color:#1a2233;overflow:hidden}
+  .page h2{font-size:17px;margin:0 0 6px}
+  .page p{font-size:12px;color:#5a6b85;margin:0 0 12px}
+  .video{height:190px;border-radius:12px;background:linear-gradient(135deg,#26415e,#101d33);display:flex;align-items:center;justify-content:center;color:#8fb7ff;font-size:13px}
+  .prog{height:3px;background:#FF5F6D;width:70%}
+  .bot{display:flex;align-items:center;justify-content:center;height:54px;background:#101830;flex-shrink:0}
+  .chip{background:linear-gradient(90deg,#FF5F6D,#FFC371);color:#fff;font-weight:700;font-size:13px;border-radius:19px;padding:9px 20px;box-shadow:0 4px 14px rgba(255,95,109,.4)}
+  .sheet{position:absolute;left:0;right:0;bottom:54px;background:#131c33;border-radius:18px 18px 0 0;padding:16px;color:#e8ecf4;box-shadow:0 -10px 40px rgba(0,0,0,.5)}
+  .sheet h4{margin:0 0 10px;font-size:13px;color:#93a4c3}
+  .item{border:1px solid #233152;border-radius:10px;padding:10px;margin-bottom:8px;background:#0f1729}
+  .item b{display:block;font-size:13px;color:#f1f5f9}
+  .item small{color:#7d8db1;font-size:10.5px;word-break:break-all}
+  .btnrow{display:flex;gap:8px;margin-top:8px}
+  .dl{background:#16a34a;color:#fff;border-radius:7px;padding:5px 12px;font-weight:600;font-size:11.5px}
+  .cp{background:#243354;color:#cdd6e6;border-radius:7px;padding:5px 12px;font-size:11.5px}
+</style>
+</head>
+<body>
+<div class="phone">
+  <div class="cam"></div>
+  <div class="bar">
+    <span class="ico">◀</span><span class="ico">▶</span><span class="ico">⟳</span>
+    <span class="url">https://example-travel.com/thailand-4k</span>
+    <span class="ico">☰</span>
+  </div>
+  <div class="prog"></div>
+  <div class="page">
+    <h2>Thailand Travel Blog — เที่ยวภูเก็ต 4K</h2>
+    <p>หน้าเว็บตัวอย่าง (mock) แสดงวิดีโอที่กำลังเล่นอยู่</p>
+    <div class="video">▶ กำลังเล่น — 1920×1080</div>
+  </div>
+  <div class="sheet">
+    <h4>🎬 วิดีโอที่ตรวจพบ (2)</h4>
+    <div class="item">
+      <b>video element · mp4 · 1920×1080</b>
+      <small>https://cdn.example-travel.com/clips/phuket-drone-4k.mp4</small>
+      <div class="btnrow"><span class="dl">⬇ ดาวน์โหลด</span><span class="cp">คัดลอกลิงก์</span></div>
+    </div>
+    <div class="item">
+      <b>network request · m3u8</b>
+      <small>https://stream.example-travel.com/hls/master.m3u8</small>
+      <div class="btnrow"><span class="dl">⬇ ดาวน์โหลด</span><span class="cp">คัดลอกลิงก์</span></div>
+    </div>
+  </div>
+  <div class="bot"><span class="chip">🎬 พบวิดีโอ 2</span></div>
+</div>
+</body>
+</html>

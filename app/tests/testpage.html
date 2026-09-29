@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>VDO Grabber selftest page</title></head>
+<body>
+<h1>selftest page</h1>
+<!-- DOM-scan target: a plain video element -->
+<video id="v" width="320" height="180" controls
+       src="http://127.0.0.1:__PORT__/dom-video.mp4"></video>
+<!-- link target -->
+<a href="http://127.0.0.1:__PORT__/linked.m3u8">linked playlist</a>
+<script>
+  // network-hook target: a fetch() of an HLS manifest (no <video> tag involved)
+  setTimeout(function () {
+    fetch("http://127.0.0.1:__PORT__/hooked/master.m3u8").catch(function () {});
+    var x = new XMLHttpRequest();
+    x.open("GET", "http://127.0.0.1:__PORT__/hooked/manifest.mpd");
+    try { x.send(); } catch (e) {}
+  }, 300);
+</script>
+</body>
+</html>

@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber — ดาวน์โหลด</title>
+<style>
+:root{--bg:#0b1020;--bg2:#101830;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371;--grn:#16a34a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.7 'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+.wrap{max-width:940px;margin:0 auto;padding:0 22px;width:100%}
+nav.top{background:rgba(11,16,32,.92);border-bottom:1px solid var(--line);position:sticky;top:0;backdrop-filter:blur(8px);z-index:10}
+nav.top .wrap{display:flex;gap:4px;align-items:center;padding:9px 22px}
+nav a{color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600}
+nav a:hover,nav a.on{background:#1a2547;color:#fff}
+nav .logo-sm{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px}
+.hero{background:radial-gradient(1200px 500px at 50% -80px,#26183a 0%,transparent 60%),var(--bg);text-align:center;padding:58px 0 40px;border-bottom:1px solid var(--line)}
+.logo-lg{width:84px;height:84px;border-radius:22px;background:linear-gradient(135deg,var(--acc),var(--acc2));
+  display:inline-flex;align-items:center;justify-content:center;font-size:38px;box-shadow:0 16px 50px rgba(255,95,109,.35)}
+h1{font-size:38px;margin:18px 0 8px}
+h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);max-width:600px;margin:0 auto}
+main{flex:1;padding:34px 0 50px}
+.release-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 28px;margin-bottom:22px}
+.vrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.vtag{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:800;border-radius:10px;padding:5px 16px;font-size:19px}
+.vtag-latest{background:#14532d;color:#86efac;border-radius:8px;padding:3px 11px;font-size:12px;font-weight:700}
+.vdate{color:var(--dim);font-size:13.5px}
+.assets{display:grid;gap:14px;margin-top:20px}
+.asset{background:#0f1729;border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.asset .ico{font-size:30px}
+.asset .meta{flex:1;min-width:220px}
+.asset .name{font-weight:700;font-size:15px;word-break:break-all}
+.asset .facts{color:var(--faint);font-size:12.5px;margin-top:3px}
+.btn{all:unset;cursor:pointer;padding:10px 20px;border-radius:10px;font-weight:700;font-size:14px}
+.btn.grn{background:var(--grn);color:#fff}.btn.grn:hover{background:#15803d}
+.btn.ghost{background:#1a2547;border:1px solid var(--line);color:var(--txt)}.btn.ghost:hover{background:#243354}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.checksum{margin-top:12px;background:#070b16;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  font:12px Consolas,monospace;color:#b7c4de;word-break:break-all;display:flex;gap:10px;align-items:flex-start}
+.checksum .lbl{color:var(--acc2);font-weight:700;flex-shrink:0;font-family:'Segoe UI',sans-serif;font-size:11.5px;padding-top:1px}
+.copy{all:unset;cursor:pointer;color:#7fb3ff;font-size:11.5px;flex-shrink:0;padding-top:1px;font-family:'Segoe UI',sans-serif}
+.notes{margin-top:18px;border-top:1px dashed var(--line);padding-top:14px;color:#c9d4e8;font-size:14px}
+.notes h4{color:var(--acc2);font-size:13.5px;margin-bottom:8px}
+.notes pre{white-space:pre-wrap;font:13.5px/1.7 'Segoe UI',sans-serif}
+.spin{display:inline-block;width:16px;height:16px;border:2.5px solid #64748b;border-top-color:#e2e8f0;border-radius:50%;
+  animation:s .7s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes s{to{transform:rotate(360deg)}}
+.state{color:var(--dim);text-align:center;padding:34px 0}
+.grid-feat{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-top:8px}
+.feat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}
+.feat .ic{font-size:24px}
+.feat b{display:block;margin:8px 0 4px}
+.feat p{color:var(--dim);font-size:13px;line-height:1.6}
+h2{font-size:22px;margin:34px 0 14px}
+footer{border-top:1px solid var(--line);padding:24px 0;color:var(--faint);font-size:13px;text-align:center}
+a{color:#7fb3ff}
+.err{color:#f87171}
+@media(max-width:640px){h1{font-size:28px}.asset{flex-direction:column;align-items:flex-start}}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <span class="logo-sm">▼</span><b style="font-size:14px">VDO Grabber</b>
+  <span style="flex:1"></span>
+  <a href="index.html" class="on">⬇ ดาวน์โหลด</a>
+  <a href="readme.html">README</a>
+  <a href="research.html">RESEARCH</a>
+  <a href="changelog.html">CHANGELOG</a>
+</div></nav>
+
+<section class="hero"><div class="wrap">
+  <div class="logo-lg">▼</div>
+  <h1>VDO <span>Grabber</span> — ดาวน์โหลด</h1>
+  <p class="sub">เปิดหน้าเว็บที่คุณต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่<br>
+  หน้านี้ดึงข้อมูล release ล่าสุดจาก GitHub API อัตโนมัติ</p>
+</div></section>
+
+<main class="wrap">
+
+  <div class="release-card" id="release">
+    <div class="state"><span class="spin"></span>กำลังดึงข้อมูล release ล่าสุดจาก GitHub API…</div>
+  </div>
+
+  <h2>ทำไมต้อง VDO Grabber</h2>
+  <div class="grid-feat">
+    <div class="feat"><span class="ic">🌐</span><b>เบราว์เซอร์ในตัว</b><p>พิมพ์ URL แล้วใช้งานได้เลย มีแถบเครื่องมือของแอปฉีดบนทุกหน้าเว็บ</p></div>
+    <div class="feat"><span class="ic">🎬</span><b>ตรวจจับวิดีโอ 3 ชั้น</b><p>DOM scan + hook fetch/XHR จับ m3u8/mpd + resource timing</p></div>
+    <div class="feat"><span class="ic">🚀</span><b>เอนจิน yt-dlp + ffmpeg</b><p>mp4 / HLS / DASH / YouTube ฯลฯ เลือกคุณภาพได้</p></div>
+    <div class="feat"><span class="ic">📜</span><b>Log ละเอียด</b><p>app.log · downloads.log · events.jsonl ดูในแอปและส่งออกได้</p></div>
+  </div>
+
+  <h2>รู้ก่อนติดตั้ง</h2>
+  <div class="release-card" style="margin-bottom:0">
+    <p style="margin-top:0">✅ <b>Windows:</b> ไฟล์เดียวจบ ดับเบิลคลิกได้ทันที ไม่ต้องติดตั้ง Python
+    (ต้องมี WebView2 Runtime — มีในตัว Windows 10/11) · ถ้า Windows Defender SmartScreen เตือนเพราะไฟล์ไม่ได้ sign
+    ให้กด "More info → Run anyway"</p>
+    <p>✅ <b>Android:</b> ติดตั้งแบบอนุญาต "แหล่งที่ไม่รู้จัก" ตามปกติ · ดาวน์โหลดไฟล์ตรง (mp4/webm/mp3)
+    ได้เต็มรูปแบบ ส่วน HLS/DASH ให้ใช้เวอร์ชันเดสก์ท็อป</p>
+    <p style="margin-bottom:0">🔐 <b>ตรวจไฟล์:</b> ใช้คำสั่ง <code style="background:#0b1120;border:1px solid #25335a;border-radius:6px;padding:1.5px 7px;font-family:Consolas,monospace;color:#ffc371">certutil -hashfile ไฟล์.exe SHA256</code>
+    แล้วเทียบกับ checksum ที่แสดงข้างบน (ดึงจาก GitHub API / ไฟล์ checksums.txt ของ release)</p>
+  </div>
+</main>
+
+<footer><div class="wrap">
+  VDO Grabber · <a href="https://github.com/NarDecH/VDO_Download_APK">GitHub</a> ·
+  <a href="https://github.com/NarDecH/VDO_Download_APK/releases">Releases ทั้งหมด</a> · MIT License
+</div></footer>
+
+<script>
+const REPO = "NarDecH/VDO_Download_APK";
+const API = "https://api.github.com/repos/" + REPO + "/releases/latest";
+const $ = (h) => { const d = document.createElement("div"); d.innerHTML = h; return d; };
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function fmtBytes(n){ if(!n && n!==0) return ""; const u=["B","KB","MB","GB"]; let i=0; while(n>=1024&&i<3){n/=1024;i++} return n.toFixed(i?1:0)+" "+u[i]; }
+
+function assetIcon(name){
+  if(/\.exe$/i.test(name)) return "🪟";
+  if(/\.apk$/i.test(name)) return "🤖";
+  return "📦";
+}
+function assetTitle(name){
+  if(/windows|\.exe$/i.test(name)) return "สำหรับ Windows — ไฟล์เดียว ไม่ต้องติดตั้ง Python";
+  if(/android|\.apk$/i.test(name)) return "สำหรับ Android — ติดตั้งได้ทันที";
+  if(/checksum/i.test(name)) return "รวมค่า SHA256 ของทุกไฟล์ใน release นี้";
+  return "";
+}
+
+async function getChecksumFor(asset, release){
+  // 1) GitHub API asset digest (available for assets uploaded 2024+)
+  if (asset.digest && asset.digest.startsWith("sha256:")) return asset.digest.slice(7);
+  // 2) parse checksums.txt asset
+  const cs = (release.assets||[]).find(a => /checksums\.txt/i.test(a.name));
+  if (cs) {
+    try {
+      const r = await fetch(cs.browser_download_url);
+      if (r.ok) {
+        const txt = await r.text();
+        const line = txt.split("\n").find(l => l.includes(asset.name));
+        if (line) return line.trim().split(/\s+/)[0];
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+function checksumBox(checksum){
+  if (!checksum) return "";
+  const id = "cs" + Math.random().toString(36).slice(2, 8);
+  return `<div class="checksum"><span class="lbl">SHA256</span>
+    <span id="${id}" style="flex:1">${esc(checksum)}</span>
+    <button class="copy" onclick="copyCs('${id}', this)">คัดลอก</button></div>`;
+}
+function copyCs(id, btn){
+  navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
+    btn.textContent = "คัดลอกแล้ว ✓"; setTimeout(() => btn.textContent = "คัดลอก", 1800);
+  });
+}
+
+async function load(){
+  const box = document.getElementById("release");
+  try {
+    const res = await fetch(API, { headers: { "Accept": "application/vnd.github+json" } });
+    if (res.status === 404) return renderNone(box);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const rel = await res.json();
+    render(box, rel);
+  } catch (e) {
+    box.innerHTML = `<div class="state"><span class="err">ดึงข้อมูลไม่สำเร็จ (${esc(e.message)})</span><br>
+      ลองรีเฟรชอีกครั้ง หรือไปที่ <a href="https://github.com/${REPO}/releases/latest">Releases บน GitHub</a> โดยตรง</div>`;
+  }
+}
+
+function renderNone(box){
+  box.innerHTML = `
+    <div class="vrow"><span class="vtag">ยังไม่มี release</span><span class="vdate">เร็วๆ นี้</span></div>
+    <p style="color:var(--dim);margin-top:14px">โปรเจกต์นี้กำลังจะเปิดให้ดาวน์โหลด — ติดตามได้ที่
+    <a href="https://github.com/${REPO}/actions">GitHub Actions</a> และ
+    <a href="https://github.com/${REPO}/releases">Releases</a></p>`;
+}
+
+async function render(box, rel){
+  const assets = (rel.assets || []).filter(a => !a.name.endsWith(".sha256"));
+  const rows = await Promise.all(assets.map(async (a) => {
+    const cs = await getChecksumFor(a, rel);
+    return `<div class="asset">
+      <span class="ico">${assetIcon(a.name)}</span>
+      <div class="meta">
+        <div class="name">${esc(a.name)}</div>
+        <div class="facts">${fmtBytes(a.size)} · ดาวน์โหลด ${a.download_count.toLocaleString()} ครั้ง${assetTitle(a.name) ? " · " + assetTitle(a.name) : ""}</div>
+        ${checksumBox(cs)}
+      </div>
+      <a class="btn grn" href="${esc(a.browser_download_url)}">⬇ ดาวน์โหลด</a>
+    </div>`;
+  }));
+  const date = new Date(rel.published_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
+  const notes = rel.body ? `<div class="notes"><h4>บันทึกประจำรุ่น</h4><pre>${esc(rel.body).replace(/\r\n/g,"\n")}</pre></div>` : "";
+  box.innerHTML = `
+    <div class="vrow">
+      <span class="vtag">${esc(rel.tag_name)}</span>
+      <span class="vtag-latest">RELEASE ล่าสุด</span>
+      <span class="vdate">เผยแพร่ ${esc(date)}</span>
+      <span style="flex:1"></span>
+      <a class="btn ghost" href="${esc(rel.html_url)}">ดูบน GitHub</a>
+    </div>
+    <div class="assets">${rows.join("") || '<div class="state">release นี้ยังไม่มีไฟล์แนบ</div>'}</div>
+    ${notes}`;
+}
+
+load();
+</script>
+</body>
+</html>

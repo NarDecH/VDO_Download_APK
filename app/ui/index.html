@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>VDO Grabber — Control Center</title>
+<style>
+:root{--bg:#0b1020;--bg2:#101830;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371;--grn:#16a34a;--red:#ef4444;--yel:#fbbf24}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:14px/1.5 'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--bg2);border-bottom:1px solid var(--line)}
+.logo{width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:800;color:#fff}
+h1{font-size:16px;font-weight:700}
+h1 small{color:var(--dim);font-weight:400;margin-left:6px}
+nav{margin-left:auto;display:flex;gap:4px}
+nav button{all:unset;cursor:pointer;padding:7px 14px;border-radius:8px;color:var(--dim);font-size:13px;font-weight:600}
+nav button:hover{background:#1a2547;color:#fff}
+nav button.on{background:#1f2c52;color:#fff}
+main{flex:1;overflow:auto;padding:14px 16px}
+.tab{display:none}.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.stat{font-size:22px;font-weight:800}.stat small{font-size:12px;color:var(--dim);font-weight:400;display:block}
+h2{font-size:15px;margin:2px 0 10px;color:var(--acc2)}
+button.act{all:unset;cursor:pointer;background:#243354;color:#fff;padding:7px 14px;border-radius:8px;font-weight:600;font-size:13px}
+button.act:hover{background:#33477a}
+button.act.grn{background:var(--grn)}button.act.grn:hover{background:#15803d}
+button.act.red{background:var(--red)}button.act.red:hover{background:#dc2626}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+th{color:var(--faint);text-align:left;font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:7px 8px;border-bottom:1px solid #1a2340;vertical-align:top}
+.url{color:var(--dim);font-size:11.5px;word-break:break-all;max-width:340px}
+.badge{display:inline-block;padding:1px 9px;border-radius:9px;font-size:11px;font-weight:700}
+.st-running{background:#164e63;color:#67e8f9}.st-done{background:#14532d;color:#86efac}
+.st-error{background:#7f1d1d;color:#fca5a5}.st-queued{background:#3f3f46;color:#d4d4d8}
+.st-canceled{background:#3f3f46;color:#a1a1aa}.st-merging{background:#78350f;color:#fcd34d}
+.bar{height:7px;background:#0b1120;border-radius:4px;overflow:hidden;margin-top:5px;border:1px solid #1c2748}
+.bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0%}
+.pill{font-size:11px;color:var(--dim);background:#0b1120;border:1px solid var(--line);padding:2px 8px;border-radius:8px;margin-right:4px}
+pre.logs{background:#070b16;border:1px solid var(--line);border-radius:10px;padding:12px;font:11.5px/1.55 Consolas,'Cascadia Mono',monospace;
+        color:#b7c4de;white-space:pre-wrap;word-break:break-all;height:calc(100vh - 210px);overflow:auto}
+.logtabs{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.logtabs button{all:unset;cursor:pointer;padding:6px 12px;border-radius:8px;background:#1a2547;color:var(--dim);font-size:12.5px;font-weight:600}
+.logtabs button.on{background:#2c3e6e;color:#fff}
+label{display:block;margin:10px 0 4px;color:var(--dim);font-size:12.5px;font-weight:600}
+input[type=text],input[type=number],select{width:100%;background:#0b1120;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px 10px;font:inherit}
+input:focus,select:focus{outline:1px solid #3b5aa0}
+.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
+.hint{color:var(--faint);font-size:11.5px;margin-top:4px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1a2340;font-size:13px}
+.kv b{color:var(--dim);font-weight:600}
+.empty{color:var(--faint);text-align:center;padding:34px 0}
+a{color:#7fb3ff}
+.mono{font-family:Consolas,monospace;font-size:12px}
+.copybtn{all:unset;cursor:pointer;color:#7fb3ff;font-size:11px;margin-left:6px}
+video.thumbs{width:120px;border-radius:8px;border:1px solid var(--line)}
+footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font-size:11px;display:flex;justify-content:space-between}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">▼</div>
+  <h1>VDO Grabber <small>Control Center</small></h1>
+  <nav>
+    <button data-tab="downloads" class="on">⬇ ดาวน์โหลด <span id="nDl"></span></button>
+    <button data-tab="media">🎬 วิดีโอที่ตรวจพบ</button>
+    <button data-tab="logs">📜 Logs</button>
+    <button data-tab="settings">⚙ ตั้งค่า</button>
+    <button data-tab="about">ℹ เกี่ยวกับ</button>
+  </nav>
+</header>
+<main>
+
+<section class="tab on" id="tab-downloads">
+  <div class="grid2" style="margin-bottom:12px">
+    <div class="card"><div class="stat" id="stActive">0<small>กำลังดาวน์โหลด</small></div></div>
+    <div class="card"><div class="stat" id="stDone">0<small>สำเร็จแล้ววันนี้</small></div></div>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <input type="text" id="quickUrl" placeholder="วาง URL วิดีโอแล้วกดดาวน์โหลด (รองรับ mp4 / m3u8 / หน้าเว็บ YouTube ฯลฯ)">
+    <button class="act grn" onclick="quickDownload()">⬇ ดาวน์โหลด</button>
+    <button class="act" onclick="refresh()">⟳</button>
+  </div>
+  <div id="dlList"></div>
+</section>
+
+<section class="tab" id="tab-media">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <button class="act" onclick="clearMedia()">ล้างรายการ</button>
+    <span class="hint" style="align-self:center">รายการวิดีโอที่ตรวจพบจากทุกหน้าเว็บในเซสชันนี้</span>
+  </div>
+  <div id="mediaList"><div class="empty">ยังไม่มีข้อมูล — เปิดเว็บในหน้าต่างเบราว์เซอร์ แล้วเล่น/สแกนวิดีโอ</div></div>
+</section>
+
+<section class="tab" id="tab-logs">
+  <div class="logtabs">
+    <button data-log="app" class="on">app.log</button>
+    <button data-log="downloads">downloads.log</button>
+    <button data-log="events">events.jsonl</button>
+    <span style="flex:1"></span>
+    <button onclick="tailLogs()" class="act" style="padding:6px 10px">⟳ รีเฟรช</button>
+    <button onclick="py().open_logs_folder()" class="act" style="padding:6px 10px">📂 เปิดโฟลเดอร์</button>
+    <button onclick="exportDiag()" class="act" style="padding:6px 10px">📦 Export diagnostics</button>
+  </div>
+  <pre class="logs" id="logBox">loading…</pre>
+</section>
+
+<section class="tab" id="tab-settings">
+  <div class="grid2">
+    <div class="card">
+      <h2>การดาวน์โหลด</h2>
+      <label>โฟลเดอร์ปลายทาง</label>
+      <div class="row"><input type="text" id="sDownDir"><button class="act" style="flex:0" onclick="pickDir()">เลือก…</button></div>
+      <label>ดาวน์โหลดพร้อมกันสูงสุด</label>
+      <input type="number" id="sMaxConc" min="1" max="8">
+      <label>User-Agent ของ yt-dlp (เว้นว่าง = ค่าเริ่มต้น)</label>
+      <input type="text" id="sUA" placeholder="Mozilla/5.0 …">
+      <div class="hint">ตรวจสอบการอัปเดต yt-dlp เป็นระยะ เพราะเว็บฝั่ง upstream เปลี่ยนบ่อย</div>
+      <div style="margin-top:10px"><button class="act grn" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
+      <button class="act" onclick="updateEngine()">⬆ อัปเดต yt-dlp</button></div>
+    </div>
+    <div class="card">
+      <h2>การตรวจจับ &amp; Logging</h2>
+      <label><input type="checkbox" id="sAutoDetect" style="width:auto"> สแกนหาวิดีโออัตโนมัติเมื่อเปิดหน้าเว็บ</label>
+      <label><input type="checkbox" id="sNotify" style="width:auto"> แจ้งเตือนเมื่อดาวน์โหลดเสร็จ</label>
+      <label>ระดับ Log (app.log)</label>
+      <select id="sLogLevel"><option>DEBUG</option><option>INFO</option><option>WARNING</option><option>ERROR</option></select>
+      <div class="hint">DEBUG = ละเอียดสุด (แนะนำตอนดีบัก) · ไฟล์ log หมุนเวียน 5MB × 5 ไฟล์</div>
+      <label>หน้าเว็บเริ่มต้น</label>
+      <input type="text" id="sStartPage">
+    </div>
+  </div>
+</section>
+
+<section class="tab" id="tab-about">
+  <div class="card" style="text-align:center;padding:26px">
+    <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
+    <h2 style="color:var(--txt)">VDO Grabber</h2>
+    <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.0.0</span></div>
+    <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
+    <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
+    <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
+    <div class="hint" style="margin-top:14px">เอกสารทั้งหมด: README · RESEARCH · CHANGELOG (โฟลเดอร์ docs/ ของ repo)<br>
+    สร้างจากแนวคิดของส่วนขยาย "Video Download Helper" — วิเคราะห์ใน docs/research.html</div>
+  </div>
+</section>
+
+</main>
+<footer><span id="ftStatus">พร้อมใช้งาน</span><span id="ftVer"></span></footer>
+
+<script>
+const DEMO = new URLSearchParams(location.search).has('demo');
+let state = { settings:{}, downloads:[], media:[] };
+let curLog = 'app';
+
+function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api); }
+
+// ---------- demo mode (docs screenshots) --------------------------------
+const demoApi = {
+  get_state: async () => ({ version:'1.0.0', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+    settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
+               user_agent:'', auto_detect:true, start_page:'https://www.google.com' },
+    downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Sunset Beach 4K Drone Shot',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K [x8Kd2m].mp4',error:''},
+                 {id:'a2',url:'https://live.example.tv/hls/master.m3u8',title:'Live Concert — Stage 2',kind:'hls',status:'running',percent:63.4,speed:'8.42MiB/s',eta:'00:41',downloaded:158329744,total:249561088,filepath:'',error:''},
+                 {id:'a3',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',title:'Classic Music Video',kind:'page',status:'queued',percent:0,speed:'',eta:'',total:0,filepath:'',error:''} ],
+    media: [ {url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',kind:'mp4',label:'video element',width:1920,height:1080,via:'DOM scan',page_url:'https://example.com/travel',page_title:'Travel Blog'},
+             {url:'https://live.example.tv/hls/master.m3u8',kind:'m3u8',label:'network (fetch)',width:null,height:null,via:'fetch hook',page_url:'https://live.example.tv/watch',page_title:'Live TV'},
+             {url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',kind:'page',label:'link',width:null,height:null,via:'DOM scan',page_url:'https://www.youtube.com/',page_title:'YouTube'} ] }),
+  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.0.0 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
+    : n==='downloads' ? "[a1] START https://cdn.example.com/clips/sunset-beach-4k.mp4\n[a1] VGPROG| 42.1%| 6.11MiB/s| 00:30|105040512|249561088|||\n[a1] [download] 100% of  238.00MiB in 00:42\n[a2] START https://live.example.tv/hls/master.m3u8\n[a2] VGPROG| 63.4%| 8.42MiB/s| 00:41|158329744||6|10|"
+    : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
+  open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
+  set_setting(){ return {ok:true} }, update_engines(){ return {ok:true,message:'up to date'} },
+  download_start: async (s)=>({ok:true,job:{id:'new'}}), download_cancel(){ return {ok:true} },
+  choose_download_dir(){ return {ok:false} }, downloads_list(){ return [] }, media_list(){ return [] },
+};
+
+// ---------- tabs ---------------------------------------------------------
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('nav button, .tab').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); document.getElementById('tab-' + b.dataset.tab).classList.add('on');
+  if (b.dataset.tab === 'logs') tailLogs();
+});
+document.querySelectorAll('.logtabs button[data-log]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.logtabs button[data-log]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on'); curLog = b.dataset.log; tailLogs();
+});
+
+function fmtBytes(n){ if(!n) return '—'; const u=['B','KB','MB','GB']; let i=0; while(n>=1024&&i<3){n/=1024;i++} return n.toFixed(i?1:0)+' '+u[i]; }
+function esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function renderDownloads(list){
+  state.downloads = list;
+  const act = list.filter(j=>['running','queued','merging'].includes(j.status)).length;
+  const done = list.filter(j=>j.status==='done').length;
+  document.getElementById('stActive').childNodes[0].nodeValue = act;
+  document.getElementById('stDone').childNodes[0].nodeValue = done;
+  document.getElementById('nDl').textContent = act ? '('+act+')' : '';
+  const el = document.getElementById('dlList');
+  if (!list.length){ el.innerHTML = '<div class="empty">ยังไม่มีการดาวน์โหลด — วาง URL ด้านบน หรือกดปุ่ม ⬇ บนแถบเครื่องมือในหน้าเว็บ</div>'; return; }
+  el.innerHTML = list.slice().reverse().map(j => `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+      <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.title || j.url.slice(0,80))}</b>
+      <span class="badge st-${j.status}">${j.status}</span>
+    </div>
+    <div class="url">${esc(j.url)}</div>
+    <div class="bar"><i style="width:${j.percent||0}%"></i></div>
+    <div style="display:flex;gap:8px;margin-top:6px;color:var(--dim);font-size:12px;align-items:center;flex-wrap:wrap">
+      <span>${(j.percent||0).toFixed(1)}%</span><span>${esc(j.speed||'')}</span><span>${j.eta?'เหลือ '+esc(j.eta):''}</span>
+      <span>${fmtBytes(j.downloaded)} / ${fmtBytes(j.total)}</span>
+      ${j.status==='done'?`<span>💾 ${esc(j.filepath||'')}</span>`:''}${j.error?`<span style="color:var(--red)">${esc(j.error.slice(0,120))}</span>`:''}
+      <span style="flex:1"></span>
+      ${['running','queued','merging'].includes(j.status)?`<button class="act red" style="padding:3px 10px" onclick="cancel('${j.id}')">ยกเลิก</button>`:''}
+      ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>`:''}
+    </div>
+  </div>`).join('');
+}
+
+function renderMedia(list){
+  const el = document.getElementById('mediaList');
+  if (!list || !list.length){ el.innerHTML = '<div class="empty">ยังไม่มีข้อมูล — เปิดเว็บในหน้าต่างเบราว์เซอร์ แล้วเล่น/สแกนวิดีโอ</div>'; return; }
+  el.innerHTML = list.slice().reverse().map(m => `
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;gap:8px">
+      <b>${esc(m.label || m.kind)}</b>
+      <span><span class="pill">${esc(m.kind)}</span>${m.width?`<span class="pill">${m.width}×${m.height}</span>`:''}</span>
+    </div>
+    <div class="url mono">${esc(m.url.slice(0,180))}</div>
+    <div class="hint">จาก: ${esc((m.page_title||'').slice(0,60))} — ${esc((m.page_url||'').slice(0,80))} · ตรวจพบโดย ${esc(m.via||'?')}</div>
+    <div style="margin-top:8px"><button class="act grn" style="padding:5px 12px" onclick="quickDownload('${esc(m.url)}')">⬇ ดาวน์โหลด</button></div>
+  </div>`).join('');
+}
+
+function renderSettings(s){
+  document.getElementById('sDownDir').value = s.download_dir || '';
+  document.getElementById('sMaxConc').value = s.max_concurrent || 3;
+  document.getElementById('sUA').value = s.user_agent || '';
+  document.getElementById('sLogLevel').value = s.log_level || 'DEBUG';
+  document.getElementById('sStartPage').value = s.start_page || '';
+  document.getElementById('sAutoDetect').checked = !!s.auto_detect;
+  document.getElementById('sNotify').checked = !!s.notify_done;
+}
+
+function fillAbout(st){
+  document.getElementById('abVer').textContent = 'v' + st.version + ' (Windows)';
+  document.getElementById('abYtdlp').textContent = st.ytdlp_version || '?';
+  document.getElementById('abFf').textContent = st.has_ffmpeg ? 'พร้อมใช้' : 'ยังไม่ติดตั้ง (จะดาวน์โหลดอัตโนมัติเมื่อจำเป็น)';
+  document.getElementById('abMode').textContent = st.frozen ? 'frozen exe (PyInstaller)' : 'Python source';
+  document.getElementById('ftVer').textContent = 'v' + st.version;
+}
+
+// ---------- actions ------------------------------------------------------
+async function refresh(){
+  const st = await py().get_state();
+  state.settings = st.settings; state.version = st.version;
+  renderDownloads(st.downloads || []); renderMedia(st.media || []);
+  renderSettings(st.settings || {}); fillAbout(st);
+}
+async function tailLogs(){
+  try { document.getElementById('logBox').textContent = await py().get_log_tail(curLog, 400); }
+  catch(e){ document.getElementById('logBox').textContent = '(ยังเชื่อมต่อ backend ไม่ได้)'; }
+}
+function quickDownload(url){
+  const u = url || document.getElementById('quickUrl').value.trim();
+  if (!u) return;
+  const kind = /\.(m3u8|mpd)(\?|#|$)/i.test(u) ? (u.endsWith('m3u8')||u.includes('.m3u8') ? 'hls' : 'dash') : 'media';
+  py().download_start({ url: u, kind, page_url:'', referrer:'' });
+  document.getElementById('quickUrl').value = '';
+}
+function cancel(id){ py().download_cancel(id); }
+function clearMedia(){ document.getElementById('mediaList').innerHTML = '<div class="empty">ล้างแล้ว (เฉพาะหน้าจอนี้)</div>'; }
+function pickDir(){ py().choose_download_dir().then(r => { if(r && r.ok) document.getElementById('sDownDir').value = r.path; }); }
+function saveSettings(){
+  py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
+  py().set_setting('max_concurrent', parseInt(document.getElementById('sMaxConc').value) || 3);
+  py().set_setting('user_agent', document.getElementById('sUA').value.trim());
+  py().set_setting('log_level', document.getElementById('sLogLevel').value);
+  py().set_setting('auto_detect', document.getElementById('sAutoDetect').checked);
+  py().set_setting('notify_done', document.getElementById('sNotify').checked);
+  py().set_setting('start_page', document.getElementById('sStartPage').value.trim());
+  status('บันทึกการตั้งค่าแล้ว'); setTimeout(refresh, 400);
+}
+function updateEngine(){
+  status('กำลังอัปเดต yt-dlp…');
+  py().update_engines().then(r => status(r.ok ? ('yt-dlp: ' + (r.version||'') + ' — ' + (r.message||'').slice(-80)) : 'อัปเดตไม่สำเร็จ'));
+}
+function exportDiag(){ py().export_diagnostics().then(r => status(r.ok ? 'บันทึก diagnostics: ' + r.path : 'ล้มเหลว: ' + (r.error||''))); }
+function status(msg){ document.getElementById('ftStatus').textContent = msg; }
+
+// ---------- event push from Python --------------------------------------
+window.__onEvent = function (event, payload) {
+  if (event === 'download_update') {
+    const list = state.downloads.filter(j => j.id !== payload.id); list.push(payload);
+    renderDownloads(list);
+  } else if (event === 'media_found') {
+    state.media = (state.media || []).filter(m => m.url !== payload.url); state.media.push(payload);
+    renderMedia(state.media);
+  } else if (event === 'state_changed') {
+    renderDownloads(payload.downloads || []); renderMedia(payload.media || []);
+    renderSettings(payload.settings || {}); fillAbout(payload);
+  } else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
+  else if (event === 'engine_progress') { status('กำลังเตรียม ' + payload.engine + '… ' + payload.percent + '%'); }
+};
+
+if (DEMO) { refresh(); tailLogs(); }
+else {
+  window.addEventListener('pywebviewready', async () => {
+    await refresh(); tailLogs();
+    setInterval(tailLogs, 4000); setInterval(refresh, 8000);
+  });
+  setTimeout(() => { if (!window.pywebview) status('กำลังเชื่อมต่อ backend… (เปิดจากแอป VDO Grabber เท่านั้น)'); }, 1500);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.pyc
+build/
+dist/
+*.spec
+
+# reference extension source (proprietary, local study only)
+code/
+
+# runtime data
+portable-data/
+*.log
+
+# Android
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/.idea/
+*.apk.idsig
+
+# OS / editor
+.DH_*
+Thumbs.db
+desktop.ini
+.vscode/
+
+# download engine binary (auto-downloaded by scripts/build_exe.py)
+app/bin/
+
+# local release staging (assets go to GitHub Releases, not the repo)
+release/
