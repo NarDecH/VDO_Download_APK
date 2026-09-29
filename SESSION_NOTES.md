@@ -49,6 +49,23 @@
 - CI: Android run แรกบน tag พังที่ E2E emulator (`ShellCommandUnresponsiveException` — infra flake)
   → `gh run rerun --failed` ผ่านปกติ; Desktop ผ่านครั้งแรก
 
+## รอบ v1.1.7 (ผู้ใช้: "ทำทุกอย่างที่แนะนำ" — 4 ข้อ)
+- ① ตรวจ release v1.1.6: ขาด `chrome-extension zip.sha256` (v1.1.5 มี) → อัปโหลดเติม +
+  โหลดทุก asset มา `sha256sum -c` ผ่าน OK หมด
+- ② E2E emulator retry: split เป็น 2 steps (`continue-on-error` attempt 1 → attempt 2 ใหม่เมื่อ fail →
+  gate step `exit 1` ถ้าสองครั้งพัง) + emulator-options hardening (`-no-snapshot -camera-back none` ฯลฯ)
+- ③ Downloader.kt รีแฟกเตอร์: helpers เป็น pure JVM (`extOf/isStream/urlStem/displayName`) +
+  DownloaderTest ใหม่ — ตอนนี้ direct downloads บน Android ตั้งชื่อจาก title เหมือน engine/desktop แล้ว
+- ④ ลบไฟล์จริง: desktop ปุ่ม 🗑 บนการ์ด done + `Api.download_delete_file` (confirm dialog ในหน้า
+  เพราะ pywebview กลืน window.confirm); Android ปุ่ม "ลบไฟล์" ใน notification ผ่าน
+  DeleteFileActivity (trampoline, ลบผ่าน MediaStore URI) + แก้ pre-Q publish ต้องใส่ `MediaColumns.DATA`
+- **gotchas**: การคำนวณ stem ว่างต้องทำก่อนเรียก yt-dlp ทั้งสองแพลตฟอร์ม (ไม่งั้น "has already been
+  downloaded" ข้ามงาน); เคส test ต้องสะท้อนพฤติกรรม trim trailing space ก่อนนามสกุล;
+  แก้ test หลัง push tag ต้อง **ย้าย tag** (delete remote tag → tag ใหม่ → push) แล้วระวัง
+  release orphan (CI Desktop สร้าง **draft** ไว้ก่อน — assets ของ Android run จะไปรวมใน draft
+  ตัวนั้น ปิดท้ายต้อง `gh release edit --draft=false` เอง)
+- ยืนยันปลายทาง: v1.1.7 published เป็น Latest, assets 10 ไฟล์, `sha256sum -c checksums.txt` OK ทุกบรรทัด
+
 ### สิ่งที่ตรวจพบและแก้ในรอบแรก (v1.0.1)
 | ปัญหา | การแก้ |
 |---|---|
