@@ -2,7 +2,15 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased] — Desktop 1.0.1 / Extension 1.1.0
+## [Unreleased] — Desktop 1.0.1 / Extension 1.1.1
+
+### แก้ไข (Fixed) — ส่วนขยาย Chrome v1.1.1
+- **content.js  hardened กัน uncaught error บนเว็บจริง** (รายงาน `content.js:180 (anonymous function)`):
+  1. ทุก `chrome.runtime.*` call ถูก guard ด้วย `extAlive()` — กรณี **reload/อัปเดต extension แล้วสคริปต์เก่ายังรันค้าง**
+     ในแท็บที่เปิดอยู่ ("Extension context invalidated") จะแจ้งเตือนให้กด F5 แทนที่จะพัง
+  2. **UI mount ทนเอกสารพิเศษ** (XML/PDF/doctype แปลก) ที่ `attachShadow` ทำไม่ได้ — detection ยังทำงาน
+     แม้แผงไม่ขึ้น และ `ensureUi()` พยายาม mount ใหม่ทุก 3 วินาที (กัน SPA ลบ host ทิ้ง)
+  3. **คัดลอกลิงก์บนเว็บ http** ที่ไม่มี `navigator.clipboard` — fallback ไป `execCommand("copy")`
 
 ### เพิ่มใหม่ (Added) — Desktop 1.0.1 + Extension 1.1.0
 - **ตรวจหาวิดีโอจาก iframe** (ปุ่ม 🔍 ตรวจหาวิดีโอ):
