@@ -97,7 +97,12 @@ class StreamDownloadService : Service() {
                 val published = publishFile(file, title)
                 FileLog.event("download_done", mapOf("url" to url, "engine" to "ytdl-android"))
                 FileLog.app("INFO", "dl", "stream download done: ${published?.first ?: file?.name}")
-                finishNotification(true, published?.first ?: file?.name ?: title.ifEmpty { url }, published?.second)
+                finishNotification(
+                    true,
+                    published?.first ?: file?.name ?: title.ifEmpty { url },
+                    published?.second,
+                    published?.let { File(outDir, it.first).absolutePath },
+                )
             } else {
                 FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
@@ -139,6 +144,10 @@ class StreamDownloadService : Service() {
                 put(MediaStore.MediaColumns.MIME_TYPE, StreamArgs.mimeOf(ext))
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/VDOGrabber")
+                } else {
+                    // pre-Q: no RELATIVE_PATH - the absolute path is what makes
+                    // it visible in Downloads/VDOGrabber (v1.1.7 fix)
+                    put(MediaStore.MediaColumns.DATA, File(outDir, displayName).absolutePath)
                 }
             }
             val uri: Uri = contentResolver.insert(
@@ -182,9 +191,10 @@ class StreamDownloadService : Service() {
     /**
      * Finished-notification (v1.1.6): tapping it (or the เปิด action) opens the
      * published file via its MediaStore URI; failure notifications open the
-     * app so the user can re-scan the page.
+     * app so the user can re-scan the page. v1.1.7 adds a ลบไฟล์ action that
+     * deletes the published file (trampolined through DeleteFileActivity).
      */
-    private fun finishNotification(ok: Boolean, text: String, openUri: Uri? = null) {
+    private fun finishNotification(ok: Boolean, text: String, openUri: Uri? = null, rawPath: String? = null) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val b = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(if (ok) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
@@ -195,6 +205,10 @@ class StreamDownloadService : Service() {
         val view = openPendingIntent(ok, openUri)
         b.setContentIntent(view)
         if (ok && openUri != null) b.addAction(0, getString(R.string.notif_open), view)
+        if (ok) {
+            b.addAction(0, getString(R.string.delete),
+                DeleteFileActivity.pendingIntent(this, openUri?.toString().orEmpty(), rawPath.orEmpty()))
+        }
         nm.notify(NOTIF_DONE_ID, b.build())
     }
 

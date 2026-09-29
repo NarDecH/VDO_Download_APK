@@ -43,6 +43,13 @@
             android:exported="false"
             android:label="@string/logs_title" />
 
+        <!-- Trampoline for the notification's delete action (v1.1.7) -->
+        <activity
+            android:name=".DeleteFileActivity"
+            android:exported="false"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <service
             android:name=".StreamDownloadService"
             android:exported="false"

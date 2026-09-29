@@ -7,25 +7,48 @@ import android.os.Environment
 import android.webkit.CookieManager
 
 /**
- * Queue downloads through the platform DownloadManager (writes into
- * Downloads/VDOGrabber and shows a notification with progress).
- * Direct files (mp4/webm/mp3...) download fully; m3u8/mpd manifests are
- * rejected here - MainActivity explains that streams need the desktop engine.
+ * Queue direct-file downloads through the platform DownloadManager (writes
+ * into Downloads/VDOGrabber and shows a notification with progress).
+ * Direct files (mp4/webm/mp3...) download fully; m3u8/mpd manifests go to
+ * StreamDownloadService instead (MainActivity.tryDownload routes by isStream).
+ *
+ * v1.1.7: the name helpers are pure JVM functions (unit-tested like
+ * StreamArgs) and files are named after the page title - same parity as the
+ * on-device engine and the desktop app.
  */
 object Downloader {
 
     val STREAM_EXT = setOf("m3u8", "mpd")
 
+    private val EXT_RE = Regex(
+        """\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?${'$'}""",
+        RegexOption.IGNORE_CASE,
+    )
+
     fun extOf(url: String): String =
-        Regex("""\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?${'$'}""", RegexOption.IGNORE_CASE)
-            .find(url)?.groupValues?.get(1)?.lowercase() ?: ""
+        EXT_RE.find(url)?.groupValues?.get(1)?.lowercase() ?: ""
 
     fun isStream(url: String): Boolean = extOf(url) in STREAM_EXT
 
+    /** URL filename without query/fragment ("https://c/v/clip.mp4?x" -> "clip.mp4"). */
+    fun urlStem(url: String): String =
+        url.substringBefore('?').substringBefore('#').substringAfterLast('/').trim()
+
+    /**
+     * Destination file name (v1.1.6 parity): the page title wins - sanitized
+     * like the desktop app - otherwise the URL filename; an extension is
+     * appended when missing. "video" is the last-resort name.
+     */
+    fun displayName(url: String, title: String): String {
+        val ext = extOf(url).ifEmpty { "mp4" }
+        var name = StreamArgs.sanitizeFilename(title.ifEmpty { urlStem(url) })
+        name = name.trimEnd('.')
+        if (name.isEmpty()) name = "video"
+        return if (name.contains('.')) name else "$name.$ext"
+    }
+
     fun enqueue(ctx: Context, url: String, title: String): Long {
-        val name = (title.ifEmpty { url.substringAfterLast('/') }).substringBefore('?')
-            .ifEmpty { "video" }
-        val fileName = if (name.contains('.')) name else "$name.${extOf(url).ifEmpty { "mp4" }}"
+        val fileName = displayName(url, title)
 
         val req = DownloadManager.Request(Uri.parse(url)).apply {
             setTitle(fileName)

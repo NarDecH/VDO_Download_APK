@@ -156,6 +156,24 @@ class Api:
         if job and job.filepath and os.path.exists(job.filepath):
             os.startfile(job.filepath)  # noqa: S606
 
+    def download_delete_file(self, job_id: str) -> dict:
+        """Delete the finished file from disk AND drop its card from the list."""
+        job = _APP.downloads.jobs.get(job_id)
+        if not job or not job.filepath:
+            return {"ok": False, "error": "file not found"}
+        path = job.filepath
+        try:
+            if os.path.exists(path):
+                os.remove(path)
+        except OSError as e:
+            _APP.logm.log("delete file failed: %s (%r)" % (path, e), level="error",
+                          event="download_delete_error", id=job_id, path=path, error=repr(e))
+            return {"ok": False, "error": repr(e)}
+        _APP.logm.log("deleted file: %s" % path, event="download_deleted", id=job_id, path=path)
+        result = _APP.downloads.clear_list()  # drop finished cards, this one included
+        _APP.push_control("downloads_cleared", {"removed": result.get("removed", 0)})
+        return {"ok": True, "path": path}
+
     def media_list(self) -> list[dict]:
         return _APP.media.list()
 

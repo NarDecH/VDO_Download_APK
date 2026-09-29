@@ -53,14 +53,41 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: E2E on emulator (HLS download through real engine)
+      # The emulator sometimes boots into an unresponsive ADB shell on hosted
+      # runners (software rendering / TCG) -> ShellCommandUnresponsiveException
+      # and connectedDebugAndroidTest finds no device (seen on the v1.1.6 tag).
+      # Run E2E twice with a FRESH emulator per attempt before giving up.
+      - name: E2E on emulator (attempt 1)
+        id: e2e1
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
           arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: |
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
             cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+
+      - name: E2E on emulator (attempt 2 - fresh emulator after infra flake)
+        id: e2e2
+        if: steps.e2e1.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          script: |
+            chmod +x "$GITHUB_WORKSPACE/android/gradlew"
+            cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+
+      - name: E2E gate (both attempts failed)
+        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome != 'success'
+        run: |
+          echo "E2E failed on two fresh emulators - real failure"
+          exit 1
 
       - name: Rename APKs (per-ABI + universal)
         run: |

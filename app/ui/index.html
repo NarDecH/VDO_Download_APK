@@ -138,7 +138,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
     <h2 style="color:var(--txt)">VDO Grabber</h2>
     <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
-    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.6</span></div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.7</span></div>
     <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
     <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
     <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
@@ -159,7 +159,7 @@ function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api
 
 // ---------- demo mode (docs screenshots) --------------------------------
 const demoApi = {
-  get_state: async () => ({ version:'1.1.6', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+  get_state: async () => ({ version:'1.1.7', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
     settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
                user_agent:'', auto_detect:true, start_page:'https://www.google.com' },
     downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Travel Blog',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K Drone Shot.mp4',title_base:'Sunset Beach 4K Drone Shot',ext:'mp4',error:''},
@@ -168,7 +168,7 @@ const demoApi = {
     media: [ {url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',kind:'mp4',label:'video element',width:1920,height:1080,via:'DOM scan',page_url:'https://example.com/travel',page_title:'Travel Blog'},
              {url:'https://live.example.tv/hls/master.m3u8',kind:'m3u8',label:'network (fetch)',width:null,height:null,via:'fetch hook',page_url:'https://live.example.tv/watch',page_title:'Live TV'},
              {url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',kind:'page',label:'link',width:null,height:null,via:'DOM scan',page_url:'https://www.youtube.com/',page_title:'YouTube'} ] }),
-  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.6 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
+  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.7 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
     : n==='downloads' ? "[a1] START https://cdn.example.com/clips/sunset-beach-4k.mp4\n[a1] VGPROG| 42.1%| 6.11MiB/s| 00:30|105040512|249561088|||\n[a1] [download] 100% of  238.00MiB in 00:42\n[a2] START https://live.example.tv/hls/master.m3u8\n[a2] VGPROG| 63.4%| 8.42MiB/s| 00:41|158329744||6|10|"
     : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
   open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
@@ -176,7 +176,7 @@ const demoApi = {
   download_start: async (s)=>({ok:true,job:{id:'new'}}), download_cancel(){ return {ok:true} },
   choose_download_dir(){ return {ok:false} }, downloads_list(){ return [] }, media_list(){ return [] },
   downloads_clear(){ return {ok:true, removed:1} }, media_clear(){ return {ok:true, removed:3} },
-  download_open_file(){}, download_open_folder(){},
+  download_open_file(){}, download_open_folder(){}, download_delete_file(){ return {ok:true} },
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -227,7 +227,8 @@ function renderDownloads(list){
       <span style="flex:1"></span>
       ${['running','queued','merging'].includes(j.status)?`<button class="act red" style="padding:3px 10px" onclick="cancel('${j.id}')">ยกเลิก</button>`:''}
       ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>
-      <button class="act" style="padding:3px 10px" onclick="py().download_open_folder('${j.id}')">📂 โฟลเดอร์</button>`:''}
+      <button class="act" style="padding:3px 10px" onclick="py().download_open_folder('${j.id}')">📂 โฟลเดอร์</button>
+      <button class="act red" style="padding:3px 10px" onclick="askDelete('${j.id}')">🗑 ลบไฟล์</button>`:''}
     </div>
   </div>`).join('');
 }
@@ -285,6 +286,27 @@ function quickDownload(url){
 }
 function cancel(id){ py().download_cancel(id); }
 function isLive(j){ return ['running','queued','merging'].includes(j.status); }
+// pywebview swallows window.confirm/alert, so use a small in-page dialog
+function confirmBox(msg, onYes){
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(5,8,18,.62);display:flex;align-items:center;justify-content:center;z-index:9999';
+  const box = document.createElement('div');
+  box.style.cssText = 'background:#141d38;border:1px solid #25335a;border-radius:12px;padding:18px;max-width:420px;box-shadow:0 12px 40px rgba(0,0,0,.5)';
+  box.innerHTML = '<div style="margin-bottom:14px;line-height:1.5">' + esc(msg) + '</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+    '<button class="act" id="cbNo">ยกเลิก</button><button class="act red" id="cbYes">ลบ</button></div>';
+  ov.appendChild(box); document.body.appendChild(ov);
+  box.querySelector('#cbNo').onclick = () => ov.remove();
+  box.querySelector('#cbYes').onclick = () => { ov.remove(); onYes(); };
+}
+function askDelete(id){
+  const j = state.downloads.find(x => x.id === id);
+  confirmBox('ลบไฟล์นี้จากดิสก์จริง ๆ ใช่ไหม?<br><span style="color:var(--dim);font-size:12px">' + esc(j && j.filepath ? j.filepath : '(ไม่ทราบเส้นทางไฟล์)') + '</span>',
+    () => py().download_delete_file(id).then(r => {
+      if (r && r.ok) status('ลบไฟล์แล้ว: ' + (r.path||'').split('\\').pop());
+      else status('ลบไม่สำเร็จ: ' + (r && r.error || '?'));
+    }));
+}
 function clearDownloads(){
   const p = py().downloads_clear ? py().downloads_clear() : Promise.resolve({ok:true});
   Promise.resolve(p).then(() => {

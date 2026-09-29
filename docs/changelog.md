@@ -4,6 +4,26 @@
 
 ## [Unreleased]
 
+## [1.1.7] — 2026-09-30
+
+### เพิ่มใหม่ (Added) — ลบไฟล์จากการ์ด done ได้เลย (ทั้งสองแพลตฟอร์ม)
+- **Desktop**: ปุ่ม "🗑 ลบไฟล์" บนการ์ดที่เสร็จแล้ว — ยืนยันด้วย dialog ในแอป (pywebview ไม่รองรับ
+  window.confirm) แล้วลบไฟล์ออกจากดิสก์จริง พร้อมการ์ดหายจากรายการทันที (Api `download_delete_file`)
+- **Android**: แจ้งเตือนเมื่อดาวน์โหลดสตรีมเสร็จ มีปุ่ม "ลบไฟล์" — ลบจาก MediaStore ผ่าน
+  DeleteFileActivity (trampoline) พร้อม Toast ยืนยัน
+- แก้ Android <10: ตอน publish เข้า MediaStore ต้องใส่ `MediaColumns.DATA` (เส้นทางเต็ม) ด้วย
+  มิฉะนั้นไฟล์จะไม่ปรากฏใน Downloads/VDOGrabber
+
+### แก้ไข (Fixed)
+- **CI**: E2E emulator step รันใหม่ได้ 1 ครั้งด้วย emulator ใหม่ (fresh boot + hardening options
+  `-no-snapshot -camera-back none` ฯลฯ) เพราะบน runner บางครั้ง ADB shell ไม่ตอบสนองตั้งแต่บูต
+  (เจอจริงบน tag v1.1.6)
+- Downloader (direct downloads บน Android) ตั้งชื่อไฟล์จาก title ของหน้าเว็บแบบเดียวกับเอนจิน
+  yt-dlp + desktop แล้ว (sanitize + ใส่นามสกุลให้ครบ) พร้อม JVM unit tests ใหม่
+- release v1.1.6: เติมไฟล์ `VDOGrabber-chrome-extension-1.1.2.zip.sha256` ที่ตกหล่น
+  และตรวจแล้วว่า checksum ทุกไฟล์ตรงกับของจริง
+
+[1.1.7]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.7
 ## [1.1.6] — 2026-09-30
 
 ### เพิ่มใหม่ (Added) — Desktop: ตั้งชื่อไฟล์ตามหน้าเว็บ + กันชื่อซ้ำ + ล้างรายการ
