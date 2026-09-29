@@ -16,22 +16,26 @@ class LogsActivity : AppCompatActivity() {
         FileLog.init(applicationContext)
 
         box = findViewById(R.id.logBox)
+        val tabApp: Button = findViewById(R.id.tabApp)
+        val tabDl: Button = findViewById(R.id.tabDl)
+        val tabEv: Button = findViewById(R.id.tabEv)
         val tabs = mapOf<Button, String>(
-            findViewById(R.id.tabApp) to "app.log",
-            findViewById(R.id.tabDl) to "downloads.log",
-            findViewById(R.id.tabEv) to "events.jsonl",
+            tabApp to "app.log",
+            tabDl to "downloads.log",
+            tabEv to "events.jsonl",
         )
         val refresh = { name: String ->
             box.text = FileLog.tail(name, 400)
         }
-        tabs.forEach { (btn, name) ->
+        tabs.forEach { (btn: Button, name: String) ->
             btn.setOnClickListener {
                 refresh(name)
-                tabs.keys.forEach { it.alpha = 0.55f }
+                tabs.keys.forEach { b: Button -> b.alpha = 0.55f }
                 btn.alpha = 1f
             }
         }
-        findViewById<Button>(R.id.btnRefresh).setOnClickListener {
+        val btnRefresh: Button = findViewById(R.id.btnRefresh)
+        btnRefresh.setOnClickListener {
             refresh(tabs.values.first())
         }
         refresh("app.log")
