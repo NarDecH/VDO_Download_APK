@@ -12,7 +12,12 @@ object MediaStore {
 
     @Synchronized
     fun add(url: String, kind: String, label: String, page: String, title: String): Boolean {
-        if (items.containsKey(url)) return false
+        if (items.containsKey(url)) {
+            // touch -> re-insert at the end so eviction is true LRU
+            val existing = items.remove(url) ?: return false
+            items[url] = existing
+            return false
+        }
         items[url] = Item(url, kind, label, page, title)
         if (items.size > 200) {
             val it = items.entries.iterator()

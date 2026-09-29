@@ -24,7 +24,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import webview  # noqa: E402
 
-from core.detector import DETECT_JS, TOOLBAR_JS, build_report  # noqa: E402
+from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
 from core.settings import Settings  # noqa: E402
@@ -44,6 +44,7 @@ class MediaStore:
         key = report["url"][:400]
         with self._lock:
             new = key not in self.items
+            self.items.pop(key, None)  # re-insert = touch -> true LRU order
             self.items[key] = report
             if len(self.items) > self.limit:
                 for k in list(self.items)[: len(self.items) - self.limit]:
@@ -433,6 +434,13 @@ def selftest() -> int:
         results["detection"] = {"ok": False, "error": repr(e)}
         app.logm.exception("selftest detection", e)
 
+    # --- 2.5) detector pair sync (desktop DETECT_JS <-> android Detector.kt) -
+    try:
+        results["pair_sync"] = check_pair_sync()
+    except Exception as e:
+        results["pair_sync"] = {"ok": False, "error": repr(e)}
+        app.logm.exception("selftest pair sync", e)
+
     # --- 3) real download via yt-dlp ---------------------------------------
     try:
         job = app.downloads.start(f"http://127.0.0.1:{port}/video.mp4", title="selftest", kind="media")
@@ -450,7 +458,8 @@ def selftest() -> int:
     srv.shutdown()
     srv2.shutdown()
     print(json.dumps(results, ensure_ascii=False, indent=2))
-    passed = results["ytdlp"]["ok"] and results["detection"]["ok"] and results["download"]["ok"]
+    passed = (results["ytdlp"]["ok"] and results["detection"]["ok"]
+              and results["pair_sync"]["ok"] and results["download"]["ok"])
     app.logm.log("SELFTEST %s" % ("PASS" if passed else "FAIL"), event="selftest", passed=passed,
                  results={k: v.get("ok") for k, v in results.items() if isinstance(v, dict)})
     return 0 if passed else 1

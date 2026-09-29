@@ -1,0 +1,77 @@
+name: Desktop selftest + exe
+
+on:
+  push:
+    branches: [main]
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "requirements.txt", ".github/workflows/desktop.yml"]
+    tags: ["v*"]
+  pull_request:
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "requirements.txt", ".github/workflows/desktop.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  selftest:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Prepare yt-dlp engine (bundled into exe)
+        run: python -c "import sys; sys.path.insert(0, 'scripts'); import build_exe; build_exe.ensure_ytdlp()"
+
+      - name: Run selftest (engine + detection + real download)
+        run: python app/main.py --selftest
+
+      - name: Build exe
+        if: startsWith(github.ref, 'refs/tags/')
+        run: python scripts/build_exe.py
+
+      - name: Selftest the built exe (frozen mode)
+        if: startsWith(github.ref, 'refs/tags/')
+        run: ./dist/VDOGrabber.exe --selftest
+
+      - name: Stage exe + checksum
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          VERSION=$(grep -oP "APP_VERSION = \"\K[^\"]+" app/core/logger.py)
+          EXE_NAME="VDOGrabber-${VERSION}-windows-x64.exe"
+          mv dist/VDOGrabber.exe "$EXE_NAME"
+          sha256sum "$EXE_NAME" | tee "$EXE_NAME.sha256"
+          echo "EXE_NAME=$EXE_NAME" >> "$GITHUB_ENV"
+
+      - name: Upload exe artifact (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: VDOGrabber-windows-exe
+          path: |
+            ${{ env.EXE_NAME }}
+            ${{ env.EXE_NAME }}.sha256
+
+      - name: Attach to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --draft=false --generate-notes
+          gh release upload "$GITHUB_REF_NAME" "$EXE_NAME" "$EXE_NAME.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+          # merge exe checksum into checksums.txt on the release
+          gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "checksums.txt" --output checksums.txt 2>/dev/null || true
+          grep -vF "$EXE_NAME" checksums.txt 2>/dev/null | cat - "$EXE_NAME.sha256" > checksums.tmp || cat "$EXE_NAME.sha256" > checksums.tmp
+          mv checksums.tmp checksums.txt
+          gh release upload "$GITHUB_REF_NAME" checksums.txt --repo "$GITHUB_REPOSITORY" --clobber

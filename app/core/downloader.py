@@ -160,8 +160,22 @@ class DownloadManager:
             if job.status == "canceled":
                 return
             self._execute(job)
-        self.history.append(job.id)
+        with self._lock:
+            self.history.append(job.id)
+            self._prune_history_locked()
         self.push_ui("download_update", job.public())
+
+    def _prune_history_locked(self, keep: int = 200) -> None:
+        """Cap in-memory history: forget oldest *finished* jobs (and their Job
+        objects) so a long session does not grow without bound. Requires
+        self._lock to be held."""
+        if len(self.history) <= keep:
+            return
+        drop, self.history = self.history[:-keep], self.history[-keep:]
+        for jid in drop:
+            job = self.jobs.get(jid)
+            if job and job.status in ("done", "error", "canceled"):
+                del self.jobs[jid]
 
     def _execute(self, job: Job) -> None:
         ytdlp = self.engines.ensure_ytdlp()

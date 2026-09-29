@@ -2,7 +2,20 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased] — Desktop 1.0.1 / Extension 1.1.1
+## [Unreleased]
+
+## [1.0.1] — 2026-09-29
+
+### เพิ่มใหม่ (Added) — Android v1.0.1 (versionCode 2)
+- **ตรวจหาวิดีโอใน iframe แบบเดียวกับเดสก์ท็อป** — Detector.kt เพิ่ม `scanIframes()`:
+  same-origin/srcdoc ลงไปสแกนข้างในจริง, cross-origin embed player รายงาน URL เป็น kind `embed`
+- **ปุ่ม "🌐 เปิดหน้า embed"** ใน bottom sheet ของรายการ embed — เปิดหน้า embed เป็นหน้าหลัก
+  แล้วตัวตรวจจับสแกนวิดีโอในหน้านั้นต่ออัตโนมัติ (แบบเดียวกับ toolbar เดสก์ท็อป)
+- รายการ embed เพิ่มจาก `<embed>` / `<object>` player
+
+### เพิ่มใหม่ (Added) — CI เดสก์ท็อป
+- Workflow ใหม่ `.github/workflows/desktop.yml`: รัน `python app/main.py --selftest` บน Windows runner
+  ทุก push/PR ที่แตะ `app/**` หรือ `scripts/build_exe.py` — และแนบ `VDOGrabber.exe` + SHA256 ลง release เมื่อ tag `v*` (คู่กับ workflow ฝั่ง Android)
 
 ### แก้ไข (Fixed) — ส่วนขยาย Chrome v1.1.1
 - **content.js  hardened กัน uncaught error บนเว็บจริง** (รายงาน `content.js:180 (anonymous function)`):
@@ -33,6 +46,7 @@
   1. แถบเครื่องมือ navigate ในหน้าเองด้วย JS (`location.href` / `history`) ไม่ผ่าน Python อีกต่อไป
   2. `api.navigate` (สำหรับผู้เรียกอื่น) หน่วงโหลด 80ms ให้ callback ส่งมอบก่อน
 - ปุ่ม ⚙️ ตอนนี้ `restore()` + `show()` Control Center จริงๆ — หน้าต่างที่เปิดค้างไว้จะโผล่มาหน้าสุด ไม่ต้องกดรัว
+- แก้ Windows version resource (`filevers`/`prodvers` ใน `scripts/version_info.txt`) ให้ตรงกับ 1.0.1
 - ทดสอบ regression ใหม่: `scripts/test_navigate_fix.py` (ซ่อนหน้าต่าง, ยิงทั้งสอง call style,
   ตรวจว่า stderr สะอาด) — ผ่านทั้งหมด, `--selftest` ยังผ่าน, exe 1.0.1 ผ่าน selftest ใน frozen mode
 
@@ -52,6 +66,17 @@
   ด้วย fMP4 จริง (init+segment ตัดจาก shaka-demo-assets พร้อม parse sidx) — ทุกข้อตรวจ
   SHA256 เทียบไบต์ต้นฉบับ
 - เพิ่ม debug bridge (page ↔ content ↔ SW) สำหรับอ่าน logs/downloads ระหว่างทดสอบ
+
+### บำรุงรักษา (Maintenance) — Repo
+- ลบ `watch_fixed.py` ที่ถูก track ไว้ทั้งที่มีเนื้อหาเพียงบรรทัดเดียว (ขยะจาก redirect ผิด)
+- ลบ `WATCHDOG_JS` ที่ไม่มีที่ใช้แล้วออกจาก `app/core/detector.py` (watchdog ทำงานฝั่ง Python)
+- **แก้ memory growth ในเซสชันยาว**: MediaStore ทั้ง desktop และ Android ขยับเป็น LRU จริง
+  (รายการเดิมที่พบซ้ำถูก touch ไปท้ายแทนการนิ่ง), `DownloadManager` เริ่ม prune ประวัติงานเก่า
+  (เหลือ 200 รายการล่าสุด และคืน Job ที่จบแล้วออกจากหน่วยความจำ)
+- **selftest เพิ่มขั้น `pair_sync`** — ตรวจว่า `DETECT_JS` (desktop) และ `Detector.INJECT_JS` (Android)
+  สังเคราะห์ JS ที่ถูกต้อง (`node --check` เมื่อมี Node.js / structural checks เมื่อไม่มี) และมี
+  feature markers ตรงกัน (scanIframes, EMBED_RE, MEDIA_RE, embed kind) ทำให้กติกา "detector เป็นคู่"
+  ใน AGENTS.md ถูกบังคับอัตโนมัติ ไม่ต้องรอล้ำ CI ฝั่ง Android มาเจอทีหลัง
 
 ## [1.0.0] — 2026-09-29
 
@@ -80,4 +105,5 @@
 - Android ยังไม่รวมไฟล์ HLS/DASH — แนะนำใช้เดสก์ท็อป (roadmap: ฝัง youtubedl-android)
 - ไฟล์ `code/` (ส่วนขยายต้นแบบที่ minify) ถูก `.gitignore` — มีแต่ในเครื่องผู้พัฒนา
 
+[1.0.1]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.0.1
 [1.0.0]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.0.0

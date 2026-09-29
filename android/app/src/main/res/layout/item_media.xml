@@ -49,5 +49,17 @@
             android:paddingVertical="6dp"
             android:text="@string/copy_link"
             android:textColor="#CDD6E6" />
+
+        <TextView
+            android:id="@+id/mOpen"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="#78350f"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="@string/open_embed"
+            android:textColor="#FCD34D"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

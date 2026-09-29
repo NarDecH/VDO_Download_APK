@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.0.0 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.0.1 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -168,6 +168,11 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 32, 48, 32)
         }
+        val dialog = AlertDialog.Builder(this)
+            .setTitle(getString(R.string.found_title, items.size))
+            .setView(container)
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
         for (m in items.take(15)) {
             val row = layoutInflater.inflate(R.layout.item_media, container, false)
             row.findViewById<TextView>(R.id.mLabel).text =
@@ -179,13 +184,19 @@ class MainActivity : AppCompatActivity() {
                 cm.setPrimaryClip(ClipData.newPlainText("url", m.url))
                 Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
             }
+            // embed players: opening the embed page as the top page lets the
+            // detector find the real video URLs inside it (same idea as the
+            // desktop toolbar's "เปิดหน้า embed" button)
+            row.findViewById<TextView>(R.id.mOpen).visibility =
+                if (m.kind == "embed") View.VISIBLE else View.GONE
+            row.findViewById<TextView>(R.id.mOpen).setOnClickListener {
+                FileLog.event("embed_open", mapOf("url" to m.url))
+                FileLog.app("INFO", "nav", "open embed page: ${m.url}")
+                navigate(m.url)
+                dialog.dismiss()
+            }
             container.addView(row)
         }
-        AlertDialog.Builder(this)
-            .setTitle(getString(R.string.found_title, items.size))
-            .setView(container)
-            .setNegativeButton(android.R.string.cancel, null)
-            .show()
     }
 
     private fun tryDownload(url: String, title: String) {

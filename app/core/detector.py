@@ -16,6 +16,11 @@ Results are reported to Python via window.pywebview.api.report_media(json).
 from __future__ import annotations
 
 import json
+import os
+import re
+import shutil
+import subprocess
+import tempfile
 
 # Unique globals so re-injection after navigation is idempotent.
 DETECT_JS = r"""
@@ -332,17 +337,95 @@ TOOLBAR_JS = r"""
 })();
 """
 
-# Small watchdog: re-arms detection + toolbar if a navigation wiped them.
-WATCHDOG_JS = r"""
-(function () {
-  if (window.__vgWatchdog) return;
-  window.__vgWatchdog = true;
-  setInterval(function () {
-    if (!window.__vgDetect) { try { window.__vgDetect = null; } catch (e) {} }
-    if (!window.__vgToolbar) { /* re-inject handled by host app on loaded */ }
-  }, 2500);
-})();
-"""
+def _js_is_valid(js: str) -> tuple[bool, str]:
+    """Best-effort JS syntax validation of an injected script.
+
+    Uses `node --check` when Node.js is available; otherwise falls back to
+    cheap structural checks (balanced braces + IIFE wrapper present) which
+    catch the most common breakage from hand-editing these big strings.
+    """
+    node = shutil.which("node")
+    if node:
+        fd, path = tempfile.mkstemp(suffix=".js")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(js)
+            out = subprocess.run(
+                [node, "--check", path],
+                capture_output=True, text=True, timeout=30,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if out.returncode != 0:
+                return False, (out.stderr or "node --check failed").strip()[-500:]
+            return True, ""
+        except Exception as e:
+            return False, repr(e)
+        finally:
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    # No Node.js: cheap structural sanity checks (brace balance + IIFE head).
+    if js.count("{") != js.count("}"):
+        return False, "unbalanced braces"
+    if "(function ()" not in js:
+        return False, "missing IIFE wrapper"
+    return True, "node not available - structural checks only"
+
+
+_ANDROID_DETECTOR_KT = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "android", "app", "src", "main", "java", "com", "vdograbber", "app", "Detector.kt",
+)
+
+
+def _android_inject_js() -> str:
+    """Extract the INJECT_JS raw string from the Kotlin source.
+
+    The Android detector lives in a .kt file, so it cannot be imported as a
+    Python module - parse the triple-quoted raw string out of the text and
+    unescape the Kotlin `${'$'}` dollar-sign escape.
+    """
+    with open(_ANDROID_DETECTOR_KT, "r", encoding="utf-8") as f:
+        src = f.read()
+    m = re.search(r'val INJECT_JS: String = """(.*?)"""\.trimIndent', src, re.S)
+    if not m:
+        raise ValueError("INJECT_JS not found in Detector.kt")
+    return m.group(1).replace("${'$'}", "$")
+
+
+def check_pair_sync() -> dict:
+    """Guard that keeps the detector twins in lockstep (AGENTS.md rule).
+
+    Both sides must (a) synthesize syntactically valid JS and (b) declare the
+    same feature markers, so a one-sided feature change fails fast in the
+    selftest instead of silently degrading the Android app.
+    """
+    if not os.path.exists(_ANDROID_DETECTOR_KT):
+        # Frozen exe bundles only app/ - the pair guard is a dev-time check.
+        return {"ok": True, "checks": {}, "markers": {}, "skipped": "source tree not bundled (frozen run)"}
+
+    ANDROID_INJECT_JS = _android_inject_js()
+
+    checks: dict[str, bool] = {}
+    ok_desktop, err_desktop = _js_is_valid(DETECT_JS)
+    checks["desktop_js_valid"] = ok_desktop
+
+    ok_android, err_android = _js_is_valid(ANDROID_INJECT_JS)
+    checks["android_js_valid"] = ok_android
+
+    markers = ["scanIframes", "EMBED_RE", "MEDIA_RE", "contentDocument"]
+    dm = {m: (m in DETECT_JS) for m in markers}
+    am = {m: (m in ANDROID_INJECT_JS) for m in markers}
+    checks["marker_parity"] = dm == am
+
+    ok = all(checks.values())
+    return {
+        "ok": ok,
+        "checks": checks,
+        "markers": {m: {"desktop": dm[m], "android": am[m]} for m in markers},
+        "error": "" if ok else "; ".join(filter(None, [err_desktop, err_android])),
+    }
 
 
 def build_report(payload_json: str, page_url: str = "") -> dict | None:
