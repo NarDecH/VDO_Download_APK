@@ -39,7 +39,8 @@ class DownloaderTest {
     @Test
     fun `displayName prefers the sanitized page title`() {
         assertEquals("Travel Blog.mp4", Downloader.displayName("https://c/v/clip.mp4", "Travel Blog"))
-        assertEquals("Live TV.mp4", Downloader.displayName("https://c/v/index.m3u8?tok=1", "Live TV"))
+        // the extension follows the URL (m3u8), not a hard-coded mp4
+        assertEquals("Live TV.m3u8", Downloader.displayName("https://c/v/index.m3u8?tok=1", "Live TV"))
         // invalid chars are sanitized like the desktop app
         assertEquals("bad name .mp4", Downloader.displayName("https://c/v/clip.mp4", "bad:name?"))
     }
@@ -52,8 +53,13 @@ class DownloaderTest {
     }
 
     @Test
-    fun `displayName last resort is video with url extension`() {
-        assertEquals("video.mp4", Downloader.displayName("https://site.com/watch/1", ""))
-        assertEquals("video.m3u8", Downloader.displayName("https://c/v/index.m3u8", ""))
+    fun `displayName url-stem fallback and last resort`() {
+        // page-style URL without a media extension: the URL's last segment is
+        // used (same rule as the pre-1.1.6 DownloadManager naming)
+        assertEquals("1.mp4", Downloader.displayName("https://site.com/watch/1", ""))
+        // empty path (no file name at all) falls back to "video"
+        assertEquals("video.mp4", Downloader.displayName("https://c/v/", ""))
+        // direct manifest URL keeps its file name + media extension
+        assertEquals("index.m3u8", Downloader.displayName("https://c/v/index.m3u8", ""))
     }
 }

@@ -66,7 +66,9 @@ class StreamDownloadService : Service() {
         if (url.isEmpty()) { stopSelf(); return START_NOT_STICKY }
         // v1.1.6: name the file after the page title (deduped on disk),
         // falling back to yt-dlp's metadata title + id when there is none.
-        val titleBase = StreamArgs.sanitizeFilename(title)
+        // v1.1.7: precompute a FREE stem, otherwise yt-dlp skips a re-download
+        // with "has already been downloaded" and nothing gets saved.
+        val titleBase = freeTitleBase(outDir, StreamArgs.sanitizeFilename(title))
 
         startForeground(NOTIF_ID, buildNotification(title.ifEmpty { url }, 0))
         FileLog.event("download_start", mapOf("url" to url, "kind" to "stream", "engine" to "ytdl-android"))
@@ -163,6 +165,17 @@ class StreamDownloadService : Service() {
             FileLog.app("WARNING", "dl", "publish failed (file kept): $e")
             return null
         }
+    }
+
+    /** Return [base], or `base (2)`, `(3)`, ... while files `stem.*` exist. */
+    private fun freeTitleBase(dir: File, base: String): String {
+        if (base.isEmpty()) return base
+        fun taken(stem: String): Boolean =
+            dir.listFiles()?.any { it.name.startsWith("$stem.") } == true
+        var stem = base
+        var n = 2
+        while (taken(stem)) { stem = "$base ($n)"; n++ }
+        return stem
     }
 
     // ------------------------------------------------------------ notification
