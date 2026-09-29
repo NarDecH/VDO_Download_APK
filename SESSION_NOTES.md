@@ -2,6 +2,24 @@
 
 ## เริ่มจาก: "ตรวจสอบโปรเจกต์นี้" → จบด้วย release v1.0.1 + Android v1.1.0 (HLS ในตัว)
 
+## เพิ่มเติมรอบหลัง (v1.1.1 → v1.1.4)
+
+- **v1.1.1**: ABI splits (arm64 = 37MB จาก 126MB, -69%) + E2E HLS บน emulator ใน CI
+  (StreamEngineTest) — gotchas: emulator-runner script ต้องใช้ absolute path,
+  `com.sun.net.httpserver` ไม่มีบน Android (เขียน raw ServerSocket แทน),
+  และ `jniLibs.useLegacyPackaging = true` **จำเป็น** ไม่งั้น YoutubeDL.init พัง
+- **v1.1.2–v1.1.4 (desktop)**: แก้ "Unsupported URL" จากรายงานผู้ใช้ (merrylion2 player.html):
+  ① fallback สแกน HTML หา media URL ซ่อนใน script → ดาวน์โหลดต่อ (พร้อม Referer)
+  ② **ffprobe** ต้องมาคู่ ffmpeg (yt-dlp ใช้ probe ตอน generic extractor) — `ffmpeg_path()`
+  นับเฉพาะเมื่อมีครบคู่ + ensure_ffmpeg เติม ffprobe ให้เครื่องเดิม
+  ③ ปุ่ม "เปิดหน้านี้ในเบราว์เซอร์" ในการ์ด error — flow ผู้ใช้ปิดที่ตัวตรวจจับ 4 ชั้น
+  ④ unit test `page_fallback_scanner` ตามโครงสร้างหน้าจริง
+- E2E พิสูจน์แล้ว: player.html → fallback m3u8 → HLS merge → mp4 done
+- dependabot: merged #3 #4 #7 #10 (pillow/websocket/appcompat/gradle-wrapper),
+  ปิด major PRs (#1 #2 #9 → issue #11 roadmap)
+- ค้าง: emulator E2E ใช้ fixture HLS ที่สร้างใน CI ก่อน build — ต้องรัน ffmpeg step ก่อน
+  connectedAndroidTest เสมอ (ตาม workflow ปัจจุบันแล้วถูกต้อง)
+
 ### สิ่งที่ตรวจพบและแก้ในรอบแรก (v1.0.1)
 | ปัญหา | การแก้ |
 |---|---|
