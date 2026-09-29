@@ -4,6 +4,15 @@
 
 ## [Unreleased] — Desktop 1.0.1 / Extension 1.1.0
 
+### เพิ่มใหม่ (Added) — Desktop 1.0.1 + Extension 1.1.0
+- **ตรวจหาวิดีโอจาก iframe** (ปุ่ม 🔍 ตรวจหาวิดีโอ):
+  - iframe ต้นกำเนิดเดียวกัน / srcdoc → ลงไปสแกนข้างในจริง (`<video>`, ลิงก์สื่อ, resource timing ของ frame)
+  - iframe ต่าง origin (embed player อย่าง player2u/dood/streamtape) → เสนอ **URL ของ embed** เป็นตัวเลือกดาวน์โหลด
+    แล้วให้ yt-dlp สกัดวิดีโอ (desktop) — ข้อจำกัดของ same-origin policy ทำให้เข้าถึงข้างในไม่ได้โดยตรง
+  - Extension: แผงของหน้าแม่รวมรายการจาก **ทุก frame** + native sniffer เข้าด้วยกัน
+  - ทดสอบ: selftest เพิ่ม iframe cross-origin + srcdoc (ผ่านครบ 4 เช็ค) · E2E extension เพิ่มเป็น 18 ข้อ
+    (คลิกระบุด้วย URL + รอไฟล์ด้วย SHA256 ที่คาดหวัง กันรายการข้ามเฟสปนกัน)
+
 ### แก้ไข (Fixed) — Desktop v1.0.1
 - **TypeError spam ตอนพิมพ์ URL / กดย้อน-รีโหลดในแถบเครื่องมือ** (`returnValuesCallbacks … is not a function`) —
   สาเหตุ: pywebview ส่งค่ากลับให้ JS callback หลัง method จบ แต่ `api.navigate` เองก็ navigate หน้านั้นทันที

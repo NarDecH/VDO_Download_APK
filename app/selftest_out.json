@@ -9,31 +9,47 @@
       {
         "kind": "mp4",
         "via": "video element",
-        "url": "http://127.0.0.1:56092/dom-video.mp4"
+        "url": "http://127.0.0.1:57718/dom-video.mp4"
       },
       {
         "kind": "m3u8",
         "via": "link: linked playlist",
-        "url": "http://127.0.0.1:56092/linked.m3u8"
+        "url": "http://127.0.0.1:57718/linked.m3u8"
+      },
+      {
+        "kind": "embed",
+        "via": "",
+        "url": "http://127.0.0.1:57719/embed.html"
+      },
+      {
+        "kind": "mp4",
+        "via": "",
+        "url": "http://127.0.0.1:57718/iframe-video.mp4"
       },
       {
         "kind": "m3u8",
         "via": "network (timing)",
-        "url": "http://127.0.0.1:56092/hooked/master.m3u8"
+        "url": "http://127.0.0.1:57718/hooked/master.m3u8"
       },
       {
         "kind": "mpd",
         "via": "network (timing)",
-        "url": "http://127.0.0.1:56092/hooked/manifest.mpd"
+        "url": "http://127.0.0.1:57718/hooked/manifest.mpd"
       }
-    ]
+    ],
+    "checks": {
+      "dom": true,
+      "hooks": true,
+      "embed_iframe": true,
+      "srcdoc_iframe": true
+    }
   },
   "events": [
     [
       "download_update",
       {
-        "id": "f609a6a3ff17",
-        "url": "http://127.0.0.1:56092/video.mp4",
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
         "title": "selftest",
         "kind": "media",
         "format_id": "",
@@ -45,7 +61,7 @@
         "total": 0,
         "filepath": "",
         "error": "",
-        "created": 1790644244.1058402,
+        "created": 1790661238.3632648,
         "finished": 0.0,
         "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
       }
@@ -53,42 +69,252 @@
     [
       "download_update",
       {
-        "id": "f609a6a3ff17",
-        "url": "http://127.0.0.1:56092/video.mp4",
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
         "title": "selftest",
         "kind": "media",
         "format_id": "",
-        "status": "done",
-        "percent": 100.0,
-        "speed": "35.72MiB/s",
-        "eta": "NA",
-        "downloaded": 262144,
-        "total": 0,
+        "status": "running",
+        "percent": 0.4,
+        "speed": "Unknown B/s",
+        "eta": "",
+        "downloaded": 1024,
+        "total": 262144,
         "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
         "error": "",
-        "created": 1790644244.1058402,
-        "finished": 1790644246.1227615,
+        "created": 1790661238.3632648,
+        "finished": 0.0,
         "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
       }
     ],
     [
       "download_update",
       {
-        "id": "f609a6a3ff17",
-        "url": "http://127.0.0.1:56092/video.mp4",
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 1.2,
+        "speed": "2.93MiB/s",
+        "eta": "00:00",
+        "downloaded": 3072,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 2.7,
+        "speed": "6.83MiB/s",
+        "eta": "00:00",
+        "downloaded": 7168,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 5.9,
+        "speed": "7.33MiB/s",
+        "eta": "00:00",
+        "downloaded": 15360,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 12.1,
+        "speed": "15.15MiB/s",
+        "eta": "00:00",
+        "downloaded": 31744,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 24.6,
+        "speed": "20.51MiB/s",
+        "eta": "00:00",
+        "downloaded": 64512,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 49.6,
+        "speed": "41.35MiB/s",
+        "eta": "00:00",
+        "downloaded": 130048,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 99.6,
+        "speed": "62.28MiB/s",
+        "eta": "00:00",
+        "downloaded": 261120,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 100.0,
+        "speed": "49.98MiB/s",
+        "eta": "00:00",
+        "downloaded": 262144,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "running",
+        "percent": 100.0,
+        "speed": "31.25MiB/s",
+        "eta": "00:00",
+        "downloaded": 262144,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 0.0,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
         "title": "selftest",
         "kind": "media",
         "format_id": "",
         "status": "done",
         "percent": 100.0,
-        "speed": "35.72MiB/s",
-        "eta": "NA",
+        "speed": "31.25MiB/s",
+        "eta": "00:00",
         "downloaded": 262144,
-        "total": 0,
+        "total": 262144,
         "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
         "error": "",
-        "created": 1790644244.1058402,
-        "finished": 1790644246.1227615,
+        "created": 1790661238.3632648,
+        "finished": 1790661240.466072,
+        "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
+      }
+    ],
+    [
+      "download_update",
+      {
+        "id": "b2b6b3b0081b",
+        "url": "http://127.0.0.1:57718/video.mp4",
+        "title": "selftest",
+        "kind": "media",
+        "format_id": "",
+        "status": "done",
+        "percent": 100.0,
+        "speed": "31.25MiB/s",
+        "eta": "00:00",
+        "downloaded": 262144,
+        "total": 262144,
+        "filepath": "C:\\Users\\NarDech\\Downloads\\VDOGrabber\\video [video].mp4",
+        "error": "",
+        "created": 1790661238.3632648,
+        "finished": 1790661240.466072,
         "out_dir": "C:\\Users\\NarDech\\Downloads\\VDOGrabber"
       }
     ]

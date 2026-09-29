@@ -8,6 +8,16 @@
        src="http://127.0.0.1:__PORT__/dom-video.mp4"></video>
 <!-- link target -->
 <a href="http://127.0.0.1:__PORT__/linked.m3u8">linked playlist</a>
+
+<!-- cross-origin iframe embed player (different port = different origin):
+     JS cannot read inside it, so the iframe src itself must be reported
+     as an embed candidate for yt-dlp -->
+<iframe src="http://127.0.0.1:__PORT2__/embed.html" width="320" height="180"></iframe>
+
+<!-- same-origin srcdoc iframe: the deep scan must reach inside and find
+     the video element -->
+<iframe srcdoc="<video controls width='280' src='http://127.0.0.1:__PORT__/iframe-video.mp4'></video>" width="320" height="180"></iframe>
+
 <script>
   // network-hook target: a fetch() of an HLS manifest (no <video> tag involved)
   setTimeout(function () {

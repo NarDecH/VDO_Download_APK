@@ -58,6 +58,63 @@
       performance.getEntriesByType("resource").forEach((r) => {
         if (MEDIA_RE.test(r.name)) report(r.name, null, "network (timing)", "resource timing");
       });
+      scanIframes();
+    } catch (e) {}
+  }
+
+  // ---- iframe scan ------------------------------------------------------
+  // - same-origin / srcdoc frames: reachable -> deep scan their DOM + timing
+  // - cross-origin frames (typical embed players): the inside is blocked, so
+  //   the embed URL itself is offered - yt-dlp/desktop extracts from those.
+  const EMBED_RE = /embed|player|video|watch|stream|play|media|vod|\/v\/|\/e\//i;
+  function scanIframes() {
+    try {
+      document.querySelectorAll("iframe").forEach((f) => {
+        const src = f.src || "";
+        if (src && !/^about:/i.test(src) && EMBED_RE.test(src)) {
+          report(src, "embed", "iframe player", "iframe scan");
+        }
+        let doc = null, win = null;
+        try {
+          win = f.contentWindow;
+          doc = f.contentDocument || (win && win.document);
+        } catch (e) { doc = null; }
+        if (doc) {
+          try {
+            doc.querySelectorAll("video, audio").forEach((v) => {
+              const s = v.currentSrc || v.src || (v.querySelector("source") && v.querySelector("source").src);
+              if (s) report(s, null, "iframe: video element" + (v.videoWidth ? ` — ${v.videoWidth}×${v.videoHeight}` : ""), "iframe scan");
+            });
+            doc.querySelectorAll("a[href]").forEach((a) => {
+              if (MEDIA_RE.test(a.href)) report(a.href, null, "iframe: link", "iframe scan");
+            });
+            if (win && win.performance) {
+              win.performance.getEntriesByType("resource").forEach((r) => {
+                if (MEDIA_RE.test(r.name)) report(r.name, null, "iframe: network", "iframe scan");
+              });
+            }
+          } catch (e) {}
+        }
+      });
+      document.querySelectorAll("embed[src], object[data]").forEach((o) => {
+        const u = o.src || o.data;
+        if (u && EMBED_RE.test(u)) report(u, "embed", "<" + o.tagName.toLowerCase() + "> player", "iframe scan");
+      });
+      // pull in what other frames (and the native sniffer) reported, so the
+      // top-frame panel shows the whole tab, not just its own frame
+      try {
+        chrome.runtime.sendMessage({ type: "vg:list" }, (resp) => {
+          if (chrome.runtime.lastError || !resp || !resp.ok) return;
+          let changed = false;
+          (resp.items || []).forEach((m) => {
+            if (m.url && !items.has(m.url.slice(0, 400))) {
+              items.set(m.url.slice(0, 400), { url: m.url, kind: m.kind, label: m.label || "network", via: m.via || "other frame" });
+              changed = true;
+            }
+          });
+          if (changed) { updateBadge(); renderList(); }
+        });
+      } catch (e) {}
     } catch (e) {}
   }
 

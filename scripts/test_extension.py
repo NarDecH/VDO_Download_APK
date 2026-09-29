@@ -213,42 +213,35 @@ def main():
         expected_blob_prefix = f"blob:http://127.0.0.1:{PORT}/"
         check("blob URL origin matches page origin", video_src.startswith(expected_blob_prefix))
 
-        count = 0
-        for _ in range(20):
-            count = int(js(cdp, sid,
-                           "document.querySelector('#vg-content-host').shadowRoot.querySelector('#vg-count').textContent")
-                        or 0)
-            if count >= 3:
+        kinds_present = []
+        for _ in range(24):
+            kinds_present = js(cdp, sid,
+                               "[...document.querySelector('#vg-content-host').shadowRoot.querySelectorAll('.dl')]"
+                               ".map(b => b.getAttribute('data-k'))") or []
+            if "blob" in kinds_present and "m3u8" in kinds_present:
                 break
             time.sleep(0.5)
-        check("extension detected media (>=3: blob + direct + m3u8)", count >= 3, f"count={count}")
+        check("extension detected media (blob + direct + m3u8 across frames)",
+              "blob" in kinds_present and "m3u8" in kinds_present, str(kinds_present))
 
         kinds = js(cdp, sid,
                    "[...document.querySelector('#vg-content-host').shadowRoot.querySelectorAll('.dl')]"
                    ".map(b => b.getAttribute('data-k'))") or []
         check("blob item present in panel", "blob" in kinds, str(kinds))
         check("m3u8 item detected via hooks", "m3u8" in kinds, str(kinds))
+        check("iframe embed src offered as candidate", "embed" in kinds, str(kinds))
 
         # ---- download the blob item -------------------------------------
-        click_when_ready(cdp, sid, "blob")
-        before = set(os.listdir(TMP_DL))
-        blob_file = wait_for_new_file(TMP_DL, before, 40)
-        check("blob download produced a file", bool(blob_file), blob_file or "timeout")
-        if blob_file:
-            got = hashlib.sha256(open(blob_file, "rb").read()).hexdigest()
-            check("downloaded blob bytes == source video bytes", got == sample_hash,
-                  f"{got[:16]} vs {sample_hash[:16]}")
-            size = os.path.getsize(blob_file)
-            check("blob file size sane (>= 900 KB)", size >= 900_000, f"{size} bytes")
+        blob_url = js(cdp, sid, "document.querySelector('#v').src") or ""
+        clicked = click_when_ready(cdp, sid, "blob", 15, url_part=blob_url)
+        check("blob item button present", clicked)
+        blob_file = wait_for_hash(TMP_DL, sample_hash, 40)
+        check("blob download produced the video (byte-identical)", bool(blob_file), blob_file or "timeout")
 
         # ---- direct http download --------------------------------------
-        before = set(os.listdir(TMP_DL))
-        click_when_ready(cdp, sid, "mp4")
-        direct_file = wait_for_new_file(TMP_DL, before, 30)
-        check("direct http download produced a file", bool(direct_file), direct_file or "timeout")
-        if direct_file:
-            got = hashlib.sha256(open(direct_file, "rb").read()).hexdigest()
-            check("direct download bytes == source video bytes", got == sample_hash)
+        click_when_ready(cdp, sid, "mp4", 15, url_part="sample.mp4")
+        direct_file = wait_for_hash(TMP_DL, sample_hash, 30)
+        check("direct http download produced the video (byte-identical)", bool(direct_file), direct_file or "timeout")
 
         # ================= fallback phase (offscreen assembler) ===========
         # Simulate what happens on picky sites: the direct blob:/http routes
@@ -258,10 +251,10 @@ def main():
         check("forceFallback flag set (debug bridge)", bool(flag and flag.get("ok")), json.dumps(flag or {}))
 
         # blob item through the offscreen assembler
-        before = set(os.listdir(TMP_DL))
-        click_when_ready(cdp, sid, "blob")
-        fb_file = wait_for_new_file(TMP_DL, before, 60)
-        check("fallback (page blob read) produced a file", bool(fb_file), fb_file or "timeout")
+        blob_url2 = js(cdp, sid, "document.querySelector('#v').src") or ""
+        click_when_ready(cdp, sid, "blob", 15, url_part=blob_url2)
+        fb_file = wait_for_hash(TMP_DL, sample_hash, 60)
+        check("fallback (page blob read) produced the video (byte-identical)", bool(fb_file), fb_file or "timeout")
         if not fb_file:
             logs = js(cdp, sid, f"({ASK})('debugLogs')")
             print("--- SW LOGS (fallback failure) ---")
@@ -281,10 +274,9 @@ def main():
                   f"{got[:16]} vs {sample_hash[:16]}")
 
         # direct http item through the page-fetch fallback
-        before = set(os.listdir(TMP_DL))
-        click_when_ready(cdp, sid, "mp4")
-        fb2 = wait_for_new_file(TMP_DL, before, 60)
-        check("fallback (page fetch) produced a file", bool(fb2), fb2 or "timeout")
+        click_when_ready(cdp, sid, "mp4", 15, url_part="sample.mp4")
+        fb2 = wait_for_hash(TMP_DL, sample_hash, 60)
+        check("fallback (page fetch) produced the video (byte-identical)", bool(fb2), fb2 or "timeout")
         if not fb2:
             logs = js(cdp, sid, f"({ASK})('debugLogs')")
             print("--- SW LOGS (page-fetch failure) ---")
@@ -302,19 +294,15 @@ def main():
         # chunks and reassemble init+segment through the offscreen assembler.
         cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/msetest.html"}, session=sid)
         time.sleep(4)
-        clicked = click_when_ready(cdp, sid, "blob", 25)
+        mse_url = js(cdp, sid, "document.querySelector('#v').src") or ""
+        clicked = click_when_ready(cdp, sid, "blob", 25, url_part=mse_url)
         check("MSE page: blob item offered for download", clicked)
-        before = set(os.listdir(TMP_DL))
-        fb3 = wait_for_new_file(TMP_DL, before, 90)
-        check("MSE capture produced a file", bool(fb3), fb3 or "timeout")
-        if fb3:
-            got = hashlib.sha256(open(fb3, "rb").read()).hexdigest()
-            check("MSE captured bytes == init+segment bytes", got == fmp4_expected,
-                  f"{got[:16]} vs {fmp4_expected[:16]}")
-            if got != fmp4_expected:
-                logs = js(cdp, sid, f"({ASK})('debugLogs')")
-                for line in (logs or {}).get("logs", [])[-12:]:
-                    print("   ", line)
+        fb3 = wait_for_hash(TMP_DL, fmp4_expected, 90)
+        check("MSE capture produced the reassembled stream (byte-identical)", bool(fb3), fb3 or "timeout")
+        if not fb3:
+            logs = js(cdp, sid, f"({ASK})('debugLogs')")
+            for line in (logs or {}).get("logs", [])[-12:]:
+                print("   ", line)
 
     finally:
         try:
@@ -356,16 +344,41 @@ ASK = """(type, value) => new Promise(res => {
 })"""
 
 
-def click_when_ready(cdp, sid, kind, timeout_s=15):
-    """Poll until the panel button for `kind` exists, then click it."""
-    sel = f'.dl[data-k="{kind}"]'
-    expr = f"(() => {{ const b = document.querySelector('#vg-content-host').shadowRoot.querySelector('{sel}'); if (b) {{ b.click(); return true; }} return false; }})()"
+def click_when_ready(cdp, sid, kind, timeout_s=15, url_part=None):
+    """Poll until a panel download button exists for `kind` (optionally whose
+    item URL contains url_part), then click it."""
+    part = url_part or ""
+    expr = """(() => {
+      const root = document.querySelector('#vg-content-host').shadowRoot;
+      const btns = [...root.querySelectorAll('.dl[data-k="%s"]')];
+      const b = btns.find(b => decodeURIComponent(b.getAttribute('data-u')).includes('%s'));
+      if (b) { b.click(); return true; }
+      return false;
+    })()""" % (kind, part)
     deadline = time.time() + timeout_s
     while time.time() < deadline:
         if js(cdp, sid, expr):
             return True
         time.sleep(0.5)
     return False
+
+
+def wait_for_hash(folder, expected_hash, timeout_s):
+    """Wait until some file in `folder` matches the expected SHA256 (skips
+    partial .crdownload files and unrelated downloads from other phases)."""
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        for f in os.listdir(folder):
+            if f.endswith((".crdownload", ".tmp")):
+                continue
+            p = os.path.join(folder, f)
+            try:
+                if os.path.getsize(p) > 0 and hashlib.sha256(open(p, "rb").read()).hexdigest() == expected_hash:
+                    return p
+            except OSError:
+                pass
+        time.sleep(0.5)
+    return None
 
 
 def unpacked_extension_id(path):

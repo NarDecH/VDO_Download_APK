@@ -318,7 +318,9 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
 
       case "vg:list": {
-        const key = await tabKey(msg.tabId);
+        // content scripts don't know their tab id - fall back to the sender
+        const tabId = (sender.tab && sender.tab.id) != null ? sender.tab.id : msg.tabId;
+        const key = await tabKey(tabId);
         const store = await chrome.storage.session.get(key);
         sendResponse({ ok: true, items: store[key] || [], logs: logs.slice(-120) });
         break;

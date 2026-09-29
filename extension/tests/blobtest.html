@@ -13,6 +13,9 @@ players that hide the direct file URL. The extension must still offer a working 
 <video id="v" controls width="480"></video>
 <p id="st">creating blob…</p>
 <a href="sample.mp4">direct sample.mp4 link</a>
+<!-- cross-port iframe embed player: same server, still a distinct "player page";
+     the top frame must report the iframe src itself as an embed candidate -->
+<iframe src="/embed.html" width="320" height="180"></iframe>
 <script>
   // keep a reference so the blob is not garbage-collected
   window.__keep = [];

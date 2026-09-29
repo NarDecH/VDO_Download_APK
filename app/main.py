@@ -357,7 +357,7 @@ def selftest() -> int:
 
     app.downloads.push_ui = push_stub
 
-    # --- tiny local media server -----------------------------------------
+    # --- tiny local media server (two ports = two origins for iframe tests) -
     mp4 = (b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * (256 * 1024 - 24))
     m3u8 = b"#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:4.0,\nseg0.ts\n#EXT-X-ENDLIST\n"
 
@@ -373,10 +373,17 @@ def selftest() -> int:
         def log_message(self, *a):
             pass
 
-    srv = ThreadingHTTPServer(("127.0.0.1", 0), H)
+    def start_server(port_hint=0):
+        s = ThreadingHTTPServer(("127.0.0.1", port_hint), H)
+        threading.Thread(target=s.serve_forever, daemon=True).start()
+        return s
+
+    srv = start_server()
     port = srv.server_address[1]
-    threading.Thread(target=srv.serve_forever, daemon=True).start()
-    app.logm.log("selftest: local media server on port %d" % port, event="selftest_server", port=port)
+    srv2 = start_server()
+    port2 = srv2.server_address[1]
+    app.logm.log("selftest: local media servers on ports %d, %d" % (port, port2),
+                 event="selftest_server", port=port, port2=port2)
 
     # --- 1) engines --------------------------------------------------------
     try:
@@ -388,7 +395,7 @@ def selftest() -> int:
     # --- 2) detection JS in a real webview ---------------------------------
     src_page = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "testpage.html")
     with open(src_page, "r", encoding="utf-8") as f:
-        html = f.read().replace("__PORT__", str(port))
+        html = f.read().replace("__PORT__", str(port)).replace("__PORT2__", str(port2))
     tmp_page = os.path.join(app.data_dir, "selftest-page.html")
     with open(tmp_page, "w", encoding="utf-8") as f:
         f.write(html)
@@ -410,10 +417,17 @@ def selftest() -> int:
                 pass
 
         webview.start(func=on_loaded, gui="edgechromium")
-        kinds = {r["kind"] for r in app.media.list()}
+        items = app.media.list()
+        kinds = {r["kind"] for r in items}
+        urls = [r["url"] for r in items]
+        has_embed = "embed" in kinds and any("/embed.html" in u for u in urls)
+        has_iframe_video = any("iframe-video.mp4" in u for u in urls)
+        has_dom_video = any("dom-video.mp4" in u for u in urls)
+        has_hooks = "m3u8" in kinds and "mpd" in kinds
         results["detection"] = {
-            "ok": ("mp4" in kinds or "media" in kinds) and "m3u8" in kinds,
-            "found": [{"kind": r["kind"], "via": r["via"], "url": r["url"][:80]} for r in app.media.list()],
+            "ok": has_hooks and has_dom_video and has_embed and has_iframe_video,
+            "found": [{"kind": r["kind"], "via": r["via"], "url": r["url"][:80]} for r in items],
+            "checks": {"dom": has_dom_video, "hooks": has_hooks, "embed_iframe": has_embed, "srcdoc_iframe": has_iframe_video},
         }
     except Exception as e:
         results["detection"] = {"ok": False, "error": repr(e)}
@@ -434,6 +448,7 @@ def selftest() -> int:
         results["download"] = {"ok": False, "error": repr(e)}
 
     srv.shutdown()
+    srv2.shutdown()
     print(json.dumps(results, ensure_ascii=False, indent=2))
     passed = results["ytdlp"]["ok"] and results["detection"]["ok"] and results["download"]["ok"]
     app.logm.log("SELFTEST %s" % ("PASS" if passed else "FAIL"), event="selftest", passed=passed,

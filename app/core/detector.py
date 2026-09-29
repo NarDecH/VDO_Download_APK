@@ -129,12 +129,56 @@ DETECT_JS = r"""
     } catch (e) {}
   }
 
+  // ---- iframe scan ------------------------------------------------------
+  // - same-origin / srcdoc frames: reachable -> deep scan their DOM + timing
+  // - cross-origin frames (typical embed players): same-origin policy blocks
+  //   the inside, so report the embed URL itself - yt-dlp extracts those.
+  const EMBED_RE = /embed|player|video|watch|stream|play|media|vod|\/v\/|\/e\//i;
+  function scanIframes() {
+    try {
+      document.querySelectorAll("iframe").forEach(function (f) {
+        const src = f.src || "";
+        if (src && !/^about:/i.test(src) && EMBED_RE.test(src)) {
+          report(src, "embed", "iframe player (yt-dlp สกัดให้)", "iframe scan");
+        }
+        let doc = null, win = null;
+        try {
+          win = f.contentWindow;
+          doc = f.contentDocument || (win && win.document);
+        } catch (e) { doc = null; }
+        if (doc) {
+          try {
+            doc.querySelectorAll("video, audio").forEach(function (v) {
+              const s = v.currentSrc || v.src || (v.querySelector("source") && v.querySelector("source").src);
+              if (s) report(s, null, "iframe: video element" + (v.videoWidth ? " — " + v.videoWidth + "×" + v.videoHeight : ""), "iframe scan");
+            });
+            doc.querySelectorAll("video source, audio source").forEach(function (s) {
+              if (s.src) report(s.src, null, "iframe: <source>", "iframe scan");
+            });
+            doc.querySelectorAll("a[href]").forEach(function (a) {
+              if (MEDIA_RE.test(a.href)) report(a.href, null, "iframe: link", "iframe scan");
+            });
+            if (win && win.performance) {
+              win.performance.getEntriesByType("resource").forEach(function (r) {
+                if (MEDIA_RE.test(r.name)) report(r.name, null, "iframe: network", "iframe scan");
+              });
+            }
+          } catch (e) {}
+        }
+      });
+      document.querySelectorAll("embed[src], object[data]").forEach(function (o) {
+        const u = o.src || o.data;
+        if (u && EMBED_RE.test(u)) report(u, "embed", "<" + o.tagName.toLowerCase() + "> player", "iframe scan");
+      });
+    } catch (e) {}
+  }
+
   // ---- orchestrator -----------------------------------------------------
   let scanCount = 0;
   window.__vgDetect = {
     scan: function (reason) {
       scanCount++;
-      installHooks(); scanDom(); scanResources(); flush();
+      installHooks(); scanDom(); scanResources(); scanIframes(); flush();
       // deep scan can be requested from the toolbar button
       return scanCount;
     }
