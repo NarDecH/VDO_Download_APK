@@ -30,6 +30,10 @@ android/             โปรเจกต์ Gradle มาตรฐาน (AGP 
   .../Detector.kt       INJECT_JS — ฉบับ Android ของตัวตรวจจับ
   .../FileLog.kt        ระบบ log สามไฟล์เดียวกับฝั่ง desktop
 scripts/             make_icon.py (Pillow) · build_exe.py (PyInstaller) · version_info.txt
+                     test_extension.py — E2E ทดสอบ extension ด้วย Chrome for Testing + CDP
+extension/           ส่วนขยาย Chrome (MV3): content.js (UI/DOM scan) · inject-main.js (MAIN world:
+                     fetch/XHR hooks + MediaSource.appendBuffer capture + blob reader) ·
+                     background.js (SW: downloads + webRequest sniffer) · popup · tests/blobtest.html
 docs/                readme/research/changelog (md + html) · index.html = หน้าดาวน์โหลด (Pages)
                      assets/ (สกรีนช็อต, SVG ไดอะแกรม, demo pages)
 .github/workflows/android.yml   ปั่น APK และแนบ release + checksum
@@ -45,6 +49,12 @@ python app/main.py --selftest     # ต้องผ่าน (exit 0) ก่อ�
 python scripts/build_exe.py       # dist/VDOGrabber.exe (~32MB) แล้วทดสอบ exe: ./dist/VDOGrabber.exe --selftest
 python scripts/make_icon.py       # สร้าง assets/icon.ico + docs/assets/logo.png
 cd android && ./gradlew assembleDebug   # หรือปล่อยให้ CI ทำ
+
+# Chrome extension
+python scripts/test_extension.py  # E2E: Chrome for Testing + CDP (12 checks, รวม blob byte-compare)
+                                  # แตะ extension/ แล้วต้องรันให้ผ่านก่อน push
+                                  # ห้ามใช้ --load-extension บน Chrome/Edge branded stable (ถูกบล็อก)
+                                  # ให้ใช้ tools/chrome-win64 (Chrome for Testing — ดาวน์โหลดเองไม่ commit)
 ```
 
 ## กติกาการแก้โค้ด

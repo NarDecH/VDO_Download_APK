@@ -1,3 +1,4 @@
 pywebview>=6.0
 Pillow>=10.0
 pyinstaller>=6.0
+websocket-client>=1.8  # extension E2E test (scripts/test_extension.py)

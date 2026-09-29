@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<title>Test Player — blob video (player2u pattern)</title>
+<style>body{font-family:system-ui;background:#111;color:#ddd;padding:20px}video{max-width:480px}</style>
+</head>
+<body>
+<h1>blob: URL test page (same mechanism as player2u.com)</h1>
+<p>This page fetches a video over HTTP, wraps it in a Blob and assigns
+<code>blob:http://…/uuid</code> as the <code>&lt;video&gt;</code> source — exactly the pattern used by
+players that hide the direct file URL. The extension must still offer a working download.</p>
+<video id="v" controls width="480"></video>
+<p id="st">creating blob…</p>
+<a href="sample.mp4">direct sample.mp4 link</a>
+<script>
+  // keep a reference so the blob is not garbage-collected
+  window.__keep = [];
+  fetch("/sample.mp4").then(r => r.blob()).then(b => {
+    const url = URL.createObjectURL(b);
+    window.__keep.push(url);
+    const v = document.getElementById("v");
+    v.src = url;
+    document.getElementById("st").textContent = "video src = " + url;
+  });
+  // also exercise the fetch hook with an HLS manifest
+  fetch("/stream.m3u8").catch(() => {});
+</script>
+</body>
+</html>

@@ -59,6 +59,25 @@ a{color:#7fb3ff}
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
+    <span class="vtag" style="background:#1f2c52">Unreleased</span>
+    <span class="vtag-latest" style="background:#78350f;color:#fcd34d">COMING</span>
+    <span class="vdate">ส่วนขยาย Chrome — แนบใน release v1.0.0 แล้ว</span>
+  </div>
+  <h3>เพิ่มใหม่ <span class="en">Added</span></h3>
+  <ul>
+    <li><b>ส่วนขยาย Chrome (MV3)</b> — ปุ่มลอย + แผงรายการวิดีโอในทุกหน้าเว็บ, ตรวจจับ 4 ชั้น
+        (DOM scan · hook fetch/XHR ใน MAIN world · resource timing · webRequest observer),
+        popup ต่อแท็บพร้อม logs และท่อดาวน์โหลดหลายชั้น: direct → blob: ตรง → อ่าน bytes ในหน้า
+        → MSE capture (ดัก <code>MediaSource.appendBuffer</code> แล้วประกอบไฟล์)</li>
+    <li><b>ทดสอบ E2E ด้วย Chrome จริง</b> (Chrome for Testing + CDP) กับหน้าจำลองกลไก
+        <code>blob:</code> ของ player2u.com — ผ่าน 12/12 รวมถึงไฟล์ที่ดาวน์โหลดจาก blob มี
+        SHA256 ตรงกับต้นฉบับทุกไบต์</li>
+    <li>แนบ <code>VDOGrabber-chrome-extension-1.0.0.zip</code> ใน release พร้อม checksum</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
     <span class="vtag">v1.0.0</span>
     <span class="vtag-latest">LATEST</span>
     <span class="vdate">29 กันยายน 2026</span>

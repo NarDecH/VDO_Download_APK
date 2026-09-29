@@ -2,6 +2,21 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [Unreleased]
+
+### เพิ่มใหม่ (Added)
+- **ส่วนขยาย Chrome (MV3)** ในโฟลเดอร์ `extension/` — ปุ่มลอย + แผงรายการวิดีโอในทุกหน้าเว็บ,
+  ตรวจจับ 4 ชั้น (DOM scan, hook fetch/XHR ใน MAIN world, resource timing, webRequest observer),
+  popup แสดงรายการต่อแท็บพร้อม logs, และท่อดาวน์โหลดหลายชั้น:
+  1. direct http(s) ผ่าน `chrome.downloads` (แนบ Referer จากหน้า)
+  2. `blob:` URL → ดาวน์โหลดตรงผ่าน downloads API (ไฟล์ blob ต้องยังมีชีวิตอยู่ในหน้า)
+  3. fallback: อ่าน bytes ในหน้า (fetch blob → base64 chunks → data URL)
+  4. MSE streams: ดัก `MediaSource.appendBuffer` เก็บชิ้นส่วนแล้วประกอบไฟล์ใหม่
+- **ทดสอบ E2E ด้วย Chrome จริง** (`scripts/test_extension.py` + Chrome for Testing + CDP):
+  หน้าทดสอบจำลองกลไก `blob:` ของ player2u.com (fetch → Blob → video.src) — ผ่าน 12/12
+  รวมถึงพิสูจน์ว่าไฟล์ที่ดาวน์โหลดจาก blob มี SHA256 ตรงกับต้นฉบับทุกไบต์
+- แนบ `VDOGrabber-chrome-extension-1.0.0.zip` เข้า release พร้อม checksum
+
 ## [1.0.0] — 2026-09-29
 
 ### เพิ่มใหม่ (Added)

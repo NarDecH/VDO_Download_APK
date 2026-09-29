@@ -9,6 +9,7 @@
 |---|---|---|
 | Windows | `VDOGrabber.exe` ไฟล์เดียว (PyInstaller) ไม่ต้องติดตั้ง Python | pywebview (WebView2) + yt-dlp + ffmpeg |
 | Android | `VDOGrabber-android.apk` (GitHub Actions build) | Kotlin WebView + DownloadManager |
+| Chrome | ส่วนขยาย MV3 (`extension/`, zip ใน release) | content script + MAIN-world hooks + chrome.downloads |
 
 ## ลิงก์ด่วน
 

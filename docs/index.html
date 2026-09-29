@@ -126,11 +126,13 @@ function fmtBytes(n){ if(!n && n!==0) return ""; const u=["B","KB","MB","GB"]; l
 function assetIcon(name){
   if(/\.exe$/i.test(name)) return "🪟";
   if(/\.apk$/i.test(name)) return "🤖";
+  if(/chrome.*\.zip/i.test(name)) return "🧩";
   return "📦";
 }
 function assetTitle(name){
   if(/windows|\.exe$/i.test(name)) return "สำหรับ Windows — ไฟล์เดียว ไม่ต้องติดตั้ง Python";
   if(/android|\.apk$/i.test(name)) return "สำหรับ Android — ติดตั้งได้ทันที";
+  if(/chrome.*\.zip/i.test(name)) return "ส่วนขยาย Chrome — แตก zip แล้วโหลดที่ chrome://extensions (เปิด Developer mode → Load unpacked)";
   if(/checksum/i.test(name)) return "รวมค่า SHA256 ของทุกไฟล์ใน release นี้";
   return "";
 }

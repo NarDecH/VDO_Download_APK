@@ -31,3 +31,9 @@ app/bin/
 
 # local release staging (assets go to GitHub Releases, not the repo)
 release/
+
+# extension E2E test artifacts
+tmp_dl/
+tmp_chrome/
+tools/
+chrome_launch.log
