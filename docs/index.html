@@ -153,6 +153,13 @@ async function getChecksumFor(asset, release){
   return null;
 }
 
+function checksumBox(checksum){
+  if (!checksum) return "";
+  const id = "cs" + Math.random().toString(36).slice(2, 8);
+  return `<div class="checksum"><span class="lbl">SHA256</span>
+    <span id="${id}" style="flex:1">${esc(checksum)}</span>
+    <button class="copy" onclick="copyCs('${id}', this)">คัดลอก</button></div>`;
+}
 function copyCs(id, btn){
   navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
     btn.textContent = "คัดลอกแล้ว ✓"; setTimeout(() => btn.textContent = "คัดลอก", 1800);
