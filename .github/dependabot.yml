@@ -1,0 +1,19 @@
+version: 2
+updates:
+  # Python deps (pywebview, Pillow, pyinstaller, websocket-client)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Android (junit, androidx.*, material)
+  - package-ecosystem: "gradle"
+    directory: "/android"
+    schedule:
+      interval: "weekly"
+
+  # GitHub Actions themselves (checkout, setup-python, setup-java, ...)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"

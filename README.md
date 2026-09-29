@@ -11,6 +11,20 @@
 | Android | `VDOGrabber-android.apk` (GitHub Actions build) | Kotlin WebView + DownloadManager |
 | Chrome | ส่วนขยาย MV3 (`extension/`, zip ใน release) | content script + MAIN-world hooks + chrome.downloads |
 
+## ตรวจจับวิดีโออย่างไร
+
+ทุกหน้าที่เปิดจะถูกฉีดสคริปต์ตรวจจับ 4 ชั้น (ฝั่ง desktop และ Android เป็นโค้ดคู่กัน):
+
+![Detection Pipeline](docs/assets/detection-pipeline.svg)
+
+1. **DOM scan** — `<video>/<source>/<audio>`, meta og:video, JSON-LD VideoObject, ลิงก์ที่ชี้เข้าไฟล์สื่อ
+2. **Network hooks** — wrap `fetch`/`XMLHttpRequest` (MAIN world) จับ m3u8/mpd/mp4 แม้ไม่มีแท็กวิดีโอ
+3. **Resource timing** — จับ request ที่เกิดก่อน hook ถูกติดตั้ง
+4. **Iframe scan** — same-origin/srcdoc สแกนลึกข้างใน · cross-origin embed player รายงาน URL embed (+ปุ่มเปิดหน้า embed)
+
+> กติกาการดูแล: ตัวตรวจจับสองฝั่งเป็น "คู่" ต้อง sync กันเสมอ — `--selftest` ขั้น `pair_sync`
+> จะตรวจว่า JS ทั้งคู่ถูกต้องและมี feature markers ตรงกันทุก build (ดู [docs/research.md](docs/research.md))
+
 ## ลิงก์ด่วน
 
 - ⬇ **[หน้าดาวน์โหลด (GitHub Pages)](https://nardech.github.io/VDO_Download_APK/)** — ดึง release ล่าสุดอัตโนมัติ + checksum

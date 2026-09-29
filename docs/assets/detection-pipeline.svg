@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 660" font-family="Segoe UI, sans-serif">
+  <defs>
+    <linearGradient id="acc" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ff5f6d"/><stop offset="1" stop-color="#ffc371"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#7d8db1"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="660" fill="#0b1020" rx="14"/>
+
+  <text x="40" y="48" fill="#e8ecf4" font-size="24" font-weight="700">Video Detection Pipeline — 4 layers, injected into every page</text>
+  <text x="40" y="74" fill="#7d8db1" font-size="13">DETECT_JS (desktop) ↔ Detector.INJECT_JS (Android) — kept in lockstep by the pair_sync selftest step</text>
+
+  <!-- layer 1 -->
+  <g>
+    <rect x="40" y="110" width="540" height="200" rx="12" fill="#141d38" stroke="#25335a"/>
+    <circle cx="80" cy="150" r="20" fill="url(#acc)"/>
+    <text x="80" y="157" fill="#fff" font-size="18" font-weight="800" text-anchor="middle">1</text>
+    <text x="114" y="157" fill="#e8ecf4" font-size="17" font-weight="700">DOM scan</text>
+    <text x="64" y="192" fill="#93a4c3" font-size="13">&lt;video&gt; / &lt;source&gt; / &lt;audio&gt; currentSrc</text>
+    <text x="64" y="216" fill="#93a4c3" font-size="13">meta og:video · twitter:player:stream</text>
+    <text x="64" y="240" fill="#93a4c3" font-size="13">JSON-LD VideoObject.contentUrl</text>
+    <text x="64" y="264" fill="#93a4c3" font-size="13">&lt;a href&gt; pointing at media files</text>
+    <text x="64" y="292" fill="#5c6b8c" font-size="11.5">runs every 3 s (periodic re-scan)</text>
+  </g>
+
+  <!-- layer 2 -->
+  <g>
+    <rect x="620" y="110" width="540" height="200" rx="12" fill="#141d38" stroke="#25335a"/>
+    <circle cx="660" cy="150" r="20" fill="url(#acc)"/>
+    <text x="660" y="157" fill="#fff" font-size="18" font-weight="800" text-anchor="middle">2</text>
+    <text x="694" y="157" fill="#e8ecf4" font-size="17" font-weight="700">Network hooks</text>
+    <text x="644" y="192" fill="#93a4c3" font-size="13">wrap window.fetch (keeps original behaviour)</text>
+    <text x="644" y="216" fill="#93a4c3" font-size="13">wrap XMLHttpRequest.open</text>
+    <text x="644" y="240" fill="#93a4c3" font-size="13">catch m3u8 / mpd / mp4 requests</text>
+    <text x="644" y="264" fill="#93a4c3" font-size="13">works even with no &lt;video&gt; tag at all</text>
+    <text x="644" y="292" fill="#5c6b8c" font-size="11.5">installed before page scripts run where possible</text>
+  </g>
+
+  <!-- layer 3 -->
+  <g>
+    <rect x="40" y="350" width="540" height="200" rx="12" fill="#141d38" stroke="#25335a"/>
+    <circle cx="80" cy="390" r="20" fill="url(#acc)"/>
+    <text x="80" y="397" fill="#fff" font-size="18" font-weight="800" text-anchor="middle">3</text>
+    <text x="114" y="397" fill="#e8ecf4" font-size="17" font-weight="700">Resource timing</text>
+    <text x="64" y="432" fill="#93a4c3" font-size="13">performance.getEntriesByType('resource')</text>
+    <text x="64" y="456" fill="#93a4c3" font-size="13">surfaces requests made BEFORE hooks existed</text>
+    <text x="64" y="480" fill="#93a4c3" font-size="13">re-checked on every scan cycle</text>
+    <text x="64" y="504" fill="#93a4c3" font-size="13">same technique inside reachable iframes</text>
+    <text x="64" y="532" fill="#5c6b8c" font-size="11.5">complements layers 1–2, zero false negatives on reload</text>
+  </g>
+
+  <!-- layer 4 -->
+  <g>
+    <rect x="620" y="350" width="540" height="200" rx="12" fill="#141d38" stroke="#25335a"/>
+    <circle cx="660" cy="390" r="20" fill="url(#acc)"/>
+    <text x="660" y="397" fill="#fff" font-size="18" font-weight="800" text-anchor="middle">4</text>
+    <text x="694" y="397" fill="#e8ecf4" font-size="17" font-weight="700">Iframe / embed scan</text>
+    <text x="644" y="432" fill="#93a4c3" font-size="13">same-origin + srcdoc frames → deep scan inside</text>
+    <text x="644" y="456" fill="#93a4c3" font-size="13">cross-origin embed players → report embed URL</text>
+    <text x="644" y="480" fill="#93a4c3" font-size="13">desktop: yt-dlp extracts · "open embed page" button</text>
+    <text x="644" y="504" fill="#93a4c3" font-size="13">&lt;embed&gt; / &lt;object&gt; players included</text>
+    <text x="644" y="532" fill="#5c6b8c" font-size="11.5">same-origin policy is respected, never bypassed</text>
+  </g>
+
+  <!-- arrows to result bar -->
+  <path d="M310 310 L310 350 L560 350 L560 588" fill="none" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)"/>
+  <path d="M890 310 L890 588" fill="none" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)"/>
+  <path d="M310 550 L560 588" fill="none" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)"/>
+  <path d="M890 550 L700 588" fill="none" stroke="#7d8db1" stroke-width="2" marker-end="url(#arr)"/>
+
+  <!-- result bar -->
+  <rect x="40" y="590" width="1100" height="52" rx="12" fill="url(#acc)"/>
+  <text x="590" y="622" fill="#0b1020" font-size="15" font-weight="700" text-anchor="middle">report → window.pywebview.api / AndroidBridge → MediaStore (LRU) → toolbar badge + Control Center + events.jsonl</text>
+</svg>

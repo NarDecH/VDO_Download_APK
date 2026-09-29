@@ -4,6 +4,15 @@
 
 ## [Unreleased]
 
+### เพิ่มใหม่ (Added)
+- ไดอะแกรม pipeline การตรวจจับ 4 ชั้น (`docs/assets/detection-pipeline.svg`) พร้อมหัวข้อ
+  "ตรวจจับวิดีโออย่างไร" ใน README หลักของ repo
+- แผนฟีเจอร์ HLS/DASH บน Android ด้วย youtubedl-android ([docs/plan-android-hls.md](plan-android-hls.md))
+
+### บำรุงรักษา (Maintenance) — CI / Repo
+- **Branch protection บน main**: ต้องผ่าน check `selftest` (desktop) และ `build` (Android) ก่อน merge เสมอ (strict)
+- **Dependabot** สำหรับ pip / gradle / github-actions (รายสัปดาห์) — actions จะไม่ค้างเก่าอีก
+
 ## [1.0.1] — 2026-09-29
 
 ### เพิ่มใหม่ (Added) — Android v1.0.1 (versionCode 2)
