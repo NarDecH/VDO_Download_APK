@@ -18,6 +18,10 @@
 - **Engine init ตอนเปิดแอป** + **ปุ่มบำรุงรักษาเอนจิน** ในหน้า Logs (ตรวจเวอร์ชัน / อัปเดต yt-dlp ผ่าน `updateYoutubeDL`) — ขั้น 6 ของแผน
 - CI: gradle-wrapper 9.8.0 (dependabot #10, update-branch แล้ว CI ผ่าน + merge)
 
+### เดสก์ท็อป v1.1.0 (รีลีสเดียวกัน)
+- เลขเวอร์ชัน desktop ขยับเป็น 1.1.0 ให้ตรงกับ Android (APP_VERSION + Windows version resource)
+  — ไม่มีการเปลี่ยนพฤติกรรม; rebuild ด้วย dependencies ใหม่ตาม dependabot floors
+
 ### เอกสาร
 - ตรวจทาน plan-android-hls.md: ยืนยันขั้น 1–3 + 6 ทำแล้วบนโค้ด, เหลือขั้น 5 (ทดสอบบนอุปกรณ์จริง) เป็นลำดับถัดไป
 
