@@ -39,7 +39,7 @@ class StreamEngineTest {
     @Test
     fun engineIsInitialized() {
         YoutubeDL.getInstance().init(instr.targetContext) // idempotent
-        val v = YoutubeDL.getInstance().version(instr.targetContext)
+        val v: String = YoutubeDL.getInstance().version(instr.targetContext) ?: ""
         assertTrue("engine version should be non-empty", v.isNotEmpty())
     }
 
