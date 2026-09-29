@@ -19,8 +19,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import youtubedl.YoutubeDL
-import youtubedl.YoutubeDLRequest
+import com.yausername.youtubedl_android.YoutubeDL
+import com.yausername.youtubedl_android.YoutubeDLRequest
 
 /**
  * On-device HLS/DASH (and any yt-dlp-supported site) downloads.
@@ -80,7 +80,7 @@ class StreamDownloadService : Service() {
                 }
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
                     updateNotification(title.ifEmpty { url }, progress)
-                    if (line.isNotBlank()) FileLog.download("[stream] $line")
+                    if (!line.isNullOrBlank()) FileLog.download("[stream] $line")
                 }
                 ok = result.exitCode == 0
                 if (!ok) errorMsg = "yt-dlp exit ${result.exitCode}"
