@@ -55,6 +55,10 @@ class MediaStore:
         with self._lock:
             return list(self.items.values())[-self.limit :]
 
+    def clear(self) -> None:
+        with self._lock:
+            self.items.clear()
+
 
 class Api:
     """Bridge exposed to JS as window.pywebview.api (both windows).
@@ -119,6 +123,7 @@ class Api:
             title=str(spec.get("title") or ""),
             page_url=str(spec.get("page_url") or ""),
             referrer=str(spec.get("referrer") or ""),
+            page_title=str(spec.get("page_title") or ""),
         )
         _APP.push_control("download_update", job.public())
         return {"ok": True, "job": job.public()}
@@ -128,6 +133,17 @@ class Api:
 
     def downloads_list(self) -> list[dict]:
         return _APP.downloads.list()
+
+    def downloads_clear(self) -> dict:
+        """Clear finished downloads from the Control Center list."""
+        return _APP.downloads.clear_list()
+
+    def media_clear(self) -> dict:
+        """Clear the detected-videos list (both windows use the same store)."""
+        n = len(_APP.media.items)
+        _APP.media.clear()
+        _APP.logm.log("media list cleared: %d items" % n, event="media_cleared", removed=n)
+        return {"ok": True, "removed": n}
 
     def download_open_folder(self, job_id: str = "") -> None:
         d = _APP.downloads.jobs[job_id].out_dir if job_id in _APP.downloads.jobs else _APP.settings.get("download_dir")

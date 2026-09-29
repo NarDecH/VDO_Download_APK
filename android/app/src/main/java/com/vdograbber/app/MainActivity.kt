@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.1.5 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.1.6 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -200,6 +200,13 @@ class MainActivity : AppCompatActivity() {
             .setTitle(getString(R.string.found_title, items.size))
             .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
+            .setNeutralButton(R.string.clear_list) { _, _ ->
+                MediaStore.clear()
+                updateChip()
+                FileLog.event("media_cleared", mapOf("removed" to items.size))
+                FileLog.app("INFO", "ui", "media list cleared (${items.size} items)")
+                Toast.makeText(this, R.string.cleared, Toast.LENGTH_SHORT).show()
+            }
             .show()
         for (m in items.take(15)) {
             val row = layoutInflater.inflate(R.layout.item_media, container, false)

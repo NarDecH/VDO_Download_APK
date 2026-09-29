@@ -64,6 +64,9 @@ class StreamDownloadService : Service() {
         val url = intent?.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
         if (url.isEmpty()) { stopSelf(); return START_NOT_STICKY }
+        // v1.1.6: name the file after the page title (deduped on disk),
+        // falling back to yt-dlp's metadata title + id when there is none.
+        val titleBase = StreamArgs.sanitizeFilename(title)
 
         startForeground(NOTIF_ID, buildNotification(title.ifEmpty { url }, 0))
         FileLog.event("download_start", mapOf("url" to url, "kind" to "stream", "engine" to "ytdl-android"))
@@ -75,7 +78,7 @@ class StreamDownloadService : Service() {
             val pid = processId ?: ""
             try {
                 val req = YoutubeDLRequest(url).apply {
-                    StreamArgs.optionsArgs(outDir).forEach { addOption(it) }
+                    StreamArgs.optionsArgs(outDir, titleBase).forEach { addOption(it) }
                     addOption("-f", "bv*+ba/b")
                 }
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
@@ -91,9 +94,10 @@ class StreamDownloadService : Service() {
 
             if (ok) {
                 val file = StreamArgs.newestFileIn(outDir)
-                publishFile(file)
+                val published = publishFile(file, title)
                 FileLog.event("download_done", mapOf("url" to url, "engine" to "ytdl-android"))
-                FileLog.app("INFO", "dl", "stream download done: ${file?.name}")
+                FileLog.app("INFO", "dl", "stream download done: ${published?.first ?: file?.name}")
+                finishNotification(true, published?.first ?: file?.name ?: title.ifEmpty { url }, published?.second)
             } else {
                 FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
@@ -107,34 +111,48 @@ class StreamDownloadService : Service() {
                     sendBroadcast(i)
                 }
             }
-            finishNotification(ok, title.ifEmpty { url })
+            if (!ok) finishNotification(false, title.ifEmpty { url })
             stopSelf()
         }
         return START_NOT_STICKY
     }
 
-    /** Copy the finished file into the public media store so gallery/apps see it. */
-    private fun publishFile(file: File?) {
-        if (file == null || !file.exists()) return
+    /**
+     * Copy the finished file into the public media store so gallery/apps see it.
+     * v1.1.6: renamed to the sanitized page title and de-duplicated
+     * (`name (2).mp4`); returns (display name, content URI) for the
+     * finished-notification's open action, or null when publish failed.
+     */
+    private fun publishFile(file: File?, title: String): Pair<String, Uri>? {
+        if (file == null || !file.exists()) return null
         val ext = file.extension.ifEmpty { "mp4" }
+        val stem = StreamArgs.sanitizeFilename(title)
+        // when yt-dlp already named/deduped it after the title, keep that name
+        val displayName = when {
+            stem.isEmpty() -> file.name
+            file.name.startsWith(stem) -> file.name
+            else -> StreamArgs.uniqueFileName(outDir, stem, ext)
+        }
         try {
             val values = android.content.ContentValues().apply {
-                put(MediaStore.MediaColumns.DISPLAY_NAME, file.name)
+                put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
                 put(MediaStore.MediaColumns.MIME_TYPE, StreamArgs.mimeOf(ext))
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/VDOGrabber")
                 }
             }
             val uri: Uri = contentResolver.insert(
-                MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
             contentResolver.openOutputStream(uri)?.use { out ->
                 file.inputStream().use { it.copyTo(out) }
             }
             file.delete() // avoid a second copy sitting in the public dir
-            FileLog.event("download_published", mapOf("file" to file.name, "uri" to uri.toString().take(120)))
+            FileLog.event("download_published", mapOf("file" to displayName, "uri" to uri.toString().take(120)))
+            return displayName to uri
         } catch (e: Exception) {
             // worst case: the raw file remains in Downloads/VDOGrabber
             FileLog.app("WARNING", "dl", "publish failed (file kept): $e")
+            return null
         }
     }
 
@@ -161,15 +179,37 @@ class StreamDownloadService : Service() {
         nm.notify(NOTIF_ID, buildNotification(title, progress.toInt().coerceIn(0, 99)))
     }
 
-    private fun finishNotification(ok: Boolean, title: String) {
+    /**
+     * Finished-notification (v1.1.6): tapping it (or the เปิด action) opens the
+     * published file via its MediaStore URI; failure notifications open the
+     * app so the user can re-scan the page.
+     */
+    private fun finishNotification(ok: Boolean, text: String, openUri: Uri? = null) {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val n = NotificationCompat.Builder(this, CHANNEL_ID)
+        val b = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(if (ok) android.R.drawable.stat_sys_download_done else android.R.drawable.stat_notify_error)
             .setContentTitle(getString(if (ok) R.string.stream_dl_done else R.string.stream_dl_failed))
-            .setContentText(title.take(60))
+            .setContentText(text.take(60))
             .setOngoing(false)
-            .build()
-        nm.notify(NOTIF_DONE_ID, n)
+            .setAutoCancel(true)
+        val view = openPendingIntent(ok, openUri)
+        b.setContentIntent(view)
+        if (ok && openUri != null) b.addAction(0, getString(R.string.notif_open), view)
+        nm.notify(NOTIF_DONE_ID, b.build())
+    }
+
+    private fun openPendingIntent(ok: Boolean, openUri: Uri?): PendingIntent {
+        if (ok && openUri != null) {
+            val i = Intent(Intent.ACTION_VIEW)
+                .setDataAndType(openUri, "video/*")
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+            return PendingIntent.getActivity(
+                this, RC_OPEN, i,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        }
+        return PendingIntent.getActivity(
+            this, RC_MAIN, Intent(this, MainActivity::class.java),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
 
     private fun cancelPendingIntent(): PendingIntent = PendingIntent.getService(
@@ -189,6 +229,8 @@ class StreamDownloadService : Service() {
         private const val CHANNEL_ID = "stream_downloads"
         private const val NOTIF_ID = 41
         private const val NOTIF_DONE_ID = 42
+        private const val RC_OPEN = 43
+        private const val RC_MAIN = 44
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"

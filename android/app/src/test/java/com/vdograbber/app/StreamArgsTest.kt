@@ -40,6 +40,45 @@ class StreamArgsTest {
     }
 
     @Test
+    fun `output template with title base names the file after the title`() {
+        val t = StreamArgs.outputTemplate(File("/tmp"), "My Clip")
+        assertTrue(t.endsWith("My Clip.%(ext)s"))
+        // literal % must be doubled for yt-dlp
+        val pct = StreamArgs.outputTemplate(File("/tmp"), "100% Cool")
+        assertTrue(pct.endsWith("100%% Cool.%(ext)s"))
+        // empty title falls back to yt-dlp metadata naming
+        val legacy = StreamArgs.outputTemplate(File("/tmp"), "")
+        assertTrue(legacy.endsWith("%(title).120B [%(id)s].%(ext)s"))
+    }
+
+    @Test
+    fun `sanitize filename strips invalid chars and trims`() {
+        assertEquals("bad name .mp4", StreamArgs.sanitizeFilename("bad:name?.mp4"))
+        assertEquals("end", StreamArgs.sanitizeFilename("  end. "))
+        assertEquals("A B C", StreamArgs.sanitizeFilename("A<B>C"))
+        assertEquals("ทดสอบ clip", StreamArgs.sanitizeFilename(" ทดสอบ clip "))
+        assertEquals("x".repeat(100), StreamArgs.sanitizeFilename("x".repeat(250)))
+        assertEquals("", StreamArgs.sanitizeFilename(""))
+    }
+
+    @Test
+    fun `unique file name dedupes like a browser`() {
+        val dir = java.nio.file.Files.createTempDirectory("vg-dedupe").toFile()
+        try {
+            assertEquals("clip.mp4", StreamArgs.uniqueFileName(dir, "clip", "mp4"))
+            File(dir, "clip.mp4").createNewFile()
+            assertEquals("clip (2).mp4", StreamArgs.uniqueFileName(dir, "clip", "mp4"))
+            File(dir, "clip (2).mp4").createNewFile()
+            assertEquals("clip (3).mp4", StreamArgs.uniqueFileName(dir, "clip", "mp4"))
+            // other stems/extensions unaffected
+            assertEquals("clip.webm", StreamArgs.uniqueFileName(dir, "clip", "webm"))
+            assertEquals("other.mp4", StreamArgs.uniqueFileName(dir, "other", "mp4"))
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
+
+    @Test
     fun `newest file wins`() {
         val dir = java.nio.file.Files.createTempDirectory("vg").toFile()
         val old = File(dir, "old.mp4").apply { writeText("a"); setLastModified(1_000_000) }

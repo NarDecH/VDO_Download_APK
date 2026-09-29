@@ -80,6 +80,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <input type="text" id="quickUrl" placeholder="วาง URL วิดีโอแล้วกดดาวน์โหลด (รองรับ mp4 / m3u8 / หน้าเว็บ YouTube ฯลฯ)">
     <button class="act grn" onclick="quickDownload()">⬇ ดาวน์โหลด</button>
     <button class="act" onclick="refresh()">⟳</button>
+    <button class="act" onclick="clearDownloads()" title="ลบรายการที่เสร็จ/ผิดพลาด/ยกเลิกแล้วออกจากรายการ (ไม่ลบไฟล์)">🧹 ล้างรายการ</button>
   </div>
   <div id="dlList"></div>
 </section>
@@ -137,7 +138,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
     <h2 style="color:var(--txt)">VDO Grabber</h2>
     <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
-    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.5</span></div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.6</span></div>
     <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
     <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
     <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
@@ -158,22 +159,24 @@ function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api
 
 // ---------- demo mode (docs screenshots) --------------------------------
 const demoApi = {
-  get_state: async () => ({ version:'1.1.5', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+  get_state: async () => ({ version:'1.1.6', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
     settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
                user_agent:'', auto_detect:true, start_page:'https://www.google.com' },
-    downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Sunset Beach 4K Drone Shot',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K [x8Kd2m].mp4',error:''},
-                 {id:'a2',url:'https://live.example.tv/hls/master.m3u8',title:'Live Concert — Stage 2',kind:'hls',status:'running',percent:63.4,speed:'8.42MiB/s',eta:'00:41',downloaded:158329744,total:249561088,filepath:'',error:''},
+    downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Travel Blog',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K Drone Shot.mp4',title_base:'Sunset Beach 4K Drone Shot',ext:'mp4',error:''},
+                 {id:'a2',url:'https://live.example.tv/hls/master.m3u8',title:'Live Concert — Stage 2',kind:'hls',status:'running',percent:63.4,speed:'8.42MiB/s',eta:'00:41',downloaded:158329744,total:249561088,filepath:'',title_base:'Live Concert — Stage 2',ext:'m3u8',error:''},
                  {id:'a3',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',title:'Classic Music Video',kind:'page',status:'queued',percent:0,speed:'',eta:'',total:0,filepath:'',error:''} ],
     media: [ {url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',kind:'mp4',label:'video element',width:1920,height:1080,via:'DOM scan',page_url:'https://example.com/travel',page_title:'Travel Blog'},
              {url:'https://live.example.tv/hls/master.m3u8',kind:'m3u8',label:'network (fetch)',width:null,height:null,via:'fetch hook',page_url:'https://live.example.tv/watch',page_title:'Live TV'},
              {url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',kind:'page',label:'link',width:null,height:null,via:'DOM scan',page_url:'https://www.youtube.com/',page_title:'YouTube'} ] }),
-  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.5 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
+  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.6 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
     : n==='downloads' ? "[a1] START https://cdn.example.com/clips/sunset-beach-4k.mp4\n[a1] VGPROG| 42.1%| 6.11MiB/s| 00:30|105040512|249561088|||\n[a1] [download] 100% of  238.00MiB in 00:42\n[a2] START https://live.example.tv/hls/master.m3u8\n[a2] VGPROG| 63.4%| 8.42MiB/s| 00:41|158329744||6|10|"
     : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
   open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
   set_setting(){ return {ok:true} }, update_engines(){ return {ok:true,message:'up to date'} },
   download_start: async (s)=>({ok:true,job:{id:'new'}}), download_cancel(){ return {ok:true} },
   choose_download_dir(){ return {ok:false} }, downloads_list(){ return [] }, media_list(){ return [] },
+  downloads_clear(){ return {ok:true, removed:1} }, media_clear(){ return {ok:true, removed:3} },
+  download_open_file(){}, download_open_folder(){},
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -218,11 +221,13 @@ function renderDownloads(list){
     <div style="display:flex;gap:8px;margin-top:6px;color:var(--dim);font-size:12px;align-items:center;flex-wrap:wrap">
       <span>${(j.percent||0).toFixed(1)}%</span><span>${esc(j.speed||'')}</span><span>${j.eta?'เหลือ '+esc(j.eta):''}</span>
       <span>${fmtBytes(j.downloaded)} / ${fmtBytes(j.total)}</span>
-      ${j.status==='done'?`<span>💾 ${esc(j.filepath||'')}</span>`:''}${j.error?`<span style="color:var(--red)" title="${esc(j.error.slice(0,300))}">${esc(friendlyError(j.error))}</span>`:''}
+      ${j.status==='done'?`<span title="${esc(j.filepath||'')}">💾 ${esc(j.filepath||'')}</span>`
+        :(j.title_base?`<span class="pill" title="ตั้งชื่อจากหน้าเว็บ">ชื่อไฟล์: ${esc(j.title_base)}.${esc(j.ext||'mp4')}</span>`:'')}${j.error?`<span style="color:var(--red)" title="${esc(j.error.slice(0,300))}">${esc(friendlyError(j.error))}</span>`:''}
       ${/Unsupported URL/i.test(j.error||'')?`<button class="act" style="padding:2px 10px" onclick="openInBrowser('${esc(j.url)}')">🌐 เปิดหน้านี้ในเบราว์เซอร์</button>`:''}
       <span style="flex:1"></span>
       ${['running','queued','merging'].includes(j.status)?`<button class="act red" style="padding:3px 10px" onclick="cancel('${j.id}')">ยกเลิก</button>`:''}
-      ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>`:''}
+      ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>
+      <button class="act" style="padding:3px 10px" onclick="py().download_open_folder('${j.id}')">📂 โฟลเดอร์</button>`:''}
     </div>
   </div>`).join('');
 }
@@ -279,7 +284,20 @@ function quickDownload(url){
   document.getElementById('quickUrl').value = '';
 }
 function cancel(id){ py().download_cancel(id); }
-function clearMedia(){ document.getElementById('mediaList').innerHTML = '<div class="empty">ล้างแล้ว (เฉพาะหน้าจอนี้)</div>'; }
+function isLive(j){ return ['running','queued','merging'].includes(j.status); }
+function clearDownloads(){
+  const p = py().downloads_clear ? py().downloads_clear() : Promise.resolve({ok:true});
+  Promise.resolve(p).then(() => {
+    state.downloads = state.downloads.filter(j => isLive(j));
+    renderDownloads(state.downloads); status('ล้างรายการที่เสร็จแล้ว (ไฟล์ยังอยู่บนดิสก์)');
+  });
+}
+function clearMedia(){
+  const p = py().media_clear ? py().media_clear() : Promise.resolve({ok:true});
+  Promise.resolve(p).then(() => {
+    state.media = []; renderMedia([]); status('ล้างรายการวิดีโอที่ตรวจพบแล้ว');
+  });
+}
 function pickDir(){ py().choose_download_dir().then(r => { if(r && r.ok) document.getElementById('sDownDir').value = r.path; }); }
 function saveSettings(){
   py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
@@ -309,6 +327,11 @@ window.__onEvent = function (event, payload) {
   } else if (event === 'state_changed') {
     renderDownloads(payload.downloads || []); renderMedia(payload.media || []);
     renderSettings(payload.settings || {}); fillAbout(payload);
+  } else if (event === 'downloads_cleared') {
+    state.downloads = state.downloads.filter(j => isLive(j)); renderDownloads(state.downloads);
+    status('ล้างรายการดาวน์โหลดแล้ว ' + (payload.removed||0) + ' รายการ');
+  } else if (event === 'media_cleared') {
+    state.media = []; renderMedia([]); status('ล้างรายการวิดีโอที่ตรวจพบแล้ว');
   } else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
   else if (event === 'engine_progress') { status('กำลังเตรียม ' + payload.engine + '… ' + payload.percent + '%'); }
 };

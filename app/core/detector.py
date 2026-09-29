@@ -274,7 +274,8 @@ TOOLBAR_JS = r"""
     }
     if (b.classList.contains('dlbtn')) {
       pyapi() && pyapi().download_start({ url: decodeURIComponent(b.getAttribute('data-url')),
-        kind: classifyKind(b.getAttribute('data-url')), page_url: decodeURIComponent(b.getAttribute('data-ref') || ''), referrer: '' });
+        kind: classifyKind(b.getAttribute('data-url')), page_url: decodeURIComponent(b.getAttribute('data-ref') || ''), referrer: '',
+        title: document.title || '', page_title: document.title || '' });
       panel.style.display = 'none'; return;
     }
     if (b.classList.contains('fmtbtn')) {
@@ -289,7 +290,8 @@ TOOLBAR_JS = r"""
         (r.formats || []).slice(0, 14).forEach(function (f) {
           const btn = document.createElement('button'); btn.className = 'fmtbtn';
           btn.textContent = [f.id, f.ext, f.res, f.tbr ? Math.round(f.tbr) + 'k' : '', f.size ? (f.size / 1048576).toFixed(1) + 'MB' : ''].filter(Boolean).join(' · ');
-          btn.onclick = function () { pyapi().download_start({ url: url, format_id: f.id, title: r.title || '', kind: 'media', referrer: '' }); panel.style.display = 'none'; };
+          btn.onclick = function () { pyapi().download_start({ url: url, format_id: f.id, title: r.title || '', kind: 'media', referrer: '',
+            page_title: document.title || '' }); panel.style.display = 'none'; };
           box.appendChild(btn);
         });
         if (!(r.formats || []).length) box.innerHTML = '<small style="color:#fbbf24">ไม่พบรูปแบบรายการ — ใช้ปุ่มดาวน์โหลดอัตโนมัติแทน</small>';

@@ -17,6 +17,7 @@ import os
 import re
 import sys
 import tempfile
+import time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "app"))
@@ -167,6 +168,93 @@ def test_page_fallback_obfuscated() -> bool:
     return True
 
 
+# --------------------------------------- title-based naming + dedupe (v1.1.6)
+def test_sanitize_filename() -> bool:
+    from core.downloader import sanitize_filename
+
+    assert sanitize_filename("bad:name?.mp4") == "bad name .mp4"
+    # spaces + trailing dots stripped (Windows), interior dots kept
+    assert sanitize_filename("  end. ") == "end"
+    # collapsed whitespace after replacing invalid chars
+    assert sanitize_filename('A<B>C:D"E/F\\G?*|.txt') == "A B C D E F G .txt"
+    # Thai + emoji survive
+    assert sanitize_filename("  ทดสอบ 🎬 clip  ") == "ทดสอบ 🎬 clip"
+    # length cap (100) so `stem (9).ext` still fits MAX_PATH budgets
+    assert sanitize_filename("x" * 250) == "x" * 100
+    assert sanitize_filename(None) == ""
+    return True
+
+
+def test_unique_stem() -> bool:
+    import tempfile
+    from core.downloader import unique_stem
+
+    d = tempfile.mkdtemp(prefix="vg-dedupe-")
+    a = unique_stem(d, "clip", ".mp4")
+    assert os.path.basename(a) == "clip.mp4"
+    open(a, "wb").close()
+    b = unique_stem(d, "clip", ".mp4")
+    assert os.path.basename(b) == "clip (2).mp4", b
+    open(b, "wb").close()
+    c = unique_stem(d, "clip", ".mp4")
+    assert os.path.basename(c) == "clip (3).mp4", c
+    # other extensions/stems are unaffected
+    assert os.path.basename(unique_stem(d, "clip", ".webm")) == "clip.webm"
+    assert os.path.basename(unique_stem(d, "other", ".mp4")) == "other.mp4"
+    return True
+
+
+def test_title_base_policy() -> bool:
+    """Page/URL titles name media+manifests; site pages keep yt-dlp's title."""
+    from core.downloader import DownloadManager
+
+    d = DownloadManager._decide_title_base
+    assert d("http://c/v.mp4", "media", "mp4", "Travel Blog") == "Travel Blog"
+    assert d("http://c/v.m3u8?tok=1", "hls", "m3u8", "Live TV") == "Live TV"
+    assert d("http://c/v.mpd", "dash", "mpd", "Live TV") == "Live TV"
+    # site-page URLs: title is the site name -> keep yt-dlp metadata naming
+    assert d("http://site/player.html", "embed", "", "SomeSite") == ""
+    assert d("http://site/watch/1", "page", "", "SomeSite") == ""
+    # explicit title_base always wins
+    assert d("http://c/v.mp4", "media", "mp4", "A", "B") == "B"
+    return True
+
+
+def test_out_template_and_newest_match() -> bool:
+    import tempfile
+    from core.downloader import DownloadManager, Job
+
+    settings = type("S", (), {"get": staticmethod(lambda k: 3)})()
+    log = type("L", (), {"log": staticmethod(lambda *a, **k: None)})()
+    mgr = DownloadManager(settings, type("E", (), {})(), log)  # type: ignore[arg-type]
+    d = tempfile.mkdtemp(prefix="vg-tmpl-")
+
+    # title already sanitized (the ':' would have become a space anyway)
+    job = Job("http://127.0.0.1:1/x.m3u8", kind="hls", out_dir=d,
+              title_base="My Clip ตอน 1")
+    tmpl = mgr._out_template(job)
+    assert os.path.basename(tmpl) == "My Clip ตอน 1.%(ext)s", tmpl
+
+    # literal % must be doubled or yt-dlp eats it as a template field
+    job2 = Job("http://127.0.0.1:1/x.mp4", kind="media", out_dir=d, title_base="100% Cool")
+    assert os.path.basename(mgr._out_template(job2)) == "100%% Cool.%(ext)s"
+
+    # no title -> legacy metadata template
+    job3 = Job("http://site/watch/1", kind="page", out_dir=d)
+    assert "[%(id)s]" in mgr._out_template(job3)
+
+    # _newest_match picks the newest stem.ext / stem (n).ext
+    f1 = os.path.join(d, "My Clip ตอน 1.mp4")
+    open(f1, "wb").close()
+    time.sleep(0.02)
+    f2 = os.path.join(d, "My Clip ตอน 1 (2).mp4")
+    open(f2, "wb").close()
+    hit = mgr._newest_match(d, "My Clip ตอน 1")
+    assert os.path.basename(hit) == "My Clip ตอน 1 (2).mp4", hit
+    assert mgr._newest_match(d, "No Such Stem") == ""
+    return True
+
+
 # ------------------------------------------------------------- pair-sync
 def test_pair_sync_guard() -> bool:
     r = check_pair_sync()
@@ -185,6 +273,10 @@ def main() -> int:
         "prune_frees_finished": test_prune_frees_finished_jobs,
         "page_fallback_scanner": test_page_fallback_scanner,
         "page_fallback_obfuscated": test_page_fallback_obfuscated,
+        "sanitize_filename": test_sanitize_filename,
+        "unique_stem": test_unique_stem,
+        "title_base_policy": test_title_base_policy,
+        "out_template_and_newest_match": test_out_template_and_newest_match,
         "pair_sync_guard": test_pair_sync_guard,
     }
     failed = []

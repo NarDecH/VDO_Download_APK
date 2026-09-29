@@ -33,12 +33,43 @@ PROGRESS_TEMPLATE = (
 
 MEDIA_EXT_RE = re.compile(r"\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?$", re.I)
 
+# Windows-invalid filename characters (plus control chars) -> replaced by spaces
+_INVALID_FS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
+
+
+def sanitize_filename(name, max_len: int = 100) -> str:
+    """Make a page title / URL stem safe to use as a filename on Windows.
+
+    Invalid chars become spaces, whitespace collapses, and the result is
+    stripped of trailing dots/spaces (Windows hates those) and capped in
+    length so `stem + ' (9)' + '.ext'` still fits MAX_PATH budgets.
+    """
+    name = _INVALID_FS_RE.sub(" ", str(name or ""))
+    name = re.sub(r"\s+", " ", name).strip(" .")
+    if len(name) > max_len:
+        name = name[:max_len].rstrip(" .")
+    return name
+
+
+def unique_stem(directory: str, stem: str, ext: str) -> str:
+    """Full path `stem.ext` that does not collide on disk - duplicates become
+    `stem (2).ext`, `stem (3).ext`, ... (the classic browser-download rule)."""
+    first = os.path.join(directory, stem + ext)
+    if not os.path.exists(first):
+        return first
+    n = 2
+    while os.path.exists(os.path.join(directory, "%s (%d)%s" % (stem, n, ext))):
+        n += 1
+    return os.path.join(directory, "%s (%d)%s" % (stem, n, ext))
+
 
 class Job:
-    _attrs = ("url", "title", "kind", "format_id", "page_url", "referrer")
+    _attrs = ("url", "title", "kind", "format_id", "page_url", "referrer",
+              "ext", "title_base", "page_title")
 
     def __init__(self, url: str, title: str = "", kind: str = "media", format_id: str = "",
-                 page_url: str = "", referrer: str = "", out_dir: str = ""):
+                 page_url: str = "", referrer: str = "", out_dir: str = "", ext: str = "",
+                 title_base: str = "", page_title: str = ""):
         self.id = uuid.uuid4().hex[:12]
         self.url = url
         self.title = title or ""
@@ -47,6 +78,9 @@ class Job:
         self.page_url = page_url
         self.referrer = referrer
         self.out_dir = out_dir
+        self.ext = ext or ""              # source extension sniffed from the URL
+        self.title_base = title_base or ""  # filename stem decided up-front
+        self.page_title = page_title or ""
         self.status = "queued"        # queued running merging done error canceled
         self.percent = 0.0
         self.speed = ""
@@ -66,6 +100,7 @@ class Job:
             "speed": self.speed, "eta": self.eta, "downloaded": self.downloaded,
             "total": self.total, "filepath": self.filepath, "error": self.error,
             "created": self.created, "finished": self.finished, "out_dir": self.out_dir,
+            "ext": self.ext, "title_base": self.title_base,
         }
 
 
@@ -81,13 +116,32 @@ class DownloadManager:
         self._lock = threading.Lock()
 
     # ------------------------------------------------------------------ api
+    @staticmethod
+    def _decide_title_base(url: str, kind: str, ext: str, title: str, title_base: str = "") -> str:
+        """Filename stem policy (v1.1.6): page/URL titles name raw media and
+        manifest (hls/dash) URLs; site-page URLs ("page"/"embed") keep
+        yt-dlp's own metadata title because their `title` is the site name."""
+        if title_base:
+            return title_base
+        if ext or kind in ("hls", "dash"):
+            return title
+        return ""
+
     def start(self, url: str, **kw) -> Job:
+        # Sniff the source extension, then decide the filename stem (above).
+        if not kw.get("ext"):
+            m = MEDIA_EXT_RE.search(url)
+            kw["ext"] = m.group(1).lower() if m else ""
+        kw["title_base"] = self._decide_title_base(
+            url, str(kw.get("kind") or "media"), str(kw.get("ext") or ""),
+            str(kw.get("title") or ""), str(kw.get("title_base") or ""))
         job = Job(url, out_dir=kw.pop("out_dir", "") or self.settings.get("download_dir"), **kw)
         os.makedirs(job.out_dir, exist_ok=True)
         with self._lock:
             self.jobs[job.id] = job
         self.log.log("download queued: %s (kind=%s fmt=%s)" % (url, job.kind, job.format_id or "auto"),
-                     event="download_queued", id=job.id, url=url, kind=job.kind, format_id=job.format_id)
+                     event="download_queued", id=job.id, url=url, kind=job.kind, format_id=job.format_id,
+                     title=job.title, page_title=job.page_title, title_base=job.title_base)
         threading.Thread(target=self._run, args=(job,), name=f"dl-{job.id}", daemon=True).start()
         return job
 
@@ -105,6 +159,20 @@ class DownloadManager:
             self.log.log("download canceled: %s" % job_id, event="download_canceled", id=job_id, url=job.url)
         self.push_ui("download_update", job.public())
         return {"ok": True, "job": job.public()}
+
+    def clear_list(self) -> dict:
+        """Forget every finished job (UI "clear list"); running ones keep going
+        and re-appear in the list when they finish."""
+        with self._lock:
+            finished = [jid for jid in self.history
+                        if self.jobs.get(jid) and self.jobs[jid].status in ("done", "error", "canceled")]
+            done = set(finished)
+            self.history = [jid for jid in self.history if jid not in done]
+            for jid in finished:
+                self.jobs.pop(jid, None)
+        self.log.log("download list cleared: %d finished jobs" % len(finished),
+                     event="downloads_cleared", removed=len(finished))
+        return {"ok": True, "removed": len(finished)}
 
     def get_formats(self, url: str, referrer: str = "") -> dict:
         """Probe a URL with yt-dlp -J and return a compact format list."""
@@ -203,6 +271,33 @@ class DownloadManager:
             return urllib.parse.urljoin(job.url, m.group(1).strip())
         return None
 
+    # ------------------------------------------------------- output naming
+    def _out_template(self, job: Job) -> str:
+        """yt-dlp output template for a job (v1.1.6 title-based naming).
+
+        Known page/URL title (toolbar sends document.title) wins so files stop
+        landing as `output [output].mp4`; without one, fall back to yt-dlp's
+        metadata title + id. Literal `%` in the stem must be doubled or
+        yt-dlp would parse it as a template field.
+        """
+        stem = sanitize_filename(job.title_base)
+        if stem:
+            return os.path.join(job.out_dir, stem.replace("%", "%%") + ".%(ext)s")
+        return os.path.join(job.out_dir, "%(title).120B [%(id)s].%(ext)s")
+
+    @staticmethod
+    def _newest_match(directory: str, stem: str) -> str:
+        """Newest existing `stem.ext` / `stem (n).ext` file in directory."""
+        try:
+            pat = re.compile(re.escape(stem) + r"(?: \(\d+\))?\.[A-Za-z0-9]{1,5}$")
+            cands = [f for f in os.listdir(directory or ".") if pat.fullmatch(f)]
+        except OSError:
+            return ""
+        if not cands:
+            return ""
+        best = max(cands, key=lambda f: os.path.getmtime(os.path.join(directory, f)))
+        return os.path.join(directory, best)
+
     # ----------------------------------------------------------------- core
     def _run(self, job: Job) -> None:
         with self._sem:
@@ -241,7 +336,7 @@ class DownloadManager:
                              level="warning", event="download_no_ffmpeg", id=job.id)
                 job.format_id = job.format_id if job.format_id and "*" not in job.format_id and "+" not in job.format_id else ""
 
-        out_tmpl = os.path.join(job.out_dir, "%(title).120B [%(id)s].%(ext)s")
+        out_tmpl = self._out_template(job)
         cmd = [ytdlp, "--no-playlist", "--no-warnings", "--newline", "--progress-template", PROGRESS_TEMPLATE,
                "--no-mtime", "-o", out_tmpl]
         if job.format_id:
@@ -323,6 +418,10 @@ class DownloadManager:
                     self.push_ui("download_update", job.public())
                     job.url = cand
                     job.error = ""
+                    # the fallback stream is a bare manifest - name it after
+                    # the page the user actually wanted (v1.1.2 case)
+                    if not job.title_base:
+                        job.title_base = job.title
                     job.status = "queued"
                     return self._execute(job, allow_fallback=False)
         self.push_ui("download_update", job.public())
@@ -378,9 +477,17 @@ class DownloadManager:
     def _guess_output_file(self, job: Job) -> str:
         if job.filepath and os.path.exists(job.filepath):
             return job.filepath
+        # 1) known stem: our title-based template may have produced
+        #    `stem.ext` / `stem (2).ext` without yt-dlp ever printing the path
+        stem = sanitize_filename(job.title_base)
+        if stem:
+            hit = self._newest_match(job.out_dir, stem)
+            if hit:
+                return hit
+        # 2) ask yt-dlp what it would have written
         try:
             out = subprocess.run([self.engines.ytdlp_path or "yt-dlp", "--no-playlist", "--print", "filename",
-                                  "-o", os.path.join(job.out_dir, "%(title).120B [%(id)s].%(ext)s"), "--skip-download", job.url],
+                                  "-o", self._out_template(job), "--skip-download", job.url],
                                  capture_output=True, text=True, timeout=60,
                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             p = out.stdout.strip().splitlines()[-1] if out.stdout.strip() else ""
