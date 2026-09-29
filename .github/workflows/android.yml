@@ -33,26 +33,55 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace testDebugUnitTest
 
+      - name: Generate HLS fixture with ffmpeg (E2E)
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg
+          mkdir -p android/app/src/androidTest/assets/hls
+          ffmpeg -y -hide_banner -loglevel error \
+            -f lavfi -i testsrc=duration=6:size=320x240:rate=15 \
+            -f lavfi -i sine=frequency=440:duration=6 \
+            -c:v libx264 -preset ultrafast -g 30 -sc_threshold 0 \
+            -c:a aac -b:a 64k \
+            -f hls -hls_time 3 -hls_list_size 0 \
+            -hls_segment_filename "android/app/src/androidTest/assets/hls/seg%d.ts" \
+            android/app/src/androidTest/assets/hls/index.m3u8
+          ls -la android/app/src/androidTest/assets/hls
+
       - name: Build debug APK (debug-signed, installable)
         working-directory: android
         run: |
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
 
-      - name: Rename APK
+      - name: E2E on emulator (HLS download through real engine)
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          script: |
+            cd android
+            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+
+      - name: Rename APKs (per-ABI + universal)
         run: |
           VERSION=$(grep -oP 'versionName\s*=\s*"\K[^"]+' android/app/build.gradle.kts)
-          APK_NAME="VDOGrabber-${VERSION}-android.apk"
-          cp android/app/build/outputs/apk/debug/app-debug.apk "$APK_NAME"
+          APK_NAME="VDOGrabber-${VERSION}-android-universal.apk"
+          OUT=android/app/build/outputs/apk/debug
+          cp "$OUT/app-arm64-v8a-debug.apk" "VDOGrabber-${VERSION}-android-arm64.apk"
+          cp "$OUT/app-armeabi-v7a-debug.apk" "VDOGrabber-${VERSION}-android-armv7.apk"
+          cp "$OUT/app-x86_64-debug.apk"    "VDOGrabber-${VERSION}-android-x86_64.apk"
+          cp "$OUT/app-universal-debug.apk" "$APK_NAME"
           echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
-          sha256sum "$APK_NAME" | tee "${APK_NAME}.sha256"
+          echo "ABI_APKS=VDOGrabber-${VERSION}-android-arm64.apk VDOGrabber-${VERSION}-android-armv7.apk VDOGrabber-${VERSION}-android-x86_64.apk" >> "$GITHUB_ENV"
+          sha256sum "$APK_NAME" VDOGrabber-"$VERSION"-android-*.apk | tee "${APK_NAME}.sha256"
 
       - name: Upload artifact (every branch)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: VDOGrabber-android-apk
           path: |
             ${{ env.APK_NAME }}
+            ${{ env.ABI_APKS }}
             ${{ env.APK_NAME }}.sha256
 
       - name: Attach to release (tags only)
@@ -62,9 +91,9 @@ jobs:
         run: |
           gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
             gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --draft=false --generate-notes
-          gh release upload "$GITHUB_REF_NAME" "$APK_NAME" "${APK_NAME}.sha256" --repo "$GITHUB_REPOSITORY" --clobber
-          # merge APK checksum into checksums.txt on the release
+          gh release upload "$GITHUB_REF_NAME" $ABI_APKS "$APK_NAME" "${APK_NAME}.sha256" --repo "$GITHUB_REPOSITORY" --clobber
+          # merge APK checksums into checksums.txt on the release
           gh release download "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --pattern "checksums.txt" --output checksums.txt 2>/dev/null || true
-          grep -vF "$APK_NAME" checksums.txt 2>/dev/null | cat - "${APK_NAME}.sha256" > checksums.tmp || cat "${APK_NAME}.sha256" > checksums.tmp
+          grep -vE "VDOGrabber-.*-android" checksums.txt 2>/dev/null | cat - "${APK_NAME}.sha256" > checksums.tmp || cat "${APK_NAME}.sha256" > checksums.tmp
           mv checksums.tmp checksums.txt
           gh release upload "$GITHUB_REF_NAME" checksums.txt --repo "$GITHUB_REPOSITORY" --clobber

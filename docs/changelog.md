@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [1.1.1] — 2026-09-29
+
+### เพิ่มใหม่ (Added)
+- **แยก APK ตามสถาปัตยกรรม (ABI splits)** — arm64-v8a / armeabi-v7a / x86_64 + universal
+  ลดขนาดไฟล์ที่ผู้ใช้ดาวน์โหลดเหลือ ~1/3 ของ universal (yt-dlp + ffmpeg เป็น native lib ใหญ่)
+  CI แนบทุกตัวลง release พร้อม checksum รวม
+- **E2E HLS บน emulator ใน CI** — ffmpeg ใน runner สร้าง m3u8 จริง → เสิร์ฟผ่าน loopback HTTP →
+  yt-dlp บนอุปกรณ์ดาวน์โหลด + รวมไฟล์จริง (`StreamEngineTest`) ปิดขั้น 5 ของแผนแบบอัตโนมัติ
+
+### เพิ่มใหม่ (Added) — รวมจาก dependabot
+- androidx.appcompat 1.8.0 (#4) · gradle-wrapper 9.8.0 (#10)
+
+[1.1.1]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.1
 ## [1.1.0] — 2026-09-29
 
 ### เพิ่มใหม่ (Added) — Android v1.1.0 (versionCode 3): HLS/DASH ในตัว

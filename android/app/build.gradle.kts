@@ -11,14 +11,27 @@ android {
         applicationId = "com.vdograbber.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.1.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
+
+    // youtubedl-android ships big per-ABI native libs (yt-dlp + ffmpeg);
+    // split APKs keep each download ~1/3 the size of a universal build.
+    // CI renames and attaches the per-ABI APKs (android.yml).
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a", "x86_64")
+            isUniversalApk = true
         }
     }
     compileOptions {
@@ -42,4 +55,6 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
     testImplementation("junit:junit:4.13.2")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
 }
