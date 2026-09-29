@@ -2,7 +2,17 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased] — Extension 1.1.0
+## [Unreleased] — Desktop 1.0.1 / Extension 1.1.0
+
+### แก้ไข (Fixed) — Desktop v1.0.1
+- **TypeError spam ตอนพิมพ์ URL / กดย้อน-รีโหลดในแถบเครื่องมือ** (`returnValuesCallbacks … is not a function`) —
+  สาเหตุ: pywebview ส่งค่ากลับให้ JS callback หลัง method จบ แต่ `api.navigate` เองก็ navigate หน้านั้นทันที
+  ทำให้หน้าเว็บ (และ callback) หายไปก่อนการส่งมอบ แก้ 2 ชั้น:
+  1. แถบเครื่องมือ navigate ในหน้าเองด้วย JS (`location.href` / `history`) ไม่ผ่าน Python อีกต่อไป
+  2. `api.navigate` (สำหรับผู้เรียกอื่น) หน่วงโหลด 80ms ให้ callback ส่งมอบก่อน
+- ปุ่ม ⚙️ ตอนนี้ `restore()` + `show()` Control Center จริงๆ — หน้าต่างที่เปิดค้างไว้จะโผล่มาหน้าสุด ไม่ต้องกดรัว
+- ทดสอบ regression ใหม่: `scripts/test_navigate_fix.py` (ซ่อนหน้าต่าง, ยิงทั้งสอง call style,
+  ตรวจว่า stderr สะอาด) — ผ่านทั้งหมด, `--selftest` ยังผ่าน, exe 1.0.1 ผ่าน selftest ใน frozen mode
 
 ### แก้ไข (Fixed) — ส่วนขยาย Chrome v1.1.0
 - **"Failed - Network error" ที่เกิดกับวิดีโอแบบ blob: ได้รับการแก้ครบวงจร** —

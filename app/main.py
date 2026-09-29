@@ -66,7 +66,12 @@ class Api:
 
     # ------------------------------------------------------------ navigation
     def navigate(self, url: str) -> None:
-        _APP.navigate(url)
+        # Defer the actual load: pywebview delivers the JS return-value callback
+        # right after this method returns, and a synchronous load_url would wipe
+        # the page (and the callback) first -> "returnValuesCallbacks ... is not
+        # a function" spam. A short timer lets the callback win the race.
+        _APP.logm.log("api.navigate called (deferred): %s" % url, level="debug", event="api_navigate", url=url)
+        threading.Timer(0.08, _APP.navigate, args=(url,)).start()
 
     def nav_back(self) -> None:
         _APP.browser.evaluate_js("history.back()")
@@ -329,10 +334,13 @@ class App:
             self.logm.log("on_loaded injection failed: %r" % e, level="warning", event="inject_error", error=repr(e))
 
     def show_control(self):
-        self.logm.log("control center shown", event="control_shown")
-        self.control.show()
+        _APP.logm.log("control center shown", event="control_shown")
+        # show + restore so an already-open (but hidden behind the browser)
+        # window actually comes to the front instead of silently staying put
+        _APP.control.restore()
+        _APP.control.show()
         try:
-            self.control.evaluate_js("window.__onEvent && window.__onEvent('state_changed', %s); 1;" % json.dumps(self.api.get_state(), ensure_ascii=False, default=str))
+            _APP.control.evaluate_js("window.__onEvent && window.__onEvent('state_changed', %s); 1;" % json.dumps(_APP.api.get_state(), ensure_ascii=False, default=str))
         except Exception:
             pass
 

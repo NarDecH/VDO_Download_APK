@@ -209,7 +209,12 @@ TOOLBAR_JS = r"""
   shadow.addEventListener('click', function (e) {
     const b = e.target.closest('button'); if (!b) return;
     const act = b.getAttribute('data-act');
-    if (act === 'back' || act === 'fwd' || act === 'reload') { pyapi() && pyapi()['nav_' + act](); return; }
+    // navigation stays INSIDE the page on purpose: calling pywebview.api for
+    // something that navigates races the return-value callback (the page is
+    // gone before Python delivers the result) and throws TypeErrors.
+    if (act === 'back') { history.back(); return; }
+    if (act === 'fwd') { history.forward(); return; }
+    if (act === 'reload') { location.reload(); return; }
     if (act === 'detect') { pyapi() && pyapi().detect_now(); badge.textContent = '...'; return; }
     if (act === 'panel') { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; return; }
     if (act === 'ctrl') { pyapi() && pyapi().show_control(); return; }
@@ -239,7 +244,16 @@ TOOLBAR_JS = r"""
     }
   });
   function classifyKind(u) { const m = decodeURIComponent(u).match(/\.(m3u8|mpd)(\?|#|$)/i); return m ? m[1].toLowerCase() : 'media'; }
-  urlbox.addEventListener('keydown', function (e) { if (e.key === 'Enter' && urlbox.value.trim()) { pyapi() && pyapi().navigate(urlbox.value.trim()); urlbox.blur(); } });
+  urlbox.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || !urlbox.value.trim()) return;
+    const v = urlbox.value.trim();
+    let u;
+    if (/^https?:\/\//i.test(v) || /^file:\/\//i.test(v)) u = v;
+    else if (/^(localhost|127\.)/i.test(v) || (v.includes('.') && !v.includes(' '))) u = 'https://' + v;
+    else u = 'https://duckduckgo.com/?q=' + encodeURIComponent(v);
+    location.href = u;   // in-page navigation, no pywebview callback involved
+    urlbox.blur();
+  });
   document.addEventListener('click', function (e) {
     if (!host.contains(e.target) && e.target !== host && !host.shadowRoot.contains(e.target)) {
       /* allow panel to stay open while interacting with it; close on page clicks */ if (panel.style.display === 'block' && !e.target.closest('#vg-toolbar-host')) panel.style.display = 'none';
