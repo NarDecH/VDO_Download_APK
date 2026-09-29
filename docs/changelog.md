@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [1.1.2] — 2026-09-29
+
+### แก้ไข (Fixed) — Desktop: "Unsupported URL" กับหน้า player
+- **วางลิงก์หน้า player (เช่น `player.html`) แล้วโหลดไม่ได้** — ตอนนี้เมื่อ yt-dlp ไม่รู้จัก URL
+  แอปจะ**ดึงหน้า HTML มาสแกนเอง**: เจอลิงก์ media (m3u8/mpd/mp4/webm) ซ่อนใน script/attribute →
+  ดาวน์โหลดต่อทันที (พร้อม Referer ของหน้าเดิม ช่วยเรื่อง hotlink protection), ถ้าไม่เจอแต่มี
+  `<iframe>/<embed>` → ลองกับ URL ของ embed แทน
+- **error แบบเข้าใจง่ายใน Control Center** — "Unsupported URL" ถูกแปลงเป็นคำแนะนำภาษาไทย
+  (เปิดหน้าในเบราว์เซอร์ของแอปแล้วกดปุ่มดาวน์โหลดบนแถบเครื่องมือ) พร้อม hover ดู error ดิบได้
+- ทดสอบ end-to-end จริง: หน้า player จำลองที่ซ่อน mp4 ใน script → fallback ดาวน์โหลดสำเร็จ
+
+[1.1.2]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.2
 ## [1.1.1] — 2026-09-29
 
 ### เพิ่มใหม่ (Added)

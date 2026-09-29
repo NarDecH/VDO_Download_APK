@@ -18,6 +18,8 @@ import re
 import subprocess
 import threading
 import time
+import urllib.parse
+import urllib.request
 import uuid
 
 from .settings import Settings
@@ -154,6 +156,38 @@ class DownloadManager:
             return [self.jobs[j].public() for j in self.history[-50:]] + \
                    [j.public() for j in self.jobs.values() if j.id not in self.history]
 
+    # ------------------------------------------------- unsupported-page fallback
+    _MEDIA_IN_HTML_RE = re.compile(
+        r"https?://[^\s\"'<>]+?\.(?:m3u8|mpd|mp4|webm)(?:\?[^\s\"'<>]*)?", re.I)
+    _IFRAME_RE = re.compile(
+        r"<(?:iframe|embed)[^>]+(?:src|data)=[\"']([^\"']+)[\"']", re.I)
+
+    def _page_fallback(self, job: Job) -> str | None:
+        """Scan an HTML page for a downloadable candidate (yt-dlp gave up).
+
+        Player pages (player.html etc.) hide the real stream behind JS or an
+        iframe. Prefer a direct media URL found in the page source; otherwise
+        return the first iframe/embed URL so yt-dlp can try its site extractor.
+        """
+        try:
+            ua = str(self.settings.get("user_agent") or "").strip() or \
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+            req = urllib.request.Request(job.url, headers={"User-Agent": ua, "Referer": job.url})
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                html = resp.read().decode("utf-8", "replace")
+        except Exception as e:
+            self.log.log("page fallback fetch failed: %r" % e, level="debug",
+                         event="fallback_fetch_error", url=job.url, error=repr(e))
+            return None
+
+        m = self._MEDIA_IN_HTML_RE.search(html)
+        if m:
+            return m.group(0)
+        m = self._IFRAME_RE.search(html)
+        if m:
+            return urllib.parse.urljoin(job.url, m.group(1).strip())
+        return None
+
     # ----------------------------------------------------------------- core
     def _run(self, job: Job) -> None:
         with self._sem:
@@ -177,7 +211,7 @@ class DownloadManager:
             if job and job.status in ("done", "error", "canceled"):
                 del self.jobs[jid]
 
-    def _execute(self, job: Job) -> None:
+    def _execute(self, job: Job, allow_fallback: bool = True) -> None:
         ytdlp = self.engines.ensure_ytdlp()
         if not ytdlp:
             job.status, job.error = "error", "yt-dlp not available"
@@ -253,6 +287,18 @@ class DownloadManager:
             job.error = job.error or "yt-dlp exited with code %s" % rc
             self.log.log("download error #%s: %s" % (job.id, job.error),
                          level="error", event="download_error", id=job.id, url=job.url, error=job.error)
+            # "Unsupported URL" on a player page: scan the HTML for the real
+            # stream / embed and retry once with the candidate we find.
+            if allow_fallback and "Unsupported URL" in job.error:
+                cand = self._page_fallback(job)
+                if cand and cand != job.url:
+                    self.log.log("unsupported URL #%s -> retrying with %s" % (job.id, cand[:120]),
+                                 event="download_fallback", id=job.id, from_url=job.url, to_url=cand)
+                    self.push_ui("download_update", job.public())
+                    job.url = cand
+                    job.error = ""
+                    job.status = "queued"
+                    return self._execute(job, allow_fallback=False)
         self.push_ui("download_update", job.public())
 
     def _parse_line(self, job: Job, line: str) -> None:

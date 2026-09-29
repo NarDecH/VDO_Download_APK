@@ -137,7 +137,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
     <h2 style="color:var(--txt)">VDO Grabber</h2>
     <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
-    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.0</span></div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.2</span></div>
     <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
     <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
     <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
@@ -158,7 +158,7 @@ function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api
 
 // ---------- demo mode (docs screenshots) --------------------------------
 const demoApi = {
-  get_state: async () => ({ version:'1.1.0', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+  get_state: async () => ({ version:'1.1.2', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
     settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
                user_agent:'', auto_detect:true, start_page:'https://www.google.com' },
     downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Sunset Beach 4K Drone Shot',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K [x8Kd2m].mp4',error:''},
@@ -167,7 +167,7 @@ const demoApi = {
     media: [ {url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',kind:'mp4',label:'video element',width:1920,height:1080,via:'DOM scan',page_url:'https://example.com/travel',page_title:'Travel Blog'},
              {url:'https://live.example.tv/hls/master.m3u8',kind:'m3u8',label:'network (fetch)',width:null,height:null,via:'fetch hook',page_url:'https://live.example.tv/watch',page_title:'Live TV'},
              {url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',kind:'page',label:'link',width:null,height:null,via:'DOM scan',page_url:'https://www.youtube.com/',page_title:'YouTube'} ] }),
-  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.0 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
+  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.2 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
     : n==='downloads' ? "[a1] START https://cdn.example.com/clips/sunset-beach-4k.mp4\n[a1] VGPROG| 42.1%| 6.11MiB/s| 00:30|105040512|249561088|||\n[a1] [download] 100% of  238.00MiB in 00:42\n[a2] START https://live.example.tv/hls/master.m3u8\n[a2] VGPROG| 63.4%| 8.42MiB/s| 00:41|158329744||6|10|"
     : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
   open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
@@ -189,6 +189,13 @@ document.querySelectorAll('.logtabs button[data-log]').forEach(b => b.onclick = 
 
 function fmtBytes(n){ if(!n) return '—'; const u=['B','KB','MB','GB']; let i=0; while(n>=1024&&i<3){n/=1024;i++} return n.toFixed(i?1:0)+' '+u[i]; }
 function esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+function friendlyError(e){
+  if (!e) return '';
+  if (/Unsupported URL/i.test(e)) return 'ไม่รู้จักลิงก์นี้ — เปิดหน้าเว็บนี้ในหน้าต่างเบราว์เซอร์ของแอปแล้วกดปุ่มดาวน์โหลดบนแถบเครื่องมือ (แอปจะสแกนหาวิดีโอข้างใน) — ขณะนี้แอปกำลังลองหาสตรีมในหน้าให้อัตโนมัติ';
+  if (/Private video|Sign in to confirm|login required/i.test(e)) return 'วิดีโอนี้ต้องล็อกอินหรือเป็นส่วนตัว — แอปยังไม่รองรับ cookie profile';
+  if (/HTTP Error 40[34]/i.test(e)) return 'ลิงก์หมดอายุหรือถูกลบแล้ว (403/404) — เล่นวิดีโอแล้วกดสแกนใหม่';
+  return e.slice(0, 160);
+}
 
 function renderDownloads(list){
   state.downloads = list;
@@ -210,7 +217,7 @@ function renderDownloads(list){
     <div style="display:flex;gap:8px;margin-top:6px;color:var(--dim);font-size:12px;align-items:center;flex-wrap:wrap">
       <span>${(j.percent||0).toFixed(1)}%</span><span>${esc(j.speed||'')}</span><span>${j.eta?'เหลือ '+esc(j.eta):''}</span>
       <span>${fmtBytes(j.downloaded)} / ${fmtBytes(j.total)}</span>
-      ${j.status==='done'?`<span>💾 ${esc(j.filepath||'')}</span>`:''}${j.error?`<span style="color:var(--red)">${esc(j.error.slice(0,120))}</span>`:''}
+      ${j.status==='done'?`<span>💾 ${esc(j.filepath||'')}</span>`:''}${j.error?`<span style="color:var(--red)" title="${esc(j.error.slice(0,300))}">${esc(friendlyError(j.error))}</span>`:''}
       <span style="flex:1"></span>
       ${['running','queued','merging'].includes(j.status)?`<button class="act red" style="padding:3px 10px" onclick="cancel('${j.id}')">ยกเลิก</button>`:''}
       ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>`:''}
