@@ -94,11 +94,16 @@ class EngineManager:
 
     # ---------------------------------------------------------------- ffmpeg
     def ffmpeg_path(self) -> str | None:
-        p = os.path.join(app_bin_dir(self.data_dir), "ffmpeg.exe")
-        return p if os.path.exists(p) else None
+        """ffmpeg dir only counts when ffprobe sits next to it - yt-dlp needs
+        both for HLS/DASH postprocessing (generic extractor probe step)."""
+        bin_dir = app_bin_dir(self.data_dir)
+        if os.path.exists(os.path.join(bin_dir, "ffmpeg.exe")) and os.path.exists(os.path.join(bin_dir, "ffprobe.exe")):
+            return bin_dir
+        return None
 
     def ensure_ffmpeg(self, push=None) -> str | None:
-        """Download ffmpeg.exe once (needed for HLS/DASH demux + A/V merge).
+        """Download ffmpeg.exe + ffprobe.exe once (needed for HLS/DASH demux,
+        A/V merge, and the generic extractor's ffprobe step).
         push(stage, pct, msg) reports progress to the UI."""
         p = self.ffmpeg_path()
         if p:
@@ -110,15 +115,21 @@ class EngineManager:
             bin_dir = app_bin_dir(self.data_dir)
             zpath = os.path.join(bin_dir, "ffmpeg.zip")
             try:
+                # Upgrades from older releases may already have ffmpeg.exe but
+                # no ffprobe.exe - the zip fetch tops up whatever is missing.
                 self._download_file(FFMPEG_URL, zpath, "ffmpeg", push=push)
                 with zipfile.ZipFile(zpath) as z:
-                    member = next(n for n in z.namelist() if n.endswith("/ffmpeg.exe"))
-                    with z.open(member) as src, open(os.path.join(bin_dir, "ffmpeg.exe"), "wb") as dst:
-                        shutil.copyfileobj(src, dst)
+                    for tool in ("ffmpeg.exe", "ffprobe.exe"):
+                        target = os.path.join(bin_dir, tool)
+                        if os.path.exists(target):
+                            continue
+                        member = next(n for n in z.namelist() if n.endswith("/" + tool))
+                        with z.open(member) as src, open(target, "wb") as dst:
+                            shutil.copyfileobj(src, dst)
                 os.remove(zpath)
-                self.log.log("ffmpeg installed -> %s" % os.path.join(bin_dir, "ffmpeg.exe"),
-                             event="engine_install", engine="ffmpeg", path=os.path.join(bin_dir, "ffmpeg.exe"))
-                return os.path.join(bin_dir, "ffmpeg.exe")
+                self.log.log("ffmpeg+ffprobe installed -> %s" % bin_dir,
+                             event="engine_install", engine="ffmpeg", path=bin_dir)
+                return self.ffmpeg_path()
             except Exception as e:
                 self.log.exception("ffmpeg install", e)
                 for f in (zpath,):

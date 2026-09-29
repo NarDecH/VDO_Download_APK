@@ -289,7 +289,9 @@ class DownloadManager:
                          level="error", event="download_error", id=job.id, url=job.url, error=job.error)
             # "Unsupported URL" on a player page: scan the HTML for the real
             # stream / embed and retry once with the candidate we find.
-            if allow_fallback and "Unsupported URL" in job.error:
+            retriable = allow_fallback and (
+                "Unsupported URL" in job.error or "Postprocessing:" in job.error)
+            if retriable:
                 cand = self._page_fallback(job)
                 if cand and cand != job.url:
                     self.log.log("unsupported URL #%s -> retrying with %s" % (job.id, cand[:120]),

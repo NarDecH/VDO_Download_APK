@@ -107,6 +107,46 @@ def test_prune_frees_finished_jobs() -> bool:
     return True
 
 
+# ------------------------------------------------- page fallback scanner
+def test_page_fallback_scanner() -> bool:
+    """Regexes that power the 'Unsupported URL' auto-fallback (v1.1.2).
+
+    Case modeled on a real player page (merrylion2.com/*/player.html):
+    a tiny HTML that builds an MPEG-DASH URL in JavaScript - no <video>,
+    no iframe. The media regex must fish the .mpd/.m3u8/.mp4 out of the
+    script text; the iframe regex handles classic embed wrappers.
+    """
+    from core.downloader import DownloadManager
+
+    player_html = (
+        '<!DOCTYPE html><html><head><title>Player</title></head><body>'
+        '<div id="player"></div><script>const u="https://merrylion2.com/f5tzf5shrb/output.mpd";'
+        'let p=dashjs.MediaPlayer().create();p.initialize(document.querySelector("#player"),u,true);'
+        '</script></body></html>'
+    )
+    m = DownloadManager._MEDIA_IN_HTML_RE.search(player_html)
+    assert m, "media regex must find the .mpd URL in the script"
+    assert m.group(0) == "https://merrylion2.com/f5tzf5shrb/output.mpd"
+
+    # media with query string / mixed extensions
+    for url in (
+        "https://cdn.x.com/v/movie.m3u8?tok=1",
+        "https://cdn.x.com/v/movie.webm",
+        "http://127.0.0.1:8123/movie.mp4",
+    ):
+        assert DownloadManager._MEDIA_IN_HTML_RE.search(f"src={url!r}"), url
+
+    # iframe/embed wrapper -> relative src is resolved by urljoin upstream
+    iframe_html = '<iframe src="/embed/abc123" allowfullscreen></iframe>'
+    m2 = DownloadManager._IFRAME_RE.search(iframe_html)
+    assert m2 and m2.group(1) == "/embed/abc123"
+
+    # nothing to find -> both None
+    assert not DownloadManager._MEDIA_IN_HTML_RE.search("<p>hello</p>")
+    assert not DownloadManager._IFRAME_RE.search("<p>hello</p>")
+    return True
+
+
 # ------------------------------------------------------------- pair-sync
 def test_pair_sync_guard() -> bool:
     r = check_pair_sync()
@@ -123,6 +163,7 @@ def main() -> int:
         "prune_keeps_running": test_prune_keeps_running_jobs,
         "prune_noop_under_limit": test_prune_noop_under_limit,
         "prune_frees_finished": test_prune_frees_finished_jobs,
+        "page_fallback_scanner": test_page_fallback_scanner,
         "pair_sync_guard": test_pair_sync_guard,
     }
     failed = []

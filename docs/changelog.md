@@ -4,6 +4,19 @@
 
 ## [Unreleased]
 
+## [1.1.3] — 2026-09-29
+
+### แก้ไข (Fixed) — Desktop
+- **ffprobe หายจาก engine bundle** — ตอนนี้ `ensure_ffmpeg` ดึง **ffmpeg + ffprobe** มาพร้อมกัน
+  และ `ffmpeg_path()` นับเฉพาะเมื่อมีครบทั้งคู่ (yt-dlp ใช้ ffprobe ตอน HLS/DASH ผ่าน generic extractor —
+  ไม่มีแล้วเจอ "Postprocessing: Conversion failed!") ผู้ใช้เดิมที่มี ffmpeg ค้างไว้จะได้ ffprobe เติมให้อัตโนมัติ
+- **fallback ครอบ "Postprocessing" error ด้วย** — หน้า player ที่ชี้ m3u8/mpd จะ retry กับ candidate ใหม่
+  แทนการจบด้วย error (ประสบการณ์จริงจาก merrylion2.com player.html)
+- **ยืนยัน end-to-end กับสถานการณ์จริง**: หน้า player ที่สร้างสตรีมใน JS → fallback จับ m3u8 →
+  โหลด HLS + merge ด้วย ffmpeg/ffprobe → ได้ไฟล์ mp4 สมบูรณ์
+- **unit test ใหม่**: `page_fallback_scanner` — ทดสอบ regex ตามโครงสร้างหน้า player จริง (รวมอยู่ใน CI)
+
+[1.1.3]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.3
 ## [1.1.2] — 2026-09-29
 
 ### แก้ไข (Fixed) — Desktop: "Unsupported URL" กับหน้า player
