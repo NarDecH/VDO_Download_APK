@@ -166,8 +166,9 @@ class DownloadManager:
         """Scan an HTML page for a downloadable candidate (yt-dlp gave up).
 
         Player pages (player.html etc.) hide the real stream behind JS or an
-        iframe. Prefer a direct media URL found in the page source; otherwise
-        return the first iframe/embed URL so yt-dlp can try its site extractor.
+        iframe. Prefer a direct media URL found in the page source (including
+        base64/atob-obfuscated ones); otherwise return the first iframe/embed
+        URL so yt-dlp can try its site extractor.
         """
         try:
             ua = str(self.settings.get("user_agent") or "").strip() or \
@@ -183,6 +184,20 @@ class DownloadManager:
         m = self._MEDIA_IN_HTML_RE.search(html)
         if m:
             return m.group(0)
+
+        # obfuscated players: atob("aHR0cHM6...") / base64 blobs holding a URL
+        for blob in re.findall(r"atob\(\s*[\"']([A-Za-z0-9+/=]{24,})[\"']\s*\)", html):
+            try:
+                import base64
+                decoded = base64.b64decode(blob).decode("utf-8", "replace")
+            except Exception:
+                continue
+            m = self._MEDIA_IN_HTML_RE.search(decoded)
+            if m:
+                self.log.log("decoded atob URL in %s" % job.url[:120], level="debug",
+                             event="fallback_atob", url=job.url)
+                return m.group(0)
+
         m = self._IFRAME_RE.search(html)
         if m:
             return urllib.parse.urljoin(job.url, m.group(1).strip())
@@ -279,6 +294,15 @@ class DownloadManager:
             job.status = "done"
             job.finished = time.time()
             job.filepath = self._guess_output_file(job)
+            job.percent = 100.0
+            # fragment/manifest downloads often never report totals - fill
+            # them from the finished file so the UI shows real size + 100%
+            if job.filepath and os.path.exists(job.filepath):
+                try:
+                    size = os.path.getsize(job.filepath)
+                    job.total = job.downloaded = size
+                except OSError:
+                    pass
             self.log.log("download done #%s -> %s" % (job.id, job.filepath or "(file name unknown)"),
                          event="download_done", id=job.id, url=job.url, filepath=job.filepath,
                          seconds=round(job.finished - job.created, 1), bytes=job.total)

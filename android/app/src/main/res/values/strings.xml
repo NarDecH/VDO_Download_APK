@@ -24,7 +24,8 @@
     <string name="engine_error">error: %1$s</string>
     <string name="stream_dl_title">กำลังดาวน์โหลดสตรีม (yt-dlp)</string>
     <string name="stream_dl_done">ดาวน์โหลดสตรีมเสร็จแล้ว</string>
-    <string name="stream_dl_failed">ดาวน์โหลดสตรีมไม่สำเร็จ</string>
+    <string name="stream_dl_failed">ดาวน์โหลดสตรีมไม่สำเร็จ — เปิดหน้านี้ในเบราว์เซอร์ของแอป เล่นวิดีโอ แล้วแตะ 🎬 พบวิดีโอ</string>
+    <string name="open_in_browser_hint">เปิดหน้าในเบราว์เซอร์แล้ว — เล่นวิดีโอรอสักครู่ แล้วแตะ 🎬 พบวิดีโอ เพื่อดาวน์โหลด</string>
     <string name="cancel">ยกเลิก</string>
     <string name="refresh">รีเฟรช</string>
 </resources>

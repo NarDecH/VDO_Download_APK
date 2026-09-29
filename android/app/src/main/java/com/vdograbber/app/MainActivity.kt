@@ -64,9 +64,21 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.1.0 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.1.5 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
+
+        // Stream service reports "Unsupported URL" pages so the user can
+        // open them in this WebView and let the detector catch the stream
+        registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: android.content.Intent?) {
+                val u = intent?.getStringExtra("url") ?: return
+                FileLog.app("INFO", "dl", "unsupported URL -> opening in browser: $u")
+                Toast.makeText(this@MainActivity, R.string.open_in_browser_hint, Toast.LENGTH_LONG).show()
+                navigate(u)
+            }
+        }, android.content.IntentFilter("com.vdograbber.app.OPEN_IN_BROWSER"),
+            Context.RECEIVER_NOT_EXPORTED)
 
         // yt-dlp + ffmpeg init for on-device stream downloads (async, engine
         // is installed into files/ on first launch - docs/plan-android-hls.md)

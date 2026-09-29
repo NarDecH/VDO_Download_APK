@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [1.1.5] — 2026-09-29
+
+### แก้ไข (Fixed) — Desktop: การ์ด "done" แสดง 0.0%
+- งานที่โหลดผ่าน HLS/DASH/manifest บางตัวไม่เคยรายงานขนาดรวม — เมื่อจบแล้วแอปจะ**อ่านขนาดไฟล์
+  จริงจากดิสก์** มาเติมทั้ง `total`/`downloaded` และตั้ง percent = 100% ทำให้การ์ด done
+  แสดงความคืบหน้าและขนาดไฟล์จริง (แทน 0.0% · — / —)
+
+### เพิ่มใหม่ (Added)
+- **fallback รองรับ player แบบ obfuscated** — สแกน `atob("...")` / base64 blob ในหน้าเว็บ
+  ถอดรหัสแล้วหา media URL ข้างใน (unit test `page_fallback_obfuscated`)
+- **Android v1.1.5 (versionCode 5)**: เมื่อเอนจินคืน "Unsupported URL" แอปจะ**เปิดหน้านั้นใน WebView
+  ให้อัตโนมัติ** — เล่นวิดีโอรอสักครู่แล้วแตะ 🎬 พบวิดีโอ เพื่อดาวน์โหลด (parity กับ desktop v1.1.4)
+
+[1.1.5]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.5
 ## [1.1.4] — 2026-09-29
 
 ### เพิ่มใหม่ (Added) — Desktop: fallback ชั้นที่ 3

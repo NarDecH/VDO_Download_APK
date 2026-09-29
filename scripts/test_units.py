@@ -14,6 +14,7 @@ cannot be imported from Python; the desktop side is the reference test.
 from __future__ import annotations
 
 import os
+import re
 import sys
 import tempfile
 
@@ -147,6 +148,25 @@ def test_page_fallback_scanner() -> bool:
     return True
 
 
+def test_page_fallback_obfuscated() -> bool:
+    """atob/base64-obfuscated players must still yield a media URL."""
+    import base64
+    from core.downloader import DownloadManager
+
+    real = "https://cdn.example.com/v/stream.m3u8?tok=9"
+    blob = base64.b64encode(real.encode()).decode()
+    html = f'<script>var u=atob("{blob}");play(u);</script>'
+    assert not DownloadManager._MEDIA_IN_HTML_RE.search(html), "plain scan must miss it"
+
+    # decode step used by _page_fallback
+    blob_match = re.search(r'atob\(\s*["\']([A-Za-z0-9+/=]{24,})["\']\s*\)', html)
+    assert blob_match, "atob pattern must match"
+    decoded = base64.b64decode(blob_match.group(1)).decode()
+    m = DownloadManager._MEDIA_IN_HTML_RE.search(decoded)
+    assert m and m.group(0) == real
+    return True
+
+
 # ------------------------------------------------------------- pair-sync
 def test_pair_sync_guard() -> bool:
     r = check_pair_sync()
@@ -164,6 +184,7 @@ def main() -> int:
         "prune_noop_under_limit": test_prune_noop_under_limit,
         "prune_frees_finished": test_prune_frees_finished_jobs,
         "page_fallback_scanner": test_page_fallback_scanner,
+        "page_fallback_obfuscated": test_page_fallback_obfuscated,
         "pair_sync_guard": test_pair_sync_guard,
     }
     failed = []

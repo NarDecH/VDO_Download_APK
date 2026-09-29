@@ -97,6 +97,15 @@ class StreamDownloadService : Service() {
             } else {
                 FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
+                // Unsupported-URL player pages: hand the page to the WebView so
+                // the in-page detector can catch the real stream while it plays
+                // (desktop parity - plan-android-hls.md / v1.1.4 desktop flow)
+                if (errorMsg.contains("Unsupported URL", true)) {
+                    val i = Intent("com.vdograbber.app.OPEN_IN_BROWSER")
+                        .setPackage(packageName)
+                        .putExtra("url", url)
+                    sendBroadcast(i)
+                }
             }
             finishNotification(ok, title.ifEmpty { url })
             stopSelf()
