@@ -43,7 +43,15 @@ main{flex:1;padding:34px 0 50px}
 .copy{all:unset;cursor:pointer;color:#7fb3ff;font-size:11.5px;flex-shrink:0;padding-top:1px;font-family:'Segoe UI',sans-serif}
 .notes{margin-top:18px;border-top:1px dashed var(--line);padding-top:14px;color:#c9d4e8;font-size:14px}
 .notes h4{color:var(--acc2);font-size:13.5px;margin-bottom:8px}
-.notes pre{white-space:pre-wrap;font:13.5px/1.7 'Segoe UI',sans-serif}
+.notes pre{white-space:pre-wrap;font:13.5px/1.7 Consolas,monospace}
+.notes h4{margin-top:12px}
+.notes p{margin:6px 0}
+.notes ul{margin:6px 0 6px 20px}
+.notes li{margin:4px 0}
+.notes table.mdt{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+.notes table.mdt th{text-align:left;color:var(--acc2);border-bottom:1px solid var(--line);padding:6px 8px}
+.notes table.mdt td{border-bottom:1px solid #1a2340;padding:6px 8px;color:#c9d4e8}
+.notes code{background:#0b1120;border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-family:Consolas,monospace;color:var(--acc2);font-size:12.5px}
 .spin{display:inline-block;width:16px;height:16px;border:2.5px solid #64748b;border-top-color:#e2e8f0;border-radius:50%;
   animation:s .7s linear infinite;vertical-align:-3px;margin-right:8px}
 @keyframes s{to{transform:rotate(360deg)}}
@@ -145,17 +153,41 @@ async function getChecksumFor(asset, release){
   return null;
 }
 
-function checksumBox(checksum){
-  if (!checksum) return "";
-  const id = "cs" + Math.random().toString(36).slice(2, 8);
-  return `<div class="checksum"><span class="lbl">SHA256</span>
-    <span id="${id}" style="flex:1">${esc(checksum)}</span>
-    <button class="copy" onclick="copyCs('${id}', this)">คัดลอก</button></div>`;
-}
 function copyCs(id, btn){
   navigator.clipboard.writeText(document.getElementById(id).textContent).then(() => {
     btn.textContent = "คัดลอกแล้ว ✓"; setTimeout(() => btn.textContent = "คัดลอก", 1800);
   });
+}
+
+// tiny markdown renderer for release notes (headings, lists, tables, bold, code, links)
+function mdToHtml(src){
+  const lines = String(src).replace(/\r\n/g, "\n").split("\n");
+  let html = "", inList = false, inTable = false, inCode = false;
+  const inline = (s) => esc(s)
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  for (const raw of lines) {
+    const line = raw.trimEnd();
+    if (line.trim().startsWith("```")) { html += inCode ? "</code></pre>" : '<pre><code>'; inCode = !inCode; continue; }
+    if (inCode) { html += esc(raw) + "\n"; continue; }
+    if (/^\s*[-*] /.test(line)) { if (!inList) { html += "<ul>"; inList = true; } html += "<li>" + inline(line.replace(/^\s*[-*] /, "")) + "</li>"; continue; }
+    if (inList) { html += "</ul>"; inList = false; }
+    if (line.startsWith("|")) {
+      const cells = line.split("|").slice(1, -1).map(c => c.trim());
+      if (/^\|?[\s:|-]+\|?$/.test(line) && cells.every(c => /^:?-+:?$/.test(c))) continue;
+      if (!inTable) { html += '<table class="mdt">'; inTable = true; html += "<tr>" + cells.map(c => `<th>${inline(c)}</th>`).join("") + "</tr>"; continue; }
+      html += "<tr>" + cells.map(c => `<td>${inline(c)}</td>`).join("") + "</tr>"; continue;
+    }
+    if (inTable) { html += "</table>"; inTable = false; }
+    if (/^#{1,4} /.test(line)) { html += `<h4>${inline(line.replace(/^#+ /, ""))}</h4>`; continue; }
+    if (!line.trim()) continue;
+    html += "<p>" + inline(line) + "</p>";
+  }
+  if (inList) html += "</ul>";
+  if (inTable) html += "</table>";
+  if (inCode) html += "</code></pre>";
+  return html;
 }
 
 async function load(){
@@ -195,7 +227,7 @@ async function render(box, rel){
     </div>`;
   }));
   const date = new Date(rel.published_at).toLocaleDateString("th-TH", { year: "numeric", month: "long", day: "numeric" });
-  const notes = rel.body ? `<div class="notes"><h4>บันทึกประจำรุ่น</h4><pre>${esc(rel.body).replace(/\r\n/g,"\n")}</pre></div>` : "";
+  const notes = rel.body ? `<div class="notes"><h4>บันทึกประจำรุ่น</h4>${mdToHtml(rel.body)}</div>` : "";
   box.innerHTML = `
     <div class="vrow">
       <span class="vtag">${esc(rel.tag_name)}</span>
