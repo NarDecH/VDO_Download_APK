@@ -43,6 +43,9 @@ android {
     }
     packaging {
         resources.excludes += "META-INF/*"
+        // youtubedl-android exec()s the python/ffmpeg binaries it ships, so
+        // they must be extracted to disk (nativeLibraryDir) - same as Seal
+        jniLibs.useLegacyPackaging = true
     }
 }
 
