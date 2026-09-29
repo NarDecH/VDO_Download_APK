@@ -60,6 +60,7 @@ jobs:
           arch: x86_64
           script: |
             cd android
+            chmod +x gradlew
             ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
 
       - name: Rename APKs (per-ABI + universal)
