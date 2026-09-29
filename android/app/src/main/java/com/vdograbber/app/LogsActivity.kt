@@ -81,14 +81,13 @@ class LogsActivity : AppCompatActivity() {
         Toast.makeText(this, R.string.engine_update, Toast.LENGTH_SHORT).show()
         thread(name = "engine-update") {
             try {
-                // updateMe swaps the bundled yt-dlp binary for the latest release
-                val updated = YoutubeDL.getInstance().updateYoutubeDL(this, true)
-                val msg = if (updated) {
-                    val v = YoutubeDL.getInstance().version(this)
+                // swaps the bundled yt-dlp binary for the latest stable release
+                val status = YoutubeDL.getInstance().updateYoutubeDL(this, YoutubeDL.UpdateChannel._STABLE)
+                val v = YoutubeDL.getInstance().version(this)
+                val msg = if (status == YoutubeDL.UpdateStatus.DONE) {
                     FileLog.event("engine_update_done", mapOf("engine" to "yt-dlp", "version" to v, "ok" to true))
                     getString(R.string.engine_updated, v)
                 } else {
-                    val v = YoutubeDL.getInstance().version(this)
                     FileLog.event("engine_update_done", mapOf("engine" to "yt-dlp", "version" to v, "ok" to true, "already_latest" to true))
                     getString(R.string.engine_uptodate, v)
                 }
