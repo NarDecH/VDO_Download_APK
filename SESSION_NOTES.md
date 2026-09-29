@@ -28,6 +28,27 @@
   (registerReceiver ต้องใส่ RECEIVER_NOT_EXPORTED บน targetSdk 34+)
 - releases v1.1.2→v1.1.5 ทั้งหมดแนบ extension zip 1.1.2 พร้อม checksum รวม (แฮชเดียวกันทุก release)
 
+## รอบ v1.1.6 (คำขอผู้ใช้: ชื่อไฟล์ตามเว็บ + กันซ้ำ + ปุ่มเคลียร์รายการ)
+- **title-based filenames**: TOOLBAR_JS ส่ง `document.title` เข้า `download_start` (ทั้งปุ่มดาวน์โหลด
+  และปุ่มเลือก format) → `_decide_title_base()` เลือกใช้เฉพาะลิงก์ media/manifest (hls/dash);
+  งานชนิด page/embed คง naming ของ yt-dlp เพราะ title ที่ได้เป็นชื่อเว็บ ไม่ใช่ชื่อวิดีโอ
+- `_out_template()` ใช้ literal stem (escape `%`→`%%`) + `--no-overwrites`; dedupe คำนวณชื่อว่าง
+  ล่วงหน้าด้วย `unique_stem()` (`name (2).ext`) — yt-dlp เขียนลงไฟล์ว่างเสมอ จึงไม่เจอ "has already been downloaded"
+- `_guess_output_file` เพิ่มชั้น `_newest_match()` หาไฟล์ `stem.ext`/`stem (n).ext` ใหม่สุดใน out_dir
+  (ครอบกรณี yt-dlp ไม่พิมพ์ path ตรงรูปที่ parse ได้)
+- **clear list**: Api ใหม่ `downloads_clear()` (ลบเฉพาะ job done/error/canceled ออกจาก history+jobs —
+  งานที่รันอยู่ไม่แตะ, ไฟล์ไม่ลบ) + `media_clear()` (MediaStore.clear() จริง); UI มีปุ่ม 🧹 ทั้งสองแท็บ
+  + event sync `downloads_cleared`/`media_cleared` ให้ Control Center อัปเดตทันที
+- คำแนะนำค้างจากรอบก่อนที่ทำแล้วในรอบนี้: ปุ่ม "📂 โฟลเดอร์" ต่อการ์ด done (desktop — Api มี
+  `download_open_folder` อยู่แล้วแต่ UI ไม่เคยมีปุ่ม), Android notification เสร็จแตะเปิดไฟล์ได้
+  (content URI จาก MediaStore + action "เปิด"; ไม่ใช้ FileProvider เพราะไฟล์ raw โดน delete หลัง publish)
+- Android parity: `StreamArgs.sanitizeFilename/uniqueFileName/outputTemplate(dir,titleBase)` (JVM-testable)
+- unit tests 7→11 (sanitize/unique_stem/title_base_policy/out_template) + JVM 4 เคสใหม่;
+  **gotcha**: console บนเครื่องนี้เป็น cp1252 — รัน test ต้อง `PYTHONIOENCODING=utf-8` ไม่งั้น
+  UnicodeEncodeError ตอนพิมพ์ชื่อไฟล์ไทย (ตัว test เองไม่ผิด)
+- CI: Android run แรกบน tag พังที่ E2E emulator (`ShellCommandUnresponsiveException` — infra flake)
+  → `gh run rerun --failed` ผ่านปกติ; Desktop ผ่านครั้งแรก
+
 ### สิ่งที่ตรวจพบและแก้ในรอบแรก (v1.0.1)
 | ปัญหา | การแก้ |
 |---|---|
