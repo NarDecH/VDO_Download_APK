@@ -28,6 +28,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
+      - name: Run unit tests (stores / prune / pair-sync)
+        run: python scripts/test_units.py
+
       - name: Prepare yt-dlp engine (bundled into exe)
         run: python -c "import sys; sys.path.insert(0, 'scripts'); import build_exe; build_exe.ensure_ytdlp()"
 

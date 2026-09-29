@@ -59,6 +59,38 @@ a{color:#7fb3ff}
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
+    <span class="vtag">v1.0.1</span>
+    <span class="vtag-latest">LATEST</span>
+    <span class="vdate">29 กันยายน 2026</span>
+    <span style="flex:1"></span>
+    <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
+  </div>
+
+  <h3>เพิ่มใหม่ <span class="en">Added</span></h3>
+  <ul>
+    <li><b>Android v1.0.1</b> — ตรวจหาวิดีโอใน iframe แบบเดียวกับเดสก์ท็อป
+        (same-origin/srcdoc สแกนลึก · cross-origin embed player รายงาน URL)
+        + ปุ่ม "🌐 เปิดหน้า embed" ในรายการวิดีโอ</li>
+    <li><b>CI เดสก์ท็อป</b> — รัน selftest บน Windows runner ทุก push/PR และแนบ
+        <code>VDOGrabber-*-windows-x64.exe</code> + SHA256 ลง release อัตโนมัติเมื่อแท็ก (คู่กับ APK)</li>
+  </ul>
+
+  <h3>แก้ไข <span class="en">Fixed</span></h3>
+  <ul>
+    <li>Windows version resource (<code>filevers</code>/<code>prodvers</code>) ให้ตรงกับ 1.0.1</li>
+  </ul>
+
+  <h3>บำรุงรักษา <span class="en">Maintenance</span></h3>
+  <ul>
+    <li>MediaStore เป็น LRU จริงทั้งสองแพลตฟอร์ม + <code>DownloadManager</code> prune ประวัติงานเก่า (กัน memory โตในเซสชันยาว)</li>
+    <li>selftest เพิ่มขั้น <code>pair_sync</code> — บังคับว่า detector คู่ (desktop <code>DETECT_JS</code> ↔ Android <code>Detector.kt</code>)
+        สังเคราะห์ JS ถูกต้องและมี feature markers ตรงกันเสมอ</li>
+    <li>ลบไฟล์ขยะ <code>watch_fixed.py</code> และ <code>WATCHDOG_JS</code> ที่ไม่มีที่ใช้แล้ว</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
     <span class="vtag" style="background:#1f2c52">Ext v1.1.2</span>
     <span class="vtag-latest" style="background:#78350f;color:#fcd34d">แนบ release แล้ว</span>
     <span class="vdate">แก้ "Failed - Network error" กับวิดีโอ blob:/MSE</span>
@@ -104,7 +136,6 @@ a{color:#7fb3ff}
 <div class="release">
   <div class="vhead">
     <span class="vtag">v1.0.0</span>
-    <span class="vtag-latest">LATEST</span>
     <span class="vdate">29 กันยายน 2026</span>
     <span style="flex:1"></span>
     <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
@@ -145,7 +176,7 @@ a{color:#7fb3ff}
 รองรับ playlist/queue หลายรายการ · โหมด cookie นำเข้าเพื่อเนื้อหาสมาชิก · desktop workflow บน CI</p>
 
 </div>
-<footer><div class="wrap">VDO Grabber v1.0.0 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
+<footer><div class="wrap">VDO Grabber v1.0.1 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
 <a href="https://github.com/NarDecH/VDO_Download_APK/releases">Releases</a></div></footer>
 </body>
 </html>
