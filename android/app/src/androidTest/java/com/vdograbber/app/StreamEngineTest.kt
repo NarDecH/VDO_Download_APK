@@ -28,7 +28,8 @@ class StreamEngineTest {
 
     private fun copyFixtureTo(root: File) {
         val assets = instr.context.assets
-        for (name in assets.list("hls").orEmpty()) {
+        val names: Array<String> = assets.list("hls") ?: arrayOf()
+        for (name in names) {
             assets.open("hls/$name").use { input ->
                 File(root, name).outputStream().use { input.copyTo(it) }
             }
