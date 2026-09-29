@@ -3,9 +3,13 @@ package com.vdograbber.app
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.yausername.youtubedl_android.YoutubeDL
+import kotlin.concurrent.thread
 
-/** In-app log viewer: app.log / downloads.log / events.jsonl tails. */
+/** In-app log viewer: app.log / downloads.log / events.jsonl tails + engine maintenance. */
 class LogsActivity : AppCompatActivity() {
 
     private lateinit var box: TextView
@@ -38,6 +42,66 @@ class LogsActivity : AppCompatActivity() {
         btnRefresh.setOnClickListener {
             refresh(tabs.values.first())
         }
+
+        // ---- engine maintenance (docs/plan-android-hls.md step 6) ----------
+        findViewById<Button>(R.id.btnEngine).setOnClickListener { showEngineDialog() }
+
         refresh("app.log")
+    }
+
+    private fun showEngineDialog() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.engine_title)
+            .setItems(arrayOf(
+                getString(R.string.engine_check),
+                getString(R.string.engine_update),
+            )) { _, which ->
+                if (which == 0) checkEngine() else updateEngine()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun checkEngine() {
+        thread(name = "engine-check") {
+            try {
+                val v = YoutubeDL.getInstance().version(this)
+                FileLog.event("engine_check", mapOf("engine" to "yt-dlp", "version" to v))
+                runOnUiThread {
+                    box.text = getString(R.string.engine_version, v)
+                }
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "engine", "version check failed: $e")
+                runOnUiThread { showEngineError(e) }
+            }
+        }
+    }
+
+    private fun updateEngine() {
+        Toast.makeText(this, R.string.engine_update, Toast.LENGTH_SHORT).show()
+        thread(name = "engine-update") {
+            try {
+                // updateMe swaps the bundled yt-dlp binary for the latest release
+                val updated = YoutubeDL.getInstance().updateYoutubeDL(this, true)
+                val msg = if (updated) {
+                    val v = YoutubeDL.getInstance().version(this)
+                    FileLog.event("engine_update_done", mapOf("engine" to "yt-dlp", "version" to v, "ok" to true))
+                    getString(R.string.engine_updated, v)
+                } else {
+                    val v = YoutubeDL.getInstance().version(this)
+                    FileLog.event("engine_update_done", mapOf("engine" to "yt-dlp", "version" to v, "ok" to true, "already_latest" to true))
+                    getString(R.string.engine_uptodate, v)
+                }
+                runOnUiThread { box.text = msg }
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "engine", "update failed: $e")
+                FileLog.event("engine_update_done", mapOf("engine" to "yt-dlp", "ok" to false, "error" to e.message))
+                runOnUiThread { showEngineError(e) }
+            }
+        }
+    }
+
+    private fun showEngineError(e: Exception) {
+        Toast.makeText(this, getString(R.string.engine_error, e.message ?: "unknown"), Toast.LENGTH_LONG).show()
     }
 }

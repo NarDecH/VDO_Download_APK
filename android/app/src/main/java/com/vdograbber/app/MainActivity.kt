@@ -23,6 +23,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import kotlin.concurrent.thread
 
 /**
  * VDO Grabber for Android: a WebView browser that opens any site, detects the
@@ -63,9 +64,24 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.0.1 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.1.0 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
+
+        // yt-dlp + ffmpeg init for on-device stream downloads (async, engine
+        // is installed into files/ on first launch - docs/plan-android-hls.md)
+        thread(name = "engine-init") {
+            try {
+                com.yausername.youtubedl_android.YoutubeDL.getInstance().init(applicationContext)
+                com.yausername.ffmpeg.FFmpeg.getInstance().init(applicationContext)
+                val v = com.yausername.youtubedl_android.YoutubeDL.getInstance().version(applicationContext)
+                FileLog.event("engine_ready", mapOf("engine" to "yt-dlp", "version" to v))
+                FileLog.app("INFO", "engine", "yt-dlp ready (v$v)")
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "engine", "init failed: $e")
+                FileLog.event("engine_init_error", mapOf("error" to (e.message ?: "unknown")))
+            }
+        }
 
         web = findViewById(R.id.web)
         urlBox = findViewById(R.id.urlBox)

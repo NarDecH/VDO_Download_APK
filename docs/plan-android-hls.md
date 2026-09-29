@@ -51,6 +51,22 @@ StreamDownloadService (Foreground service, ใหม่)
 6. **ไซส์ APK**: เช็ค diff ขนาดก่อน/หลัง ถ้าโตเกิน ~60 MB พิจารณาเปิด ABI splits
    (`splits { abi { enable true; universalApk false } }`)
 
+## สถานะการ implement (อัปเดต 2026-09-29)
+
+- ✅ ขั้น 1: dependency library+ffmpeg 0.17.3 (พิกัด io.github.junkfood02, Maven Central)
+- ✅ ขั้น 2: `StreamDownloadService` (foreground dataSync, progress + ยกเลิก, publish MediaStore)
+- ✅ ขั้น 3: `tryDownload` เลือกเอนจินอัตโนมัติ; `StreamArgs` (JVM-testable) + `StreamArgsTest`
+- ✅ ขั้น 4: ไม่เพิ่มสิทธิ์ runtime ใหม่ (มี FOREGROUND_SERVICE + FOREGROUND_SERVICE_DATA_SYNC)
+- ⏳ ขั้น 5: ทดสอบบนอุปกรณ์จริง/emulator — **เหลืออยู่** (checklist ด้านล่าง)
+- ✅ ขั้น 6: ปุ่มบำรุงรักษาเอนจินใน LogsActivity (ตรวจเวอร์ชัน / `updateYoutubeDL`)
+
+### Checklist ทดสอบบนอุปกรณ์ (ขั้น 5)
+- [ ] เปิดแอปครั้งแรก: log `engine_ready` ปรากฏ, ปุ่มตรวจเวอร์ชันใน Logs แสดงหมายเลข
+- [ ] เปิดหน้าที่มี m3u8 → กดดาวน์โหลด → notification ขึ้น % และยกเลิกได้
+- [ ] ไฟล์จบลง Downloads/VDOGrabber (ผ่าน MediaStore) และเปิดจากแอปไฟล์ได้
+- [ ] ปุ่มอัปเดตเอนจินรายงานเวอร์ชันใหม่ถ้ามี
+- [ ] เช็คขนาด APK ก่อน/หลัง (คาด +~120MB จาก library+ffmpeg aar) — ถ้าโตเกิน พิจารณา ABI splits
+
 ## ความเสี่ยง
 
 - **ไลบรารีอัปเดตตาม yt-dlp**: เวอร์ชัน yt-dlp ฝังในไลบรารีอาจเก่ากว่า exe เดสก์ท็อป — ต้องมี

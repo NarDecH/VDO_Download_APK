@@ -4,7 +4,9 @@
 
 ## [Unreleased]
 
-### เพิ่มใหม่ (Added) — Android v1.1.0: HLS/DASH ในตัว (MVP ตาม plan-android-hls.md ขั้น 1–3)
+## [1.1.0] — 2026-09-29
+
+### เพิ่มใหม่ (Added) — Android v1.1.0 (versionCode 3): HLS/DASH ในตัว
 - **เอนจิน yt-dlp บนอุปกรณ์** — `io.github.junkfood02.youtubedl-android` (library + ffmpeg) v0.17.3
   (พิกัด/เวอร์ชันเดียวกับที่ Seal ใช้, ตรวจ artifacts บน Maven Central แล้ว)
 - **StreamDownloadService** — foreground service (dataSync) ดาวน์โหลด m3u8/mpd/หน้าเว็บที่ yt-dlp รองรับ
@@ -13,6 +15,11 @@
   (ลบ dialog "ใช้เดสก์ท็อป" เดิม)
 - เพิ่มสิทธิ์ `FOREGROUND_SERVICE` + `FOREGROUND_SERVICE_DATA_SYNC` และประกาศ service ใน manifest
 - JVM tests ใหม่: `StreamArgsTest` (output template เดียวกับเดสก์ท็อป, MIME mapping, newest-file)
+- **Engine init ตอนเปิดแอป** + **ปุ่มบำรุงรักษาเอนจิน** ในหน้า Logs (ตรวจเวอร์ชัน / อัปเดต yt-dlp ผ่าน `updateYoutubeDL`) — ขั้น 6 ของแผน
+- CI: gradle-wrapper 9.8.0 (dependabot #10, update-branch แล้ว CI ผ่าน + merge)
+
+### เอกสาร
+- ตรวจทาน plan-android-hls.md: ยืนยันขั้น 1–3 + 6 ทำแล้วบนโค้ด, เหลือขั้น 5 (ทดสอบบนอุปกรณ์จริง) เป็นลำดับถัดไป
 
 ### เพิ่มใหม่ (Added)
 - ไดอะแกรม pipeline การตรวจจับ 4 ชั้น (`docs/assets/detection-pipeline.svg`) พร้อมหัวข้อ
@@ -124,5 +131,6 @@
 - Android ยังไม่รวมไฟล์ HLS/DASH — แนะนำใช้เดสก์ท็อป (roadmap: ฝัง youtubedl-android)
 - ไฟล์ `code/` (ส่วนขยายต้นแบบที่ minify) ถูก `.gitignore` — มีแต่ในเครื่องผู้พัฒนา
 
+[1.1.0]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.0
 [1.0.1]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.0.1
 [1.0.0]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.0.0
