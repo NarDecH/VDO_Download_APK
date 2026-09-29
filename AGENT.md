@@ -39,6 +39,8 @@ code/                (gitignored) ซอร์สส่วนขยายต้�
 ## คำสั่งสำคัญ
 
 ```bash
+run.bat                           # (Windows) รันแอปจากซอร์ส: เช็ค Python → ติดตั้ง deps ถ้าขาด → เปิดแอป
+                                  # ใส่ argument ต่อท้ายได้ เช่น run.bat --selftest หรือ run.bat https://...
 python app/main.py --selftest     # ต้องผ่าน (exit 0) ก่อน build/commit ที่แตะ app/
 python scripts/build_exe.py       # dist/VDOGrabber.exe (~32MB) แล้วทดสอบ exe: ./dist/VDOGrabber.exe --selftest
 python scripts/make_icon.py       # สร้าง assets/icon.ico + docs/assets/logo.png

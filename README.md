@@ -28,6 +28,7 @@
 
 ```bash
 pip install -r requirements.txt
+run.bat                           # (Windows) รันจากซอร์ส: เช็ค Python → ติดตั้ง deps อัตโนมัติ → เปิดแอป
 python app/main.py --selftest     # ทดสอบ
 python scripts/build_exe.py       # แพ็ก exe
 cd android && ./gradlew assembleDebug   # หรือปล่อยให้ CI ทำ
