@@ -59,9 +59,8 @@ jobs:
           api-level: 29
           arch: x86_64
           script: |
-            cd android
-            chmod +x gradlew
-            ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+            chmod +x "$GITHUB_WORKSPACE/android/gradlew"
+            cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
 
       - name: Rename APKs (per-ABI + universal)
         run: |
