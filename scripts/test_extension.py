@@ -57,7 +57,7 @@ def serve():
             if not os.path.exists(full):
                 self.send_error(404)
                 return
-            ctype = "video/mp4" if path.endswith(".mp4") else (
+            ctype = "video/mp4" if path.endswith((".mp4", ".m4s")) else (
                 "application/vnd.apple.mpegurl" if path.endswith(".m3u8") else "text/html")
             body = open(full, "rb").read()
             self.send_response(200)
@@ -129,15 +129,19 @@ def js(cdp, session, expr, timeout=15000):
 
 # ------------------------------------------------------------------ main
 def main():
+    global TMP_PROFILE
     keep = "--keep" in sys.argv
     sample = os.path.join(TESTS, "sample.mp4")
     sample_hash = hashlib.sha256(open(sample, "rb").read()).hexdigest()
+    fmp4_expected = open(os.path.join(TESTS, "fmp4_expected.sha")).read().strip()
 
     srv = serve()
     shutil.rmtree(TMP_DL, ignore_errors=True)
     os.makedirs(TMP_DL, exist_ok=True)
+    # unique profile per run: never collide with other instances or the user
+    TMP_PROFILE = os.path.join(ROOT, f"tmp_chrome-{os.getpid()}")
     if not keep:
-        shutil.rmtree(TMP_PROFILE, ignore_errors=True)
+        pass  # cleaned up in finally
 
     chrome = next((c for c in CHROME_CANDIDATES if os.path.exists(c)), None)
     if not chrome:
@@ -147,6 +151,7 @@ def main():
     proc = subprocess.Popen([
         chrome,
         f"--user-data-dir={TMP_PROFILE}",
+        "--headless=new",
         "--no-first-run", "--no-default-browser-check",
         "--disable-features=DisableLoadExtensionCommandLineSwitch",
         f"--load-extension={EXT}",
@@ -184,9 +189,22 @@ def main():
         cdp.send("Runtime.enable", session=sid)
 
         cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/blobtest.html"}, session=sid)
-        time.sleep(5)  # blob creation + content script mount + first scans
+        time.sleep(3)
 
-        mounted = js(cdp, sid, "!!document.querySelector('#vg-content-host')")
+        # the extension can lag the first page load on a cold profile - poll and
+        # reload until the content script shows up (up to ~40 s)
+        mounted = None
+        for attempt in range(4):
+            for _ in range(16):
+                mounted = js(cdp, sid, "!!document.querySelector('#vg-content-host')")
+                if mounted:
+                    break
+                time.sleep(1)
+            if mounted:
+                break
+            print(f"   (extension not mounted on attempt {attempt + 1} - reloading)")
+            js(cdp, sid, "location.reload()")
+            time.sleep(3)
         check("content script UI mounted", bool(mounted))
 
         video_src = js(cdp, sid, "document.querySelector('#v').src") or ""
@@ -195,9 +213,14 @@ def main():
         expected_blob_prefix = f"blob:http://127.0.0.1:{PORT}/"
         check("blob URL origin matches page origin", video_src.startswith(expected_blob_prefix))
 
-        count = int(js(cdp, sid,
-                       "document.querySelector('#vg-content-host').shadowRoot.querySelector('#vg-count').textContent")
-                    or 0)
+        count = 0
+        for _ in range(20):
+            count = int(js(cdp, sid,
+                           "document.querySelector('#vg-content-host').shadowRoot.querySelector('#vg-count').textContent")
+                        or 0)
+            if count >= 3:
+                break
+            time.sleep(0.5)
         check("extension detected media (>=3: blob + direct + m3u8)", count >= 3, f"count={count}")
 
         kinds = js(cdp, sid,
@@ -207,10 +230,8 @@ def main():
         check("m3u8 item detected via hooks", "m3u8" in kinds, str(kinds))
 
         # ---- download the blob item -------------------------------------
+        click_when_ready(cdp, sid, "blob")
         before = set(os.listdir(TMP_DL))
-        js(cdp, sid,
-           "document.querySelector('#vg-content-host').shadowRoot"
-           ".querySelector('.dl[data-k=\"blob\"]').click()")
         blob_file = wait_for_new_file(TMP_DL, before, 40)
         check("blob download produced a file", bool(blob_file), blob_file or "timeout")
         if blob_file:
@@ -222,14 +243,78 @@ def main():
 
         # ---- direct http download --------------------------------------
         before = set(os.listdir(TMP_DL))
-        js(cdp, sid,
-           "document.querySelector('#vg-content-host').shadowRoot"
-           ".querySelector('.dl[data-k=\"mp4\"]').click()")
+        click_when_ready(cdp, sid, "mp4")
         direct_file = wait_for_new_file(TMP_DL, before, 30)
         check("direct http download produced a file", bool(direct_file), direct_file or "timeout")
         if direct_file:
             got = hashlib.sha256(open(direct_file, "rb").read()).hexdigest()
             check("direct download bytes == source video bytes", got == sample_hash)
+
+        # ================= fallback phase (offscreen assembler) ===========
+        # Simulate what happens on picky sites: the direct blob:/http routes
+        # are unavailable, so bytes must be read inside the page and streamed
+        # through the offscreen assembler. Force it via the debug bridge.
+        flag = js(cdp, sid, f"({ASK})('debugSetFlag', true)")
+        check("forceFallback flag set (debug bridge)", bool(flag and flag.get("ok")), json.dumps(flag or {}))
+
+        # blob item through the offscreen assembler
+        before = set(os.listdir(TMP_DL))
+        click_when_ready(cdp, sid, "blob")
+        fb_file = wait_for_new_file(TMP_DL, before, 60)
+        check("fallback (page blob read) produced a file", bool(fb_file), fb_file or "timeout")
+        if not fb_file:
+            logs = js(cdp, sid, f"({ASK})('debugLogs')")
+            print("--- SW LOGS (fallback failure) ---")
+            for line in (logs or {}).get("logs", [])[-14:]:
+                print("   ", line)
+            print("--- page-side network probe ---")
+            print("fetch:", js(cdp, sid,
+                "fetch('/sample.mp4').then(r => ({t: r.type, s: r.status, ok: r.ok})).catch(e => 'FETCHFAIL ' + e)"))
+            print("vgFetchOrig === fetch:", js(cdp, sid, "String(window.__vgFetchOrig === window.fetch)"))
+            print("hooked fetch:", js(cdp, sid,
+                "window.fetch('/sample.mp4').then(r => ({t: r.type, s: r.status})).catch(e => 'HOOKFAIL ' + e)"))
+            print("readBlob direct probe:", js(cdp, sid,
+                "fetch(document.querySelector('#v').src).then(r => ({t: r.type, s: r.status})).catch(e => 'BLOBFAIL ' + e)"))
+        if fb_file:
+            got = hashlib.sha256(open(fb_file, "rb").read()).hexdigest()
+            check("fallback blob bytes == source video bytes", got == sample_hash,
+                  f"{got[:16]} vs {sample_hash[:16]}")
+
+        # direct http item through the page-fetch fallback
+        before = set(os.listdir(TMP_DL))
+        click_when_ready(cdp, sid, "mp4")
+        fb2 = wait_for_new_file(TMP_DL, before, 60)
+        check("fallback (page fetch) produced a file", bool(fb2), fb2 or "timeout")
+        if not fb2:
+            logs = js(cdp, sid, f"({ASK})('debugLogs')")
+            print("--- SW LOGS (page-fetch failure) ---")
+            for line in (logs or {}).get("logs", [])[-8:]:
+                print("   ", line)
+        if fb2:
+            got = hashlib.sha256(open(fb2, "rb").read()).hexdigest()
+            check("fallback http bytes == source video bytes", got == sample_hash)
+
+        js(cdp, sid, f"({ASK})('debugSetFlag', false)")
+
+        # ================= MSE capture phase (player2u-style) ==============
+        # The video source is a MediaSource-backed blob: URL - the direct blob
+        # download cannot work, so the extension must capture appendBuffer()
+        # chunks and reassemble init+segment through the offscreen assembler.
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/msetest.html"}, session=sid)
+        time.sleep(4)
+        clicked = click_when_ready(cdp, sid, "blob", 25)
+        check("MSE page: blob item offered for download", clicked)
+        before = set(os.listdir(TMP_DL))
+        fb3 = wait_for_new_file(TMP_DL, before, 90)
+        check("MSE capture produced a file", bool(fb3), fb3 or "timeout")
+        if fb3:
+            got = hashlib.sha256(open(fb3, "rb").read()).hexdigest()
+            check("MSE captured bytes == init+segment bytes", got == fmp4_expected,
+                  f"{got[:16]} vs {fmp4_expected[:16]}")
+            if got != fmp4_expected:
+                logs = js(cdp, sid, f"({ASK})('debugLogs')")
+                for line in (logs or {}).get("logs", [])[-12:]:
+                    print("   ", line)
 
     finally:
         try:
@@ -237,6 +322,7 @@ def main():
         except Exception:
             pass
         srv.shutdown()
+        shutil.rmtree(TMP_PROFILE, ignore_errors=True)
 
     print(f"\nRESULT: {len(passed)} passed, {len(failed)} failed")
     if failed:
@@ -258,6 +344,56 @@ def wait_for_new_file(folder, before, timeout_s):
                 pass
         time.sleep(0.5)
     return None
+
+
+ASK = """(type, value) => new Promise(res => {
+  const reqId = 'q' + Math.random().toString(36).slice(2);
+  const on = (e) => { const d = e.data;
+    if (d && d.__vg === 'main' && d.type === type && d.reqId === reqId) { window.removeEventListener('message', on); res(d.resp); } };
+  window.addEventListener('message', on);
+  window.postMessage({ __vg: 'ui', type, reqId, value }, '*');
+  setTimeout(() => res({ timeout: true }), 8000);
+})"""
+
+
+def click_when_ready(cdp, sid, kind, timeout_s=15):
+    """Poll until the panel button for `kind` exists, then click it."""
+    sel = f'.dl[data-k="{kind}"]'
+    expr = f"(() => {{ const b = document.querySelector('#vg-content-host').shadowRoot.querySelector('{sel}'); if (b) {{ b.click(); return true; }} return false; }})()"
+    deadline = time.time() + timeout_s
+    while time.time() < deadline:
+        if js(cdp, sid, expr):
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def unpacked_extension_id(path):
+    """Chrome derives the unpacked-extension id from the SHA256 of its path."""
+    h = hashlib.sha256(path.encode("utf-8")).hexdigest()[:32]
+    return "".join(chr(ord("a") + int(c, 16)) for c in h)
+
+
+def wake_service_worker(cdp):
+    """Open the extension popup page to spawn the SW, then attach to it so the
+    test can flip chrome.storage flags."""
+    eid = unpacked_extension_id(EXT)
+    popup = cdp.send("Target.createTarget", {"url": f"chrome-extension://{eid}/popup.html"})
+    time.sleep(2.5)
+    sw_sid = None
+    for t in http_json("/json/list"):
+        if t.get("type") == "service_worker" and f"chrome-extension://{eid}/" in t.get("url", ""):
+            try:
+                att = cdp.send("Target.attachToTarget", {"targetId": t["id"], "flatten": True})
+                sw_sid = att["sessionId"]
+                cdp.send("Runtime.enable", session=sw_sid)
+            finally:
+                break
+    try:
+        cdp.send("Target.closeTarget", {"targetId": popup["targetId"]})
+    except Exception:
+        pass
+    return sw_sid
 
 
 if __name__ == "__main__":

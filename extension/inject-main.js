@@ -86,16 +86,62 @@
     post("blobDone", { id, chunks: i });
   }
 
-  // ---- 3. on-demand blob: reader (works for real Blob/File objects) -----
+  // ---- 3. on-demand blob:/http(s) reader -------------------------------
+  function xhrGetBlob(url) {
+    return new Promise((resolve, reject) => {
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open("GET", url, true);
+        xhr.responseType = "blob";
+        xhr.onload = () => (xhr.response && xhr.response.size ? resolve(xhr.response) : reject(new Error("XHR empty response")));
+        xhr.onerror = () => reject(new Error("XHR network error"));
+        xhr.send();
+      } catch (e) { reject(e); }
+    });
+  }
+
   async function readBlob(id, url) {
     try {
-      const resp = await window.__vgFetchOrig ? window.__vgFetchOrig(url) : fetch(url);
-      if (!resp.ok) throw new Error("HTTP " + resp.status);
-      const blob = await resp.blob();
+      let blob = null;
+      try {
+        const resp = await window.__vgFetchOrig ? window.__vgFetchOrig(url) : fetch(url);
+        if (resp && resp.ok && resp.blob) blob = await resp.blob();
+      } catch (e) { /* fall through to XHR */ }
+      if (!blob) blob = await xhrGetBlob(url);   // XHR handles blob: URLs reliably
       const buf = new Uint8Array(await blob.arrayBuffer());
       if (buf.length === 0) throw new Error("empty blob");
       const mime = blob.type || "video/mp4";
-      const ext = (mime.split("/")[1] || "mp4").split(";")[0];
+      bufToB64Chunks(buf, id, "", mime);
+    } catch (e) {
+      post("blobError", { id, error: String(e && e.message || e) });
+    }
+  }
+
+  // direct http(s) media that chrome.downloads refused (expired signed URL,
+  // picky CDN): re-fetch with the page's own credentials/CORS and stream it.
+  async function readUrl(id, url) {
+    if (!url || !/^https?:/i.test(url)) {
+      post("blobError", { id, error: "readUrl: not an http(s) url" });
+      return;
+    }
+    try {
+      let blob = null, detail = "";
+      try {
+        const resp = await window.__vgFetchOrig ? window.__vgFetchOrig(url, { credentials: "include" }) : fetch(url, { credentials: "include" });
+        if (resp && resp.ok && resp.blob) {
+          blob = await resp.blob();
+        } else {
+          detail = `type=${resp && resp.type} status=${resp && resp.status}`;
+        }
+      } catch (e) {
+        detail = "fetch threw: " + String(e && e.message || e);
+      }
+      if (!blob) {
+        try { blob = await xhrGetBlob(url); } catch (e) { detail += " | xhr: " + String(e && e.message || e); }
+      }
+      if (!blob || !blob.size) throw new Error("readUrl failed: " + (detail || "empty"));
+      const buf = new Uint8Array(await blob.arrayBuffer());
+      const mime = blob.type || "";
       bufToB64Chunks(buf, id, "", mime);
     } catch (e) {
       post("blobError", { id, error: String(e && e.message || e) });
@@ -152,6 +198,7 @@
   window.addEventListener("message", (e) => {
     if (e.source !== window || !e.data || e.data.__vg !== "ui") return;
     if (e.data.type === "readBlob") readBlob(e.data.id, e.data.url);
+    else if (e.data.type === "readUrl") readUrl(e.data.id, e.data.url);
     else if (e.data.type === "readMse") readMse(e.data.id);
   });
 })();

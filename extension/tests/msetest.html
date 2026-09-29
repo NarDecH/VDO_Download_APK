@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="th">
+<head><meta charset="utf-8"><title>MSE Player — blob video (player2u pattern)</title>
+<style>body{font-family:system-ui;background:#111;color:#ddd;padding:20px}video{max-width:480px}</style></head>
+<body>
+<h1>MSE stream test page</h1>
+<p>The video element's source is a <code>blob:</code> URL backed by a <b>MediaSource</b>
+(not a File blob) - appended fMP4 init + media segment, exactly like players such as
+player2u.com. The direct blob download must fail and the extension should fall back
+to MSE capture (appendBuffer hook) and reassemble the file.</p>
+<video id="v" controls width="480"></video>
+<p id="st">booting MSE…</p>
+<script>
+  const ms = new MediaSource();
+  const url = URL.createObjectURL(ms);
+  const v = document.getElementById("v");
+  v.src = url;
+  ms.addEventListener("sourceopen", () => {
+    const sb = ms.addSourceBuffer('video/mp4; codecs="avc1.4d400d"');
+    const fail = (e) => document.getElementById("st").textContent = "MSE error: " + e;
+    sb.addEventListener("error", fail);
+    sb.addEventListener("updateend", () => {
+      if (!sb.__segDone) {
+        sb.__segDone = true;
+        fetch("/fmp4-seg.m4s").then(r => r.arrayBuffer()).then(b => sb.appendBuffer(b));
+      } else {
+        document.getElementById("st").textContent = "MSE ready: " + url;
+      }
+    });
+    fetch("/fmp4-init.mp4").then(r => r.arrayBuffer()).then(b => sb.appendBuffer(b));
+  });
+</script>
+</body>
+</html>

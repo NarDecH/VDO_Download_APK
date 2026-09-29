@@ -2,20 +2,24 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased]
+## [Unreleased] — Extension 1.1.0
 
-### เพิ่มใหม่ (Added)
-- **ส่วนขยาย Chrome (MV3)** ในโฟลเดอร์ `extension/` — ปุ่มลอย + แผงรายการวิดีโอในทุกหน้าเว็บ,
-  ตรวจจับ 4 ชั้น (DOM scan, hook fetch/XHR ใน MAIN world, resource timing, webRequest observer),
-  popup แสดงรายการต่อแท็บพร้อม logs, และท่อดาวน์โหลดหลายชั้น:
-  1. direct http(s) ผ่าน `chrome.downloads` (แนบ Referer จากหน้า)
-  2. `blob:` URL → ดาวน์โหลดตรงผ่าน downloads API (ไฟล์ blob ต้องยังมีชีวิตอยู่ในหน้า)
-  3. fallback: อ่าน bytes ในหน้า (fetch blob → base64 chunks → data URL)
-  4. MSE streams: ดัก `MediaSource.appendBuffer` เก็บชิ้นส่วนแล้วประกอบไฟล์ใหม่
-- **ทดสอบ E2E ด้วย Chrome จริง** (`scripts/test_extension.py` + Chrome for Testing + CDP):
-  หน้าทดสอบจำลองกลไก `blob:` ของ player2u.com (fetch → Blob → video.src) — ผ่าน 12/12
-  รวมถึงพิสูจน์ว่าไฟล์ที่ดาวน์โหลดจาก blob มี SHA256 ตรงกับต้นฉบับทุกไบต์
-- แนบ `VDOGrabber-chrome-extension-1.0.0.zip` เข้า release พร้อม checksum
+### แก้ไข (Fixed) — ส่วนขยาย Chrome v1.1.0
+- **"Failed - Network error" ที่เกิดกับวิดีโอแบบ blob: ได้รับการแก้ครบวงจร** —
+  พบสาเหตุ 3 ชั้นจากการทดสอบ E2E และแก้ทั้งหมด:
+  1. `chrome.downloads.download` **ห้ามส่ง header `Referer`** ("Unsafe request header name") — เดิมใส่ไปทำให้ดาวน์โหลดตรงพังทุกเส้นทาง
+  2. เส้นทางสำรองเดิมส่งไฟล์เป็น **data: URL ยักษ์** ซึ่ง Chrome ดาวน์โหลดไม่ได้เกินขนาดหนึ่ง — เปลี่ยนเป็นประกอบไฟล์เป็น Blob ใน **offscreen document** (reason: `BLOBS`) แล้วดาวน์โหลดผ่าน `blob:` URL ของ extension — สตรีม chunk ทีละ 4 MB ประหยัดหน่วยความจำ พร้อม cap 800 MB
+  3. ดาวน์โหลดที่ "เริ่มแล้วแต่โดน kill" (MSE blob → `NETWORK_FAILED`) ตอนนี้ถูกเฝ้าดูด้วย `downloads.onChanged` แล้ว**สลับไป fallback อัตโนมัติ** — ไม่ต้องกดซ้ำ
+- **player2u.com ใช้ MSE stream** (ไม่ใช่ File blob) — โค้ดอ่าน blob ตรงไม่ผ่าน → ตอนนี้ fallback ไป **MSE capture**: hook `MediaSource.addSourceBuffer/appendBuffer` เก็บทุก chunk ที่เล่นแล้วประกอบเป็นไฟล์ใหม่ (ทดสอบกับ fMP4 จริง — bytes ตรงต้นฉบับ)
+- **ล้างรายการวิดีโอเก่าเมื่อ navigate ใหม่** — blob: URL ตายเมื่อเปลี่ยนหน้า แผงไม่ควรเสนอลิงก์ตายอีก
+- `readBlob` ใช้ XHR fallback เมื่อ fetch ไม่ตอบสนอง + รายงาน error ที่มีรายละเอียด (ชนิด response/สาเหตุ)
+
+### ทดสอบ (Tests)
+- E2E ขยายเป็น **20 ข้อ** (headless Chrome for Testing + CDP): direct blob/http,
+  force-fallback (page blob read + page fetch) ผ่าน offscreen assembler, และ MSE capture
+  ด้วย fMP4 จริง (init+segment ตัดจาก shaka-demo-assets พร้อม parse sidx) — ทุกข้อตรวจ
+  SHA256 เทียบไบต์ต้นฉบับ
+- เพิ่ม debug bridge (page ↔ content ↔ SW) สำหรับอ่าน logs/downloads ระหว่างทดสอบ
 
 ## [1.0.0] — 2026-09-29
 

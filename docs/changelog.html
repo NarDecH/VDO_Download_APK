@@ -59,6 +59,31 @@ a{color:#7fb3ff}
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
+    <span class="vtag" style="background:#1f2c52">Ext v1.1.0</span>
+    <span class="vtag-latest" style="background:#78350f;color:#fcd34d">LATEST EXTENSION</span>
+    <span class="vdate">แก้ "Failed - Network error" กับวิดีโอ blob:/MSE</span>
+  </div>
+  <h3>แก้ไข <span class="en">Fixed</span></h3>
+  <ul>
+    <li><b>3 ชั้นสาเหตุของ "Failed - Network error"</b> ถูกปิดหมด:
+        ① <code>chrome.downloads</code> ห้ามส่ง header <code>Referer</code> (โค้ดเดิมใส่ → พังทุกเส้นทาง)
+        ② เส้นทางสำรองเดิมส่ง <b>data: URL ยักษ์</b> ที่ Chrome ดาวน์โหลดไม่ได้ → เปลี่ยนเป็นประกอบ Blob
+        ใน offscreen document (สตรีม chunk 4MB, cap 800MB)
+        ③ ดาวน์โหลดที่เริ่มแล้วโดน kill ถูกเฝ้าด้วย <code>downloads.onChanged</code> แล้วสลับ fallback อัตโนมัติ</li>
+    <li><b>player2u.com ใช้ MSE stream</b> (ไม่ใช่ File blob) — เพิ่ม <b>MSE capture</b>: hook
+        <code>MediaSource.appendBuffer</code> เก็บทุก chunk ที่เล่นแล้วประกอบเป็นไฟล์ใหม่</li>
+    <li>ล้างรายการวิดีโอเก่าเมื่อ navigate ใหม่ (blob: URL ตายเมื่อเปลี่ยนหน้า) · readBlob มี XHR fallback</li>
+  </ul>
+  <h3>ทดสอบ <span class="en">Tests</span></h3>
+  <ul>
+    <li><b>E2E 20 ข้อ</b> (headless Chrome for Testing + CDP): direct blob/http · force-fallback
+        ผ่าน offscreen assembler · MSE capture ด้วย fMP4 จริง — <b>ทุกข้อตรวจ SHA256 เทียบไบต์ต้นฉบับ</b></li>
+    <li>แนบ <code>VDOGrabber-chrome-extension-1.1.0.zip</code> ใน release พร้อม checksum ใหม่</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
     <span class="vtag" style="background:#1f2c52">Unreleased</span>
     <span class="vtag-latest" style="background:#78350f;color:#fcd34d">COMING</span>
     <span class="vdate">ส่วนขยาย Chrome — แนบใน release v1.0.0 แล้ว</span>

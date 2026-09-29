@@ -1,7 +1,8 @@
 /**
  * VDO Grabber — ISOLATED-world content script.
  * DOM scan + floating panel UI (Shadow DOM) + bridge between the MAIN world
- * injector and the service worker. Equivalent of app/ui injected toolbar.
+ * injector and the service worker. Bytes from the page are streamed to the
+ * SW in ordered 4 MB chunks (assembled by the offscreen document).
  */
 (() => {
   if (window.__vgContent) return;
@@ -9,16 +10,19 @@
 
   const MEDIA_RE = /\.(mp4|m3u8|mpd|webm|mkv|flv|mov|avi|mp3|m4a|aac|ts|3gp)(\?|#|$)/i;
   const items = new Map();          // url -> {url, kind, label, via}
-  let downloadSeq = 0;
-  const pendingBlobs = new Map();   // id -> {chunks, count, received, name, mime, total}
+  const streams = new Map();        // assembly id -> {name, kind, mime, total, received, queue}
+  let seq = 0;
 
   function report(url, kind, label, via) {
     try {
       if (!url || !/^(https?|blob)/.test(url)) return;
       let k = kind;
       if (!k || k === "media") {
-        const ext = (url.match(MEDIA_RE) || [])[1];
-        k = url.startsWith("blob:") ? "blob" : (ext ? ext.toLowerCase() : "media");
+        if (url.startsWith("blob:")) k = "blob";
+        else {
+          const ext = (url.match(MEDIA_RE) || [])[1];
+          k = ext ? ext.toLowerCase() : "media";
+        }
       }
       const key = url.slice(0, 400);
       if (items.has(key)) return;
@@ -57,33 +61,61 @@
     } catch (e) {}
   }
 
-  // ---------------- messages from MAIN world ------------------------------
+  // ---------------- messages from MAIN world (streaming) -------------------
   window.addEventListener("message", (e) => {
-    if (e.source !== window || !e.data || e.data.__vg !== "main") return;
+    if (e.source !== window || !e.data || !e.data.__vg) return;
     const d = e.data;
-    if (d.type === "media") report(d.url, null, "network", d.via || "network");
-    else if (d.type === "blobMeta") {
-      const p = pendingBlobs.get(d.id);
-      if (p) { if (d.mime) p.mime = d.mime; if (d.total) p.total = d.total; }
+
+    // debug bridge: page (E2E tests) asks for SW state through the content script
+    if (d.__vg === "ui" && (d.type === "debugLogs" || d.type === "debugDownloads" || d.type === "debugSetFlag")) {
+      const type = { debugLogs: "vg:logs", debugDownloads: "vg:downloads", debugSetFlag: "vg:setFlag" }[d.type];
+      const out = { type };
+      if (d.type === "debugSetFlag") out.value = d.value;
+      chrome.runtime.sendMessage(out, (resp) => {
+        window.postMessage({ __vg: "main", type: d.type, reqId: d.reqId, resp: resp || { err: chrome.runtime.lastError && chrome.runtime.lastError.message } }, "*");
+      });
+      return;
+    }
+
+    if (d.__vg !== "main") return;
+    if (d.type === "media") { report(d.url, null, "network", d.via || "network"); return; }
+
+    const st = streams.get(d.id);
+    if (!st) return;
+
+    if (d.type === "blobMeta") {
+      st.mime = d.mime || st.mime;
+      st.total = d.total || 0;
+      st.queue = st.queue.then(() => send({ type: "vg:blobBegin", id: d.id, mime: st.mime }));
     } else if (d.type === "blobChunk") {
-      const p = pendingBlobs.get(d.id);
-      if (!p) return;
-      p.count = d.count; p.parts[d.index] = d.b64;
+      st.received += 4 * 1024 * 1024;
+      const mb = st.total ? `${Math.min(st.received, st.total) / 1048576 | 0}/${st.total / 1048576 | 0} MB` : `${st.received / 1048576 | 0} MB`;
+      setStatus(`⏳ อ่านข้อมูลจากหน้าเว็บ… ${mb}`);
+      st.queue = st.queue.then(() => send({ type: "vg:chunk", id: d.id, b64: d.b64 }));
     } else if (d.type === "blobDone") {
-      const p = pendingBlobs.get(d.id);
-      pendingBlobs.delete(d.id);
-      if (!p) return;
-      const ordered = [];
-      for (let i = 0; i < d.chunks; i++) ordered.push(p.parts[i] || "");
-      try { chrome.runtime.sendMessage({ type: "vg:blobData", id: d.id, mime: p.mime, b64: ordered.join("") }); } catch (e2) {}
+      st.queue = st.queue.then(() => send({ type: "vg:blobEnd", id: d.id, name: st.name, mime: st.mime }))
+        .then(() => streams.delete(d.id));
     } else if (d.type === "blobError") {
-      pendingBlobs.delete(d.id);
-      try { chrome.runtime.sendMessage({ type: "vg:blobFailed", id: d.id, error: d.error }); } catch (e2) {}
-      setStatus("❌ " + (d.error || "อ่าน blob ไม่สำเร็จ"));
+      st.queue = st.queue.then(() => send({ type: "vg:blobFailed", id: d.id, error: d.error }))
+        .then(() => streams.delete(d.id));
     }
   });
 
+  function send(msg) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(msg, () => { void chrome.runtime.lastError; resolve(); });
+      } catch (e) { resolve(); }
+    });
+  }
+
   function askMain(msg) { try { window.postMessage(Object.assign({ __vg: "ui" }, msg), "*"); } catch (e) {} }
+
+  function newStream(name, kind) {
+    const id = "d" + (++seq) + "-" + Date.now();
+    streams.set(id, { name, kind, mime: kind === "mse" ? "video/mp4" : "", total: 0, received: 0, queue: Promise.resolve() });
+    return id;
+  }
 
   // ---------------- UI (Shadow DOM pill + panel) ---------------------------
   const host = document.createElement("div");
@@ -148,7 +180,7 @@
     const list = shadow.getElementById("vg-list");
     if (!list || !items.size) return;
     const kindLabel = { blob: "blob (in-page)", m3u8: "HLS", mpd: "DASH" };
-    list.innerHTML = [...items.values()].reverse().map((m, idx) => `
+    list.innerHTML = [...items.values()].reverse().map((m) => `
       <div class="item">
         <b>${esc(m.label || m.kind)}<span class="tag">${esc(kindLabel[m.kind] || m.kind)}</span></b>
         <small>${esc(m.url.slice(0, 140))}</small>
@@ -165,36 +197,67 @@
   }
 
   // ---------------- download pipeline --------------------------------------
+  function pageReadFallback(url, kind, name) {
+    if (kind === "blob") {
+      const id = newStream(name, "blob");
+      setStatus("⏳ อ่าน blob จากหน้าเว็บ…");
+      askMain({ type: "readBlob", id, url });
+    } else if (kind === "m3u8" || kind === "mpd") {
+      setStatus("📺 สตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
+    } else {
+      // http(s) media the browser refused (expired token / picky CDN):
+      // re-fetch with the page's own credentials and stream it out
+      const id = newStream(name, "media");
+      setStatus("⏳ อ่านไฟล์ด้วย fetch ของหน้าเว็บ…");
+      askMain({ type: "readUrl", id, url });
+    }
+  }
+
   function startDownload(url, kind) {
+    try { chrome.runtime.sendMessage({ type: "vg:log", msg: `content startDownload kind=${kind} url=${url.slice(0, 80)}` }); } catch (e) {}
+    const name = (document.title || "video").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "video";
+    if (kind === "m3u8" || kind === "mpd") {
+      setStatus("📺 สตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
+      return;
+    }
     setStatus("⏳ กำลังส่งให้ตัวดาวน์โหลด…");
-    const item = { url, kind, name: (document.title || "video").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) };
-    chrome.runtime.sendMessage({ type: "vg:download", item }, (resp) => {
+    chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
       const lastErr = chrome.runtime.lastError;
       if (lastErr || !resp || !resp.ok) {
-        // direct route failed → ask the page to read the blob (File blob) or MSE capture
-        const id = "d" + (++downloadSeq) + "-" + Date.now();
-        pendingBlobs.set(id, { parts: {}, count: null, received: 0, name: item.name, mime: "", total: 0 });
-        setStatus("⏳ อ่านข้อมูลจากหน้าเว็บ (blob/stream)…");
-        if (kind === "blob") askMain({ type: "readBlob", id, url });
-        else if (kind === "mse") askMain({ type: "readMse", id });
-        else askMain({ type: "readBlob", id, url });
+        pageReadFallback(url, kind, name);
       } else {
         setStatus("✅ เริ่มดาวน์โหลดแล้ว — ดูในแถบดาวน์โหลดของ Chrome");
       }
     });
   }
 
-  // messages from the service worker (webRequest sniffer + blob results)
-  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
+  // messages from the service worker
+  chrome.runtime.onMessage.addListener((msg, sender) => {
     if (sender.id !== chrome.runtime.id) return;
     if (msg.type === "vg:netMedia") report(msg.url, msg.kind, "network", "webRequest");
+    else if (msg.type === "vg:clearMedia") {
+      items.clear();
+      updateBadge();
+      const list = shadow.getElementById("vg-list");
+      if (list) list.innerHTML = '<div class="empty">ยังไม่พบวิดีโอ — เล่นวิดีโอในหน้าสักครู่</div>';
+    }
     else if (msg.type === "vg:blobSaved") setStatus("✅ ดาวน์โหลดสำเร็จ: " + (msg.filename || ""));
-    else if (msg.type === "vg:blobSaveFailed") {
-      // data-URL route failed too → offer MSE capture
-      setStatus("⚠️ " + (msg.error || "บันทึกไม่สำเร็จ") + " — ลอง MSE capture");
-      const id = "m" + (++downloadSeq) + "-" + Date.now();
-      pendingBlobs.set(id, { parts: {}, count: null, received: 0, name: "mse-stream", mime: "", total: 0 });
-      askMain({ type: "readMse", id });
+    else if (msg.type === "vg:downloadFailed") {
+      // chrome.downloads reported the async failure (MSE blob / expired link)
+      const it = msg.item || {};
+      setStatus("⚠️ Chrome ดาวน์โหลดตรงไม่สำเร็จ — สลับไปอ่านข้อมูลจากหน้าเว็บ…");
+      pageReadFallback(it.url, it.kind, it.name || (document.title || "video").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80));
+    } else if (msg.type === "vg:blobSaveFailed") {
+      // last resort: MSE capture (for blob: sources backed by MediaSource)
+      const mseStream = [...streams.values()].find((s) => s.kind === "mse");
+      if (!mseStream) {
+        const name = (document.title || "video").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "video";
+        const id = newStream(name, "mse");
+        setStatus("⏳ พยายามรวมชิ้นส่วนสตรีม (MSE capture)…");
+        askMain({ type: "readMse", id });
+      } else {
+        setStatus("❌ " + (msg.error || "ดาวน์โหลดไม่สำเร็จ") + " — ลองเล่นวิดีโอให้ครบแล้วกดใหม่ หรือใช้เวอร์ชันเดสก์ท็อป");
+      }
     }
   });
 })();

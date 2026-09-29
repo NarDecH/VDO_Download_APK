@@ -51,10 +51,18 @@ python scripts/make_icon.py       # สร้าง assets/icon.ico + docs/asset
 cd android && ./gradlew assembleDebug   # หรือปล่อยให้ CI ทำ
 
 # Chrome extension
-python scripts/test_extension.py  # E2E: Chrome for Testing + CDP (12 checks, รวม blob byte-compare)
-                                  # แตะ extension/ แล้วต้องรันให้ผ่านก่อน push
-                                  # ห้ามใช้ --load-extension บน Chrome/Edge branded stable (ถูกบล็อก)
-                                  # ให้ใช้ tools/chrome-win64 (Chrome for Testing — ดาวน์โหลดเองไม่ commit)
+python scripts/test_extension.py  # E2E 20 checks (headless Chrome for Testing + CDP)
+                                  # แตะ extension/ แล้วต้องผ่านก่อน push
+# บทเรียนที่จ่ายค่าเลือดมาแล้ว (ห้ามทำซ้ำ):
+#  - chrome.downloads.download ห้ามส่ง Referer ("Unsafe request header name" พังทั้ง request)
+#  - ห้ามส่งไฟล์ใหญ่เป็น data: URL (Chrome ดาวน์โหลดไม่ได้ → "Failed - Network error")
+#    ให้ประกอบ Blob ใน offscreen document (reason ต้องเป็น "BLOBS" ไม่ใช่ BLOB_PARSE)
+#    แล้วดาวน์โหลดผ่าน blob: URL ของ extension
+#  - chrome.downloads.download คืน ok = "เริ่มได้" ไม่ใช่ "สำเร็จ" — MSE blob จะโดน
+#    NETWORK_FAILED ตามหลัง ต้อง watch downloads.onChanged แล้วสลับ fallback
+#  - blob: URL ของหน้าตายเมื่อ navigate — ล้างรายการต่อแท็บใน tabs.onUpdated (status=loading)
+#  - Chrome/Edge branded stable (137+) บล็อก --load-extension — ใช้ tools/chrome-win64
+#    (Chrome for Testing ดาวน์โหลดเอง ไม่ commit) และรันแบบ headless เพื่อไม่ชนกับผู้ใช้
 ```
 
 ## กติกาการแก้โค้ด
