@@ -41,8 +41,9 @@ class DownloaderTest {
         assertEquals("Travel Blog.mp4", Downloader.displayName("https://c/v/clip.mp4", "Travel Blog"))
         // the extension follows the URL (m3u8), not a hard-coded mp4
         assertEquals("Live TV.m3u8", Downloader.displayName("https://c/v/index.m3u8?tok=1", "Live TV"))
-        // invalid chars are sanitized like the desktop app
-        assertEquals("bad name .mp4", Downloader.displayName("https://c/v/clip.mp4", "bad:name?"))
+        // invalid chars are sanitized like the desktop app; trailing spaces
+        // are trimmed, so the extension lands right after the stem
+        assertEquals("bad name.mp4", Downloader.displayName("https://c/v/clip.mp4", "bad:name?"))
     }
 
     @Test
