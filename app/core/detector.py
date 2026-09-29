@@ -262,6 +262,11 @@ TOOLBAR_JS = r"""
     if (act === 'detect') { pyapi() && pyapi().detect_now(); badge.textContent = '...'; return; }
     if (act === 'panel') { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; return; }
     if (act === 'ctrl') { pyapi() && pyapi().show_control(); return; }
+    // open an iframe embed page as the top-level page (in-page navigation)
+    if (b.hasAttribute('data-open')) {
+      try { location.href = decodeURIComponent(b.getAttribute('data-open')); } catch (e) {}
+      return;
+    }
     if (b.classList.contains('dlbtn')) {
       pyapi() && pyapi().download_start({ url: decodeURIComponent(b.getAttribute('data-url')),
         kind: classifyKind(b.getAttribute('data-url')), page_url: decodeURIComponent(b.getAttribute('data-ref') || ''), referrer: '' });
@@ -316,7 +321,9 @@ TOOLBAR_JS = r"""
       div.innerHTML = '<b>' + label + (q ? ' — ' + q : '') + '</b><small>' + rep.url.slice(0, 160) + '</small>' +
         '<div class="row">' +
         '<button class="dlbtn" data-url="' + encodeURIComponent(rep.url) + '" data-ref="' + encodeURIComponent(location.href) + '">⬇ ดาวน์โหลด</button>' +
-        '<button class="fmtbtn" data-url="' + encodeURIComponent(rep.url) + '">รูปแบบ/คุณภาพ</button></div>' +
+        '<button class="fmtbtn" data-url="' + encodeURIComponent(rep.url) + '">รูปแบบ/คุณภาพ</button>' +
+        (rep.kind === 'embed' ? '<button class="fmtbtn" data-open="' + encodeURIComponent(rep.url) + '" title="เปิดหน้า embed นี้เป็นหน้าหลัก แล้วสแกนวิดีโอต่อ">🌐 เปิดหน้า embed</button>' : '') +
+        '</div>' +
         '<div class="fmts"></div>';
       list.prepend(div);
     }

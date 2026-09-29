@@ -292,10 +292,14 @@
         <div class="row">
           <button class="dl" data-u="${esc(m.url)}" data-k="${esc(m.kind)}">⬇ ดาวน์โหลด</button>
           <button class="cp" data-u="${esc(m.url)}">คัดลอกลิงก์</button>
+          ${m.kind === "embed" ? `<button class="cp" data-open="${esc(m.url)}" title="เปิดหน้า embed นี้เป็นหน้าหลัก แล้วสแกนวิดีโอต่อ">🌐 เปิดหน้าเว็บ</button>` : ""}
         </div>
       </div>`).join("");
     list.querySelectorAll(".dl").forEach((b) => b.addEventListener("click", () => startDownload(b.getAttribute("data-u"), b.getAttribute("data-k"))));
     list.querySelectorAll(".cp").forEach((b) => b.addEventListener("click", () => copyText(b.getAttribute("data-u"))));
+    list.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => {
+      try { window.location.href = b.getAttribute("data-open"); } catch (e) {}
+    }));
   }
 
   function copyText(text) {

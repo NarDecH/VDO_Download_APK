@@ -84,6 +84,25 @@ def main() -> int:
             """ % PORT)
             time.sleep(1.5)
             results["url2"] = (w.get_current_url() or "")
+
+            # 3) embed open button: feed an iframe embed item, click "เปิดหน้า embed"
+            w.evaluate_js(TOOLBAR_JS)  # fresh page after navigation - re-inject
+            time.sleep(0.5)
+            w.evaluate_js("""
+                window.__vgToolbar.media({ url: 'http://127.0.0.1:%d/embed.html', kind: 'embed', label: 'iframe player' });
+            """ % PORT)
+            time.sleep(0.4)
+            results["embed_btn"] = w.evaluate_js("""
+                (() => {
+                    const root = document.querySelector('#vg-toolbar-host').shadowRoot;
+                    const btn = root.querySelector('[data-open]');
+                    if (!btn) return 'MISSING';
+                    btn.click();
+                    return 'clicked';
+                })()
+            """)
+            time.sleep(1.5)
+            results["url3"] = (w.get_current_url() or "")
         except Exception as e:
             results["probe_error"] = repr(e)
         finally:
@@ -121,6 +140,11 @@ def main() -> int:
         ok = False
     else:
         print("PASS toolbar Enter navigated ->", results["url2"][-40:])
+    if results.get("embed_btn") != "clicked" or "/embed.html" not in results.get("url3", ""):
+        print("FAIL embed open button:", results.get("embed_btn"), results.get("url3"))
+        ok = False
+    else:
+        print("PASS embed open button navigated ->", results["url3"][-40:])
     if "returnValuesCallbacks" in text:
         print("FAIL stderr still contains returnValuesCallbacks errors")
         for line in text.splitlines():

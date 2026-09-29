@@ -230,6 +230,10 @@ def main():
         check("blob item present in panel", "blob" in kinds, str(kinds))
         check("m3u8 item detected via hooks", "m3u8" in kinds, str(kinds))
         check("iframe embed src offered as candidate", "embed" in kinds, str(kinds))
+        open_btn = js(cdp, sid,
+                      "(() => { const b = document.querySelector('#vg-content-host').shadowRoot"
+                      ".querySelector('.dl[data-k=\"embed\"]'); return b ? !!b.closest('.item').querySelector('[data-open]') : false; })()")
+        check("embed item has 'open page' button", bool(open_btn))
 
         # ---- download the blob item -------------------------------------
         blob_url = js(cdp, sid, "document.querySelector('#v').src") or ""

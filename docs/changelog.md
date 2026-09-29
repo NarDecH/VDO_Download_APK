@@ -12,6 +12,11 @@
      แม้แผงไม่ขึ้น และ `ensureUi()` พยายาม mount ใหม่ทุก 3 วินาที (กัน SPA ลบ host ทิ้ง)
   3. **คัดลอกลิงก์บนเว็บ http** ที่ไม่มี `navigator.clipboard` — fallback ไป `execCommand("copy")`
 
+### เพิ่มใหม่ (Added) — Extension 1.1.2
+- **ปุ่ม "🌐 เปิดหน้าเว็บ" บนรายการ iframe embed** (ทั้ง extension panel และ desktop toolbar) —
+  เปิดหน้า embed นั้นเป็นหน้าหลักแล้วระบบสแกนวิดีโอในหน้าต่ออัตโนมัติ
+  (navigate แบบ in-page ไม่ผ่าน callback จึงไม่มี TypeError)
+
 ### เพิ่มใหม่ (Added) — Desktop 1.0.1 + Extension 1.1.0
 - **ตรวจหาวิดีโอจาก iframe** (ปุ่ม 🔍 ตรวจหาวิดีโอ):
   - iframe ต้นกำเนิดเดียวกัน / srcdoc → ลงไปสแกนข้างในจริง (`<video>`, ลิงก์สื่อ, resource timing ของ frame)
