@@ -79,7 +79,7 @@ class DownloadCleanerE2E {
                     )?.use { c -> append(" msRows=").append(c.count) }
                 } catch (e: Exception) { append(" msQueryErr=").append(e) }
                 try {
-                    val n = ctx.contentResolver.delete(listed.uri, null, null)
+                    val n = ctx.contentResolver.delete(listed.uri!!, null, null)
                     append(" manualUriDelete=").append(n)
                 } catch (e: Exception) { append(" manualUriDeleteErr=").append(e.message) }
             }
