@@ -126,6 +126,22 @@
 - เครื่องนี้ไม่มี Android SDK/ANDROID_HOME → งาน Kotlin ตรวจด้วย CI เท่านั้น (local gradlew จะ fail ที่ SDK location)
 - ไฟล์ที่ไม่ใช่ของเซสชันค้างใน working tree: `M android/build.gradle.kts` (AGP 8.7.3→8.13.2), `?? android/gradle/gradle-daemon-jvm.properties` (gradle 9.8 toolchain 25), `M android/gradlew.bat` — ห้าม commit/ทิ้ง ให้ผู้ใช้ตัดสินใจ
 
+### รอบ v1.1.9 (ผู้ใช้: "ทำทุกอย่างที่คุณแนะนำ" — 3 ข้อ)
+- **① pin CI runner**: `ubuntu-24.04` (android.yml) + `windows-2025` (desktop.yml) — ubuntu-latest จะย้ายไป Ubuntu 26 ตุลาคม 2026 (runner-images#14748)
+- **② changelog.html dynamic**: แถบ "release ล่าสุด" ดึง `/releases/latest` เหมือน index.html (timeline เขียนมือคงเดิม)
+- **③ E2E ลบไฟล์บน emulator**: `DownloadCleaner` (list/ลบแยกจาก MainActivity, จุดแตะระบบ 2 จุด) + `DownloadCleanerTest` (JVM) + `DownloadCleanerE2E` (emulator: MediaStore publish / raw leftover / DM จริงจาก loopback HTTP) — ผูกใน connectedDebugAndroidTest เดิมของ CI
+- **บั๊ก/ข้อจำกัดที่ E2E เปิดเผย (สำคัญมาก ไว้อ่านก่อนแตะ emulator test อีก)**:
+  - JVM test ห้ามเรียก `Uri.parse` — android.jar บน JVM คือ stub โยน RuntimeException("Stub!")
+  - `DownloadManager.Request.VISIBILITY_HIDDEN` = system-app-only → SecurityException (ใช้ VISIBLE_NOTIFY_COMPLETED)
+  - เขียนไฟล์ดิบลง public Downloads บน Q+ (targetSdk 35) = EACCES → `Assume.assumeTrue(Environment.isExternalStorageLegacy())`
+  - MediaStore อาจรายงาน SIZE 0 หลังปิด stream (Q lag) → update row เอง และ assert ที่ existence
+  - **fresh emulator ghost row**: แถว query เจอ (`msRows=1`) แต่ delete คืน 0 ตลอด + ไฟล์ไม่เคยลงดิสก์ → ตัดสินจาก machine facts แล้ว skip (Assume) ไม่ใช่ fail; เทสต์ DM ที่ listing ไม่ขึ้นทันที → poll 30s แล้ว skip
+  - **systemList ต้อง MERGE identity ต่อไฟล์** (dm+MediaStore+raw) — dedupe first-wins ทำให้ได้ candidate ที่มีแต่ ghost DM row แล้วลบไม่ได้จริง; dmSuccessful ไม่ตั้ง uri (downloads-provider uri ลบไม่ได้)
+- **บทเรียน CI**: Kotlin warning (deprecated) ไม่ทำ remote check ล้ม → **remote เขียวแต่ compileDebugAndroidTestKotlin พังได้** — เจอ log-failed ให้ grep "e: file" เสมอ (nullability error 2 รอบหลุดผ่าน check ที่ required เขียว)
+- **แท็กย้าย 4 ครั้ง** (fe58aae → 921cdf2 → dc57c94 → 019c5dc) แต่ละครั้ง release กลาย draft แล้ว guard `--draft=false` ที่เพิ่ม v1.1.8 เปิดกลับเองอัตโนมัติ — ทำงานจริงตามดีไซน์
+- **อุบัติเหตุ checksums.txt**: อัปโหลด clobber โดยไฟล์ local เป็นแค่บรรทัด extension (cwd ไม่มีไฟล์รวม) → ดาวน์โหลด assets มาสร้างใหม่ทั้งไฟล์แล้ว verify — **กฎ: ห้ามอัปโหลด checksums.txt ทับโดยไม่ดาวน์โหลดตัวล่าสุดจาก release ก่อน**
+- ปลายทาง: v1.1.9 published/Latest (019c5dc) · 10 assets · `sha256sum -c` OK ทุกบรรทัด · Android CI เขียวบน tag (E2E ผ่าน 5/5 หรือ skip ด้วยเหตุผล platform)
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/
