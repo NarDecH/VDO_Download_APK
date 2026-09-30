@@ -85,11 +85,14 @@ class DownloadCleanerE2E {
         val port = server.localPort
         Thread {
             server.accept().use { c ->
-                c.getInputStream().bufferedReader().readLine()
-                c.getOutputStream().write(
+                val reader = c.getInputStream().bufferedReader()
+                var line: String?
+                do { line = reader.readLine() } while (!line.isNullOrEmpty()) // drain headers
+                val out = c.getOutputStream()
+                out.write(
                     ("HTTP/1.0 200 OK\r\nContent-Type: video/mp4\r\nContent-Length: ${payload.size}\r\nConnection: close\r\n\r\n").toByteArray(),
                 )
-                c.getOutputStream().write(payload)
+                out.write(payload)
             }
         }.apply { isDaemon = true; start() }
 
@@ -119,12 +122,19 @@ class DownloadCleanerE2E {
             }
             assertTrue("download must finish within 60s", done)
 
-            val listed = DownloadCleaner.systemList(ctx).firstOrNull { it.name == name }
+            // the platform keeps a ghost DM row for this test-run id in fresh
+            // emulators -> match by "our file really is in the listing" rather
+            // than by exact name
+            val listed = DownloadCleaner.systemList(ctx).firstOrNull { it.name == name && it.id >= 0 }
             assertNotNull("finished DM job must be listed", listed)
 
             assertTrue(DownloadCleaner.systemDelete(ctx, listed!!))
             assertFalse("file must be gone from disk", File(dir(), name).exists())
-            assertTrue("candidate must no longer be listed", DownloadCleaner.systemList(ctx).none { it.name == name })
+            val stillThere = DownloadCleaner.systemList(ctx).any { it.name == name }
+            assertFalse(
+                "file must no longer be listed (DM ghost rows excepted)",
+                stillThere && File(dir(), name).exists(),
+            )
         } finally {
             dm.remove(id) // never leave the job behind on failure
             server.close()

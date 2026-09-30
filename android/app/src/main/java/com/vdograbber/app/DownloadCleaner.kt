@@ -124,8 +124,9 @@ object DownloadCleaner {
                 ok = try { ctx.contentResolver.delete(c.uri, null, null) > 0 } catch (_: Exception) { false }
             }
             if (!ok && c.raw != null) {
-                c.raw.delete()
-                ok = !c.raw.exists()
+                // the real File.delete() result: false when the file is not
+                // there (nothing to clean), true when we removed it
+                ok = try { c.raw.delete() } catch (_: Exception) { false }
             }
         } catch (_: Exception) {}
         return ok
