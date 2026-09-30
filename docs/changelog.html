@@ -30,6 +30,11 @@ ul{margin:6px 0 6px 22px;color:#c9d4e8}
 li{margin:6px 0}
 code{background:#0b1120;border:1px solid var(--line);border-radius:6px;padding:1.5px 7px;font:13px Consolas,monospace;color:#ffc371}
 .warn{border-left:4px solid var(--acc);background:#2a1420;border-radius:0 12px 12px 0;padding:14px 18px;margin:20px 0}
+.latest-banner{display:flex;gap:14px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--grn);border-radius:14px;padding:16px 20px;margin:26px 0 0}
+.latest-banner .bv{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:800;border-radius:10px;padding:4px 13px;font-size:16px}
+.latest-banner .bd{color:var(--dim);font-size:13.5px}
+.latest-banner a{font-weight:700;font-size:13.5px;text-decoration:none}
+.latest-banner.loading{border-left-color:var(--faint)}
 .timeline{position:relative;margin:30px 0 0 10px;padding-left:26px;border-left:2px solid var(--line)}
 .timeline .dot{position:absolute;left:-8px;top:6px;width:14px;height:14px;border-radius:50%;
   background:linear-gradient(135deg,var(--acc),var(--acc2));box-shadow:0 0 0 4px #0b1020}
@@ -55,17 +60,41 @@ a{color:#7fb3ff}
 
 <div class="wrap">
 
+<div class="latest-banner loading" id="latestBanner" style="display:none">…</div>
+
 <div class="timeline">
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
-    <span class="vtag">v1.1.8</span>
+    <span class="vtag">v1.1.9</span>
     <span class="vtag-latest">LATEST</span>
     <span class="vdate">30 กันยายน 2026</span>
     <span style="flex:1"></span>
     <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
   </div>
 
+  <h3>เพิ่มใหม่ <span class="en">Added</span></h3>
+  <ul>
+    <li><b>E2E บน emulator สำหรับการลบไฟล์</b> — สร้างไฟล์แบบที่แอปสร้างจริงทั้ง 3 เส้นทาง
+        (MediaStore publish · ไฟล์ดิบ · DownloadManager จาก loopback HTTP) แล้วลบผ่าน
+        DownloadCleaner ยืนยันไฟล์หายจากดิสก์ + รายการหาย — รันอัตโนมัติใน CI</li>
+    <li><b>changelog.html มีแถบ "release ล่าสุด" แบบ dynamic</b> ดึง GitHub API เหมือน index.html</li>
+  </ul>
+
+  <h3>บำรุงรักษา <span class="en">Maintenance</span></h3>
+  <ul>
+    <li><b>Pin CI runner images</b> — <code>ubuntu-24.04</code> / <code>windows-2025</code> แทน
+        <code>-latest</code> (ubuntu-latest จะย้ายไป Ubuntu 26 เมื่อ 19 ต.ค. 2026)</li>
+    <li><b>Refactor: DownloadCleaner</b> — ตรรกะ list/ลบแยกเป็น object ที่ JVM-testable
+        (จุดแตะระบบเหลือ 2 จุด ครอบด้วย E2E)</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
+    <span class="vtag">v1.1.8</span>
+    <span class="vdate">30 กันยายน 2026</span>
+  </div>
   <h3>เพิ่มใหม่ <span class="en">Added</span></h3>
   <ul>
     <li><b>Android: ส่วน "ไฟล์ที่ดาวน์โหลดแล้ว" ในชีต 🎬 พบวิดีโอ</b> — รวมไฟล์จาก DownloadManager,
@@ -332,7 +361,32 @@ a{color:#7fb3ff}
 รองรับ playlist/queue หลายรายการ · โหมด cookie นำเข้าเพื่อเนื้อหาสมาชิก · desktop workflow บน CI</p>
 
 </div>
-<footer><div class="wrap">VDO Grabber v1.1.8 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
+<footer><div class="wrap">VDO Grabber v1.1.9 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
 <a href="https://github.com/NarDecH/VDO_Download_APK/releases">Releases</a></div></footer>
+
+<script>
+/* Live "latest release" strip - mirrors docs/index.html (GitHub API). The
+   timeline below stays the hand-written record of what changed per version. */
+(function () {
+  var el = document.getElementById("latestBanner");
+  fetch("https://api.github.com/repos/NarDecH/VDO_Download_APK/releases/latest")
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (rel) {
+      var d = new Date(rel.published_at);
+      var when = isNaN(d) ? "" : d.toLocaleDateString("th-TH", { day: "numeric", month: "short", year: "numeric" });
+      var n = (rel.assets || []).length;
+      el.className = "latest-banner";
+      el.style.display = "flex";
+      el.innerHTML =
+        '<span class="bv">' + rel.tag_name + '</span>' +
+        '<span class="bd">release ล่าสุดบน GitHub' + (when ? ' · ' + when : '') +
+        (n ? ' · ' + n + ' ไฟล์' : '') + '</span>' +
+        '<span style="flex:1"></span>' +
+        '<a href="' + rel.html_url + '">ดู release →</a>' +
+        '<a href="index.html">⬇ ดาวน์โหลด</a>';
+    })
+    .catch(function () { el.style.display = "none"; });
+})();
+</script>
 </body>
 </html>

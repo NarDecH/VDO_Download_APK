@@ -14,7 +14,9 @@ permissions:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # pinned: ubuntu-latest migrates to Ubuntu 26 on 2026-10-19
+    # (actions/runner-images#14748) - keep a known-good image until tested
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v7
 
@@ -68,6 +70,9 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: |
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
+            # v1.1.9: full connectedDebugAndroidTest now also runs the
+            # DownloadCleanerE2E delete tests (MediaStore / raw file /
+            # real DownloadManager download -> delete -> assert gone)
             cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
 
       - name: E2E on emulator (attempt 2 - fresh emulator after infra flake)

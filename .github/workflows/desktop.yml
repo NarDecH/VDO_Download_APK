@@ -14,7 +14,9 @@ permissions:
 
 jobs:
   selftest:
-    runs-on: windows-latest
+    # pinned: windows-latest tracks the newest image (2025 now) - keep a
+    # known-good image until the next one is tested
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@v7
 

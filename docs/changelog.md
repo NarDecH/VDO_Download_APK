@@ -4,6 +4,25 @@
 
 ## [Unreleased]
 
+## [1.1.9] — 2026-09-30
+
+### เพิ่มใหม่ (Added)
+- **E2E บน emulator สำหรับการลบไฟล์** (`DownloadCleanerE2E`) — สร้างไฟล์แบบที่แอปสร้างจริง 3 เส้นทาง:
+  publish เข้า MediaStore Downloads/VDOGrabber (เส้นทางเอนจิน yt-dlp), ไฟล์ดิบในโฟลเดอร์ (leftover),
+  และงาน DownloadManager จริงที่ดาวน์โหลดจาก loopback HTTP → ลบผ่าน DownloadCleaner →
+  ยืนยันไฟล์หายจากดิสก์ + รายการหาย รันอัตโนมัติใน `connectedDebugAndroidTest` ของ CI
+- **หน้า changelog.html มีแถบ "release ล่าสุด" แบบ dynamic** — ดึง `/releases/latest` จาก GitHub API
+  เหมือน index.html แสดง tag/วันที่/จำนวนไฟล์ + ลิงก์ดาวน์โหลด (timeline เขียนมือยังคงเดิม)
+
+### บำรุงรักษา (Maintenance)
+- **Pin CI runner images** — `ubuntu-24.04` (android) และ `windows-2025` (desktop) แทน `-latest`:
+  GitHub ประกาศว่า `ubuntu-latest` จะย้ายไป Ubuntu 26 เมื่อ 19 ตุลาคม 2026
+  (actions/runner-images#14748) — ปักหมุดภาพที่พิสูจน์แล้วไว้ก่อน แล้วค่อยอัปเกรดเป็นชุด ๆ ที่ทดสอบแล้ว
+- **Refactor: `DownloadCleaner`** — ตรรกะ list/ลบของส่วน "ไฟล์ที่ดาวน์โหลดแล้ว" ถูกดึงออกจาก
+  MainActivity เป็น object เดียว แยกจุดแตะระบบ (`systemList` / `systemDelete`) ออกจากตรรกะบริสุทธิ์
+  (identity priority, dedupe, `identities` count) ทดสอบได้บน JVM — เพิ่ม `DownloadCleanerTest`
+
+[1.1.9]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.9
 ## [1.1.8] — 2026-09-30
 
 ### เพิ่มใหม่ (Added) — จัดการไฟล์ที่ดาวน์โหลดแล้วจาก UI โดยตรง
