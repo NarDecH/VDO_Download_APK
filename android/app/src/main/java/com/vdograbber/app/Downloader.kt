@@ -30,6 +30,14 @@ object Downloader {
 
     fun isStream(url: String): Boolean = extOf(url) in STREAM_EXT
 
+    /** Human-readable size, e.g. 1234567 -> "1.2 MB" (v1.1.8). */
+    fun humanSize(b: Long): String = when {
+        b >= 1L shl 30 -> String.format(java.util.Locale.US, "%.1f GB", b / 1073741824.0)
+        b >= 1L shl 20 -> String.format(java.util.Locale.US, "%.1f MB", b / 1048576.0)
+        b >= 1L shl 10 -> String.format(java.util.Locale.US, "%.1f KB", b / 1024.0)
+        else -> "$b B"
+    }
+
     /** URL filename without query/fragment ("https://c/v/clip.mp4?x" -> "clip.mp4"). */
     fun urlStem(url: String): String =
         url.substringBefore('?').substringBefore('#').substringAfterLast('/').trim()

@@ -32,6 +32,9 @@
     <string name="delete">ลบไฟล์</string>
     <string name="deleted">ลบไฟล์แล้ว</string>
     <string name="delete_failed">ลบไฟล์ไม่สำเร็จ</string>
+    <string name="delete_confirm">ลบไฟล์ “%1$s” ออกจากดิสก์ถาวร?</string>
+    <string name="downloads_section">ไฟล์ที่ดาวน์โหลดแล้ว (Downloads/VDOGrabber)</string>
+    <string name="downloads_title">ไฟล์ที่ดาวน์โหลดแล้ว (%1$d)</string>
     <string name="cancel">ยกเลิก</string>
     <string name="refresh">รีเฟรช</string>
 </resources>

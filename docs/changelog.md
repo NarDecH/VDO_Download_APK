@@ -4,6 +4,27 @@
 
 ## [Unreleased]
 
+## [1.1.8] — 2026-09-30
+
+### เพิ่มใหม่ (Added) — จัดการไฟล์ที่ดาวน์โหลดแล้วจาก UI โดยตรง
+- **Android: ส่วน "ไฟล์ที่ดาวน์โหลดแล้ว" ในชีต 🎬 พบวิดีโอ** — รวมไฟล์จาก DownloadManager (direct),
+  รายการ MediaStore ที่เผยแพร่แล้ว (Q+) และไฟล์จริงใน Downloads/VDOGrabber (dedupe ตามชื่อ,
+  เรียงตามวันแก้ไขล่าสุด) ทุกแถวมีปุ่ม "ลบไฟล์" พร้อม dialog ยืนยัน — ลบผ่าน
+  DownloadManager.remove() / MediaStore delete (Q+) / File.delete() แล้วแถวหายจากชีตทันที
+  (event: `download_deleted` / `download_delete_error`)
+- **Desktop: selftest ครอบการลบไฟล์แล้ว** — หลังดาวน์โหลดจริงสำเร็จ ทดสอบ `Api.download_delete_file`
+  ต่อทันที: ไฟล์ต้องหายจากดิสก์ + การ์ดต้องหลุดจากรายการ (ขั้น `delete_file`, ไม่ผ่าน = selftest FAIL)
+
+### บำรุงรักษา (Maintenance)
+- **CI guard ปิด draft release ถาวร** — ท้าย step "Attach to release" ของทั้ง desktop.yml และ android.yml
+  เพิ่ม `gh release edit --draft=false` กันกรณีแท็กถูกลบ/สร้างใหม่แล้ว release กลายเป็น draft อัตโนมัติ
+  (เหตุการณ์เดียวกับ v1.1.7)
+- **เอกสาร changelog.html** อัปเดตรายการ v1.1.5–v1.1.7 (ก่อนหน้านี้ค้างที่ v1.0.1) พร้อม footer เวอร์ชัน 1.1.8
+- ตรวจยืนยันหน้า Pages ดึง release ถูกต้อง — `/releases/latest` คืน tag `v1.1.7` (published, Latest)
+  หน้าเว็บจึงแสดงไฟล์ + checksum ถูกต้องโดยไม่ต้องแก้โค้ด
+- Downloader เพิ่ม helper `humanSize()` (pure, JVM-tested) สำหรับแสดงขนาดไฟล์ในชีต
+
+[1.1.8]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.1.8
 ## [1.1.7] — 2026-09-30
 
 ### เพิ่มใหม่ (Added) — ลบไฟล์จากการ์ด done ได้เลย (ทั้งสองแพลตฟอร์ม)

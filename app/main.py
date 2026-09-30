@@ -381,7 +381,7 @@ class App:
 
 
 def selftest() -> int:
-    """Headless smoke test: detection JS + real download through yt-dlp."""
+    """Headless smoke test: detection JS + real download via yt-dlp + delete-file API."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
     app = App()
@@ -484,16 +484,38 @@ def selftest() -> int:
                 break
         ok_file = job.status == "done" and job.filepath and os.path.exists(job.filepath) and os.path.getsize(job.filepath) >= len(mp4) - 1024
         results["download"] = {"ok": bool(ok_file), "status": job.status, "file": job.filepath, "error": job.error}
-        if ok_file:
-            os.remove(job.filepath)
     except Exception as e:
         results["download"] = {"ok": False, "error": repr(e)}
+
+    # --- 3.5) delete a finished file via Api.download_delete_file ----------
+    # v1.1.8: exercises the same path the UI "ลบไฟล์" button uses - the file
+    # must disappear from disk and the card must drop from the list.
+    try:
+        jid = next((j["id"] for j in app.downloads.list()
+                    if j.get("status") == "done" and j.get("filepath") and os.path.exists(j["filepath"])), None)
+        if not jid:
+            raise AssertionError("no finished job with a file on disk to delete")
+        path = app.downloads.jobs[jid].filepath
+        res = app.api.download_delete_file(jid)
+        gone = res.get("ok") and not os.path.exists(path)
+        cleared = all(j["id"] != jid for j in app.downloads.list())
+        results["delete_file"] = {
+            "ok": bool(gone and cleared),
+            "api_ok": bool(res.get("ok")), "file_gone": not os.path.exists(path),
+            "card_cleared": bool(cleared), "path": path,
+        }
+        app.logm.log("selftest delete_file: ok=%s gone=%s cleared=%s" % (res.get("ok"), not os.path.exists(path), cleared),
+                     event="selftest_delete_file", ok=bool(gone and cleared))
+    except Exception as e:
+        results["delete_file"] = {"ok": False, "error": repr(e)}
+        app.logm.exception("selftest delete_file", e)
 
     srv.shutdown()
     srv2.shutdown()
     print(json.dumps(results, ensure_ascii=False, indent=2))
     passed = (results["ytdlp"]["ok"] and results["detection"]["ok"]
-              and results["pair_sync"]["ok"] and results["download"]["ok"])
+              and results["pair_sync"]["ok"] and results["download"]["ok"]
+              and results["delete_file"]["ok"])
     app.logm.log("SELFTEST %s" % ("PASS" if passed else "FAIL"), event="selftest", passed=passed,
                  results={k: v.get("ok") for k, v in results.items() if isinstance(v, dict)})
     return 0 if passed else 1

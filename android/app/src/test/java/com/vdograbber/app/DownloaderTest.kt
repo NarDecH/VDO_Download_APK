@@ -54,6 +54,15 @@ class DownloaderTest {
     }
 
     @Test
+    fun `humanSize formats bytes readably`() {
+        assertEquals("0 B", Downloader.humanSize(0))
+        assertEquals("512 B", Downloader.humanSize(512))
+        assertEquals("1.0 KB", Downloader.humanSize(1024))
+        assertEquals("1.5 MB", Downloader.humanSize((1.5 * 1048576).toLong()))
+        assertEquals("1.0 GB", Downloader.humanSize(1L shl 30))
+    }
+
+    @Test
     fun `displayName url-stem fallback and last resort`() {
         // page-style URL without a media extension: the URL's last segment is
         // used (same rule as the pre-1.1.6 DownloadManager naming)

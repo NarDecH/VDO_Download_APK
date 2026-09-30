@@ -78,3 +78,6 @@ jobs:
           grep -vF "$EXE_NAME" checksums.txt 2>/dev/null | cat - "$EXE_NAME.sha256" > checksums.tmp || cat "$EXE_NAME.sha256" > checksums.tmp
           mv checksums.tmp checksums.txt
           gh release upload "$GITHUB_REF_NAME" checksums.txt --repo "$GITHUB_REPOSITORY" --clobber
+          # guard: a re-created/moved tag would silently turn the release into a
+          # draft (v1.1.7 incident) - force it published every time (v1.1.8)
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false

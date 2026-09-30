@@ -4,11 +4,14 @@ import android.annotation.SuppressLint
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore as AndroidMediaStore
 import android.view.KeyEvent
 import android.view.View
 import android.webkit.CookieManager
@@ -23,6 +26,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.File
 import kotlin.concurrent.thread
 
 /**
@@ -64,7 +68,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.1.7 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.1.8 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -188,7 +192,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showMediaSheet() {
         val items = MediaStore.list()
-        if (items.isEmpty()) {
+        val dls = listDirectDownloads()
+        if (items.isEmpty() && dls.isEmpty()) {
             Toast.makeText(this, R.string.no_media, Toast.LENGTH_SHORT).show()
             return
         }
@@ -197,7 +202,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(48, 32, 48, 32)
         }
         val dialog = AlertDialog.Builder(this)
-            .setTitle(getString(R.string.found_title, items.size))
+            .setTitle(
+                if (items.isNotEmpty()) getString(R.string.found_title, items.size)
+                else getString(R.string.downloads_title, dls.size)
+            )
             .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
             .setNeutralButton(R.string.clear_list) { _, _ ->
@@ -232,6 +240,130 @@ class MainActivity : AppCompatActivity() {
             }
             container.addView(row)
         }
+
+        // v1.1.8: finished downloads from Downloads/VDOGrabber, each with a
+        // ลบไฟล์ button (file + list entry disappear)
+        if (dls.isNotEmpty()) {
+            val head = TextView(this).apply {
+                text = getString(R.string.downloads_section)
+                setTextColor(0xFF93A4C3.toInt())
+                textSize = 13f
+                setPadding(0, 24, 0, 4)
+            }
+            container.addView(head)
+            for (d in dls.take(15)) {
+                val row = layoutInflater.inflate(R.layout.item_media, container, false)
+                row.findViewById<TextView>(R.id.mLabel).text = d.name
+                val info = row.findViewById<TextView>(R.id.mUrl)
+                info.text = Downloader.humanSize(d.size)
+                info.visibility = if (d.size > 0) View.VISIBLE else View.GONE
+                row.findViewById<TextView>(R.id.mDl).visibility = View.GONE
+                row.findViewById<TextView>(R.id.mCopy).visibility = View.GONE
+                row.findViewById<TextView>(R.id.mOpen).visibility = View.GONE
+                val del = row.findViewById<TextView>(R.id.mDel)
+                del.visibility = View.VISIBLE
+                del.setOnClickListener { deleteDownload(d) { row.visibility = View.GONE } }
+                container.addView(row)
+            }
+        }
+    }
+
+    /** One deletable download row (DownloadManager job, MediaStore item, or raw file). */
+    private class DoneDl(val id: Long, val uri: Uri?, val raw: File?, val name: String, val size: Long)
+
+    /**
+     * Finished downloads living in Downloads/VDOGrabber, deduped by name:
+     * DownloadManager jobs (direct files), published MediaStore entries (Q+)
+     * and raw engine leftovers that never got published.
+     */
+    private fun listDirectDownloads(): List<DoneDl> {
+        val out = mutableListOf<DoneDl>()
+        val seen = mutableSetOf<String>()
+        try {
+            val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+            val q = android.app.DownloadManager.Query().setFilterByStatus(android.app.DownloadManager.STATUS_SUCCESSFUL)
+            dm.query(q)?.use { c ->
+                while (c.moveToNext()) {
+                    val id = c.getLong(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_ID))
+                    val local = c.getString(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_LOCAL_FILENAME)) ?: continue
+                    if (!local.contains("VDOGrabber")) continue
+                    val f = File(local)
+                    if (!f.exists()) continue
+                    if (seen.add(f.name)) {
+                        val title = c.getString(c.getColumnIndexOrThrow(android.app.DownloadManager.COLUMN_TITLE)).orEmpty()
+                        val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) dm.getUriForDownloadedFile(id) else null
+                        out.add(DoneDl(id, uri, f, title.ifEmpty { f.name }, f.length()))
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            FileLog.app("ERROR", "dl", "list download jobs failed: $e")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            try {
+                contentResolver.query(
+                    AndroidMediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    arrayOf(
+                        AndroidMediaStore.MediaColumns._ID,
+                        AndroidMediaStore.MediaColumns.DISPLAY_NAME,
+                        AndroidMediaStore.MediaColumns.SIZE,
+                    ),
+                    "${AndroidMediaStore.MediaColumns.RELATIVE_PATH}=?",
+                    arrayOf(Environment.DIRECTORY_DOWNLOADS + "/VDOGrabber/"), null,
+                )?.use { c ->
+                    while (c.moveToNext()) {
+                        val name = c.getString(1) ?: continue
+                        if (seen.add(name)) {
+                            val uri = ContentUris.withAppendedId(AndroidMediaStore.Downloads.EXTERNAL_CONTENT_URI, c.getLong(0))
+                            out.add(DoneDl(-1, uri, null, name, c.getLong(2)))
+                        }
+                    }
+                }
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "dl", "list media store failed: $e")
+            }
+        }
+        try {
+            val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "VDOGrabber")
+            dir.listFiles()?.filter { it.isFile }?.forEach { f ->
+                if (seen.add(f.name)) out.add(DoneDl(-1, null, f, f.name, f.length()))
+            }
+        } catch (_: Exception) {}
+        return out.sortedByDescending { it.raw?.lastModified() ?: 0L }
+    }
+
+    /** Confirm, then delete one finished download (file + list entry). */
+    private fun deleteDownload(d: DoneDl, onDeleted: () -> Unit) {
+        AlertDialog.Builder(this)
+            .setMessage(getString(R.string.delete_confirm, d.name))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                var ok = false
+                try {
+                    if (d.id >= 0) {
+                        val dm = getSystemService(Context.DOWNLOAD_SERVICE) as android.app.DownloadManager
+                        dm.remove(d.id) // deletes the completed file with the row
+                        ok = d.raw == null || !d.raw.exists()
+                    }
+                    if (!ok && d.uri != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        ok = try { contentResolver.delete(d.uri, null, null) > 0 } catch (_: Exception) { false }
+                    }
+                    if (!ok && d.raw != null) {
+                        d.raw.delete()
+                        ok = !d.raw.exists()
+                    }
+                } catch (e: Exception) {
+                    FileLog.app("ERROR", "dl", "delete failed: $e")
+                }
+                FileLog.event(
+                    if (ok) "download_deleted" else "download_delete_error",
+                    mapOf("file" to d.name.take(120), "dm_id" to d.id),
+                )
+                FileLog.app(if (ok) "INFO" else "ERROR", "dl", "delete ${d.name}: ok=$ok")
+                Toast.makeText(this, if (ok) R.string.deleted else R.string.delete_failed, Toast.LENGTH_SHORT).show()
+                onDeleted()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun tryDownload(url: String, title: String) {
