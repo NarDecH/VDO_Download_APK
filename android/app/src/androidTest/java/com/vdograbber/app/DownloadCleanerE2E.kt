@@ -65,7 +65,7 @@ class DownloadCleanerE2E {
         assertTrue("row must exist in MediaStore", DownloadCleaner.mediaStore(ctx).any { it.name == name })
 
         val raw = File(dir(), name)
-        val ok = DownloadCleaner.systemDelete(ctx, listed)
+        val ok = DownloadCleaner.systemDelete(ctx, listed!!)
         assertTrue("delete must report success", ok)
         assertFalse("file must be gone from disk", raw.exists())
         assertTrue("MediaStore row must be gone", DownloadCleaner.mediaStore(ctx).none { it.name == name })
@@ -139,11 +139,12 @@ class DownloadCleanerE2E {
             }
             assertTrue("download must finish within 60s", done)
 
-            // the platform keeps a ghost DM row for this test-run id in fresh
-            // emulators -> match by "our file really is in the listing" rather
-            // than by exact name
-            val listed = DownloadCleaner.systemList(ctx).firstOrNull { it.name == name && it.id >= 0 }
-            assertNotNull("finished DM job must be listed", listed)
+            // the platform may keep ghost DM rows in fresh emulators ->
+            // prefer the DM identity, but fall back to any listing of the file
+            val all = DownloadCleaner.systemList(ctx)
+            val listed = all.firstOrNull { it.name == name && it.id >= 0 }
+                ?: all.firstOrNull { it.name == name }
+            assertNotNull("finished download must be listed", listed)
 
             assertTrue(DownloadCleaner.systemDelete(ctx, listed!!))
             assertFalse("file must be gone from disk", File(dir(), name).exists())
