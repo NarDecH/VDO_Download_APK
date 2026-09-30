@@ -308,6 +308,40 @@ def main():
             for line in (logs or {}).get("logs", [])[-12:]:
                 print("   ", line)
 
+        # ================= site exclusions (v1.1.3) ========================
+        # Drive the SAME messages the popup sends (vg:exclusion:add / remove)
+        # through the debug bridge, then reload and assert the panel mounts.
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/blobtest.html"}, session=sid)
+        time.sleep(3)
+        check("exclusion phase: panel mounts without rules",
+              bool(js(cdp, sid, "!!document.querySelector('#vg-content-host')")))
+
+        add_r = js(cdp, sid, f"({ASK})('debugAddExclusion', 'http://127.0.0.1:8799/*')")
+        check("exclusion added (vg:exclusion:add path)", bool(add_r and add_r.get("ok")), json.dumps(add_r or {}))
+        if add_r and not add_r.get("ok"):
+            swlogs = js(cdp, sid, f"({ASK})('debugLogs')")
+            for line in (swlogs or {}).get("logs", [])[-10:]:
+                print("   [sw]", line)
+
+        js(cdp, sid, "location.reload()")
+        ex_mounted = None
+        for _ in range(12):
+            time.sleep(1)
+            ex_mounted = js(cdp, sid, "!!document.querySelector('#vg-content-host')")
+        check("excluded page: panel does NOT mount", ex_mounted is False, f"mounted={ex_mounted}")
+
+        rm_r = js(cdp, sid, f"({ASK})('debugRemoveExclusion', 'http://127.0.0.1:8799/*')")
+        check("exclusion removed", bool(rm_r and rm_r.get("ok")), json.dumps(rm_r or {}))
+
+        js(cdp, sid, "location.reload()")
+        remounted = False
+        for _ in range(16):
+            time.sleep(1)
+            remounted = js(cdp, sid, "!!document.querySelector('#vg-content-host')")
+            if remounted:
+                break
+        check("exclusion removed: panel mounts again", bool(remounted))
+
     finally:
         try:
             proc.terminate()

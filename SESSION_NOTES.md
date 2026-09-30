@@ -142,6 +142,14 @@
 - **อุบัติเหตุ checksums.txt**: อัปโหลด clobber โดยไฟล์ local เป็นแค่บรรทัด extension (cwd ไม่มีไฟล์รวม) → ดาวน์โหลด assets มาสร้างใหม่ทั้งไฟล์แล้ว verify — **กฎ: ห้ามอัปโหลด checksums.txt ทับโดยไม่ดาวน์โหลดตัวล่าสุดจาก release ก่อน**
 - ปลายทาง: v1.1.9 published/Latest (019c5dc) · 10 assets · `sha256sum -c` OK ทุกบรรทัด · Android CI เขียวบน tag (E2E ผ่าน 5/5 หรือ skip ด้วยเหตุผล platform)
 
+### รอบส่วนขยาย 1.1.3 — ยกเว้นเว็บไซต์ (ผู้ใช้: chrome extension เพิ่มส่วน exclude เว็บไซต์)
+- รายการอยู่ใน `chrome.storage.local.vgExclusions` — รองรับ match pattern เต็ม (`https://www.facebook.com/*`, `*://*.tiktok.com/*`) หรือโดเมนเปล่า (`facebook.com` = ครอบซับโดเมน + ทุก path — ใจกว่า Chrome pattern ที่ match แค่ host เปะ)
+- content.js: matcher `vgExclusionRe`/`vgIsExcluded` + flag `excluded` gate ที่ report/scanDom/ensureUi/onMessage/startDownload — init ย้ายเข้า async IIFE ที่เช็คก่อน mount UI; **บทเรียนสำคัญ**: บนหน้า excluded ต้องยังรับข้อความจัดการ exclusion (debug bridge + `vg:exclusionsUpdated`) ไม่งั้นเพิ่มแล้วเอาออกไม่ได้จากหน้านั้น; ตอน remove ให้ SW **broadcast หาทุก tab** เพื่อ un-exclude แบบสด
+- background.js: cache patterns (`vgExclusionsCache`) + sniffer กรองด้วย `details.initiator` + `addMedia` กันซ้ำอีกชั้นจาก `item.page` + handlers `vg:exclusions/add/remove`
+- popup: ส่วน "🚫 ยกเว้นเว็บไซต์" (เพิ่ม pattern / ปุ่ม "โดเมนนี้" จากแท็บปัจจุบัน / ลบ)
+- E2E (24/24 ผ่าน): เพิ่มเฟสทดสอบ — **บทเรียน: popup target ใน headless CDP ไม่เสถียร** (chrome.runtime undefined = error page) → ทดสอบผ่าน debug bridge ของหน้า (`debugAddExclusion/debugRemoveExclusion`) ส่งข้อความเดียวกับ popup จริงแทน; `unpacked_extension_id()` คำนวณเองไม่ตรง → ถ้าต้องใช้ id ให้อ่านจาก Target.getTargets
+- แนบ release: VDOGrabber-chrome-extension-1.1.3.zip + sha256 (โดนกับดัก prefix `release/` ซ้ำอีกเคย — สร้าง .sha256 จากในโฟลเดอร์ release เสมอ)
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/

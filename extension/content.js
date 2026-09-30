@@ -18,6 +18,40 @@
   const streams = new Map();        // assembly id -> {name, kind, mime, total, received, queue}
   let seq = 0;
   let shadow = null;                // null = UI could not mount (detection still runs)
+  let excluded = false;             // v1.1.3: this page matches a user exclusion pattern
+
+  // ---- site exclusions (v1.1.3) ------------------------------------------
+  // Patterns live in chrome.storage.local under "vgExclusions" (one match
+  // pattern per entry: "https://www.facebook.com/*", "*://*.tiktok.com/*" or
+  // a bare domain like "facebook.com" which also covers subdomains).
+  // An excluded page gets NO panel, NO scanning, NO reporting and NO
+  // streaming - the extension is fully invisible there. (The MAIN-world
+  // injector still hooks fetch/XHR, but its messages are dropped here.)
+  function vgExclusionRe(pattern) {
+    let p = String(pattern || "").trim().toLowerCase();
+    if (!p) return null;
+    if (!/^[a-z*]+:\/\//.test(p)) p = "*://" + p;          // bare "host/path" -> any scheme
+    const m = p.match(/^([a-z*]+):\/\/([^\/]*)(.*)$/);
+    if (!m) return null;
+    const scheme = m[1], host = m[2];
+    let path = m[3];
+    if (!path || path === "/") path = "/*";
+    const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const schemeRe = scheme === "*" ? "https?" : esc(scheme);
+    // "*.host.tld" matches subdomains (like Chrome match patterns); a bare
+    // host covers its subdomains too - friendlier than Chrome's own rule
+    const hostRe = host.includes("*")
+      ? esc(host).replace(/\\\*/g, "[^/]*")
+      : "(?:[^/]+\\.)?" + esc(host);
+    const pathRe = esc(path).replace(/\\\*/g, ".*");
+    try { return new RegExp("^" + schemeRe + "://" + hostRe + pathRe + "$"); }
+    catch (e) { return null; }
+  }
+  function vgIsExcluded(patterns, url) {
+    const u = String(url || "").toLowerCase();
+    return (patterns || []).some((p) => { const re = vgExclusionRe(p); return !!re && re.test(u); });
+  }
+  function logLocal(m) { try { console.debug("[vg]", m); } catch (e) {} }
 
   const extAlive = () => {
     try { return typeof chrome !== "undefined" && !!(chrome.runtime && chrome.runtime.id); }
@@ -26,6 +60,7 @@
 
   function report(url, kind, label, via) {
     try {
+      if (excluded) return;
       if (!url || !/^(https?|blob)/.test(url)) return;
       let k = kind;
       if (!k || k === "media") {
@@ -48,6 +83,7 @@
 
   function scanDom() {
     try {
+      if (excluded) return;
       document.querySelectorAll("video, audio").forEach((v) => {
         const src = v.currentSrc || v.src || (v.querySelector("source") && v.querySelector("source").src);
         if (src) report(src, null, (v.tagName.toLowerCase() + " element") + (v.videoWidth ? ` — ${v.videoWidth}×${v.videoHeight}` : ""), "DOM scan");
@@ -138,12 +174,19 @@
     try {
       if (e.source !== window || !e.data || !e.data.__vg) return;
       const d = e.data;
+      // exclusion management must work even ON an excluded page (otherwise
+      // there is no way back from a page that got excluded while open)
+      const exclMgmt = d.__vg === "ui" && (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion");
+      if (excluded && !exclMgmt) return;
 
       // debug bridge: page (E2E tests) asks for SW state through the content script
-      if (d.__vg === "ui" && (d.type === "debugLogs" || d.type === "debugDownloads" || d.type === "debugSetFlag")) {
-        const type = { debugLogs: "vg:logs", debugDownloads: "vg:downloads", debugSetFlag: "vg:setFlag" }[d.type];
+      if (d.__vg === "ui" && (d.type === "debugLogs" || d.type === "debugDownloads" || d.type === "debugSetFlag" ||
+                              d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion")) {
+        const type = { debugLogs: "vg:logs", debugDownloads: "vg:downloads", debugSetFlag: "vg:setFlag",
+                       debugAddExclusion: "vg:exclusion:add", debugRemoveExclusion: "vg:exclusion:remove" }[d.type];
         const out = { type };
-        if (d.type === "debugSetFlag") out.value = d.value;
+        if (d.type === "debugSetFlag" || d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.value = d.value;
+        if (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.pattern = d.value;
         if (extAlive()) {
           chrome.runtime.sendMessage(out, (resp) => {
             window.postMessage({ __vg: "main", type: d.type, reqId: d.reqId, resp: resp || { err: chrome.runtime.lastError && chrome.runtime.lastError.message } }, "*");
@@ -232,6 +275,7 @@
   // Returns true when the pill is live in the document.
   function ensureUi() {
     try {
+      if (excluded) return false;
       if (!document.documentElement) return false;
       if (!uiHost) {
         uiHost = document.createElement("div");
@@ -259,12 +303,28 @@
     }
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => { if (ensureUi()) scanDom(); });
-  } else {
-    if (ensureUi()) scanDom();
-  }
-  setInterval(() => { ensureUi(); scanDom(); }, 3000);
+  // v1.1.3: decide exclusion before anything mounts. An excluded page never
+  // mounts the UI, never scans, never reports, never streams.
+  (async () => {
+    try {
+      if (extAlive()) {
+        const s = await chrome.storage.local.get("vgExclusions");
+        if (vgIsExcluded(s.vgExclusions || [], location.href)) {
+          excluded = true;
+          items.clear();
+          if (uiHost && uiHost.isConnected) uiHost.remove();
+          logLocal("excluded: " + location.href.slice(0, 100));
+          return;
+        }
+      }
+    } catch (e) {}
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", () => { if (ensureUi()) scanDom(); });
+    } else {
+      if (ensureUi()) scanDom();
+    }
+    setInterval(() => { ensureUi(); scanDom(); }, 3000);
+  })();
 
   function updateBadge() {
     if (!shadow) return;
@@ -345,6 +405,7 @@
   }
 
   function startDownload(url, kind) {
+    if (excluded) return;
     if (!extAlive()) {
       setStatus("⚠️ Extension ถูกอัปเดต — รีเฟรชหน้าเว็บ (F5) แล้วกดใหม่");
       return;
@@ -370,6 +431,26 @@
   chrome.runtime.onMessage.addListener((msg, sender) => {
     try {
       if (sender.id !== chrome.runtime.id) return;
+      // the SW tells us the exclusion list changed - even an excluded page
+      // must hear this so removing the pattern brings the panel back live
+      if (msg.type === "vg:exclusionsUpdated") {
+        // re-evaluate this page right away (the popup just changed the list)
+        (async () => {
+          try {
+            const s = await chrome.storage.local.get("vgExclusions");
+            const isEx = vgIsExcluded(s.vgExclusions || [], location.href);
+            if (isEx && !excluded) {
+              excluded = true;
+              items.clear();
+              if (uiHost && uiHost.isConnected) uiHost.remove();
+            } else if (!isEx && excluded) {
+              excluded = false;
+              if (ensureUi()) scanDom();
+            }
+          } catch (e) {}
+        })();
+        return;
+      }
       if (msg.type === "vg:netMedia") report(msg.url, msg.kind, "network", "webRequest");
       else if (msg.type === "vg:blobSaved") setStatus("✅ ดาวน์โหลดสำเร็จ: " + (msg.filename || ""));
       else if (msg.type === "vg:clearMedia") {

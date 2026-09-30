@@ -34,3 +34,37 @@ async function load() {
 
 $("#refresh").addEventListener("click", load);
 load();
+
+// ---------------- site exclusions (v1.1.3) ---------------------------------
+async function renderExclusions() {
+  chrome.runtime.sendMessage({ type: "vg:exclusions" }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) return;
+    const list = resp.patterns || [];
+    $("#exList").innerHTML = list.length
+      ? list.map((p) => `<div class="ex"><code>${esc(p)}</code><button data-rm="${esc(p)}">ลบ</button></div>`).join("")
+      : '<div class="exhint">ยังไม่มีรายการยกเว้น</div>';
+    document.querySelectorAll(".exlist button[data-rm]").forEach((b) => b.addEventListener("click", () => {
+      chrome.runtime.sendMessage({ type: "vg:exclusion:remove", pattern: b.getAttribute("data-rm") }, renderExclusions);
+    }));
+  });
+}
+
+$("#exAdd").addEventListener("click", () => {
+  const v = $("#exInput").value.trim();
+  if (!v) return;
+  chrome.runtime.sendMessage({ type: "vg:exclusion:add", pattern: v }, (resp) => {
+    if (resp && resp.ok) { $("#exInput").value = ""; renderExclusions(); }
+  });
+});
+$("#exInput").addEventListener("keydown", (e) => { if (e.key === "Enter") $("#exAdd").click(); });
+$("#exAddHost").addEventListener("click", () => {
+  chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+    const t = tabs && tabs[0];
+    if (!t || !t.url) return;
+    try {
+      const host = new URL(t.url).host;
+      chrome.runtime.sendMessage({ type: "vg:exclusion:add", pattern: host }, renderExclusions);
+    } catch (e) {}
+  });
+});
+renderExclusions();

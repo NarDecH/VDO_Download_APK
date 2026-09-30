@@ -24,6 +24,20 @@ details{margin-top:8px}
 summary{cursor:pointer;color:var(--acc2);font-size:11.5px}
 pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8px;font:10px Consolas,monospace;color:#b7c4de;
     max-height:120px;overflow:auto;white-space:pre-wrap;margin-top:6px}
+.exbar{display:flex;gap:6px;margin-top:8px}
+.exbar input{flex:1;background:#0b1120;border:1px solid var(--line);border-radius:8px;color:#e8ecf4;
+             padding:6px 9px;font:12px 'Segoe UI',system-ui,sans-serif;outline:0}
+.exbar input:focus{border-color:var(--acc2)}
+.exbar button{background:#1a2547;white-space:nowrap}
+.exbar button:hover{background:#243354}
+.exlist{margin-top:7px}
+.exlist .ex{display:flex;align-items:center;gap:6px;background:#131c33;border:1px solid var(--line);
+            border-radius:8px;padding:5px 8px;margin-top:5px;font-size:11.5px}
+.exlist .ex code{flex:1;color:#cdd6e6;font:11px Consolas,monospace;word-break:break-all}
+.exlist .ex button{background:#7f1d1d;color:#fca5a5;padding:2px 8px;font-size:11px}
+.exlist .ex button:hover{background:#991b1b}
+.exhint{color:#5c6b8c;font-size:10.5px;margin-top:6px;line-height:1.45}
+.exhint code{color:#93a4c3}
 </style>
 </head>
 <body>
@@ -34,6 +48,17 @@ pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8p
   <button id="refresh">⟳</button>
 </header>
 <div id="list"><div class="empty">กำลังโหลด…</div></div>
+<details id="exSettings">
+  <summary>🚫 ยกเว้นเว็บไซต์ (ไม่ตรวจจับ/ไม่แสดงแผง)</summary>
+  <div class="exbar">
+    <input id="exInput" type="text" placeholder="https://www.facebook.com/*" spellcheck="false">
+    <button id="exAdd">+ เพิ่ม</button>
+    <button id="exAddHost" title="เพิ่มเว็บนี้ทั้งโดเมน + ซับโดเมน">โดเมนนี้</button>
+  </div>
+  <div class="exlist" id="exList"></div>
+  <div class="exhint">รูปแบบ: <code>https://www.facebook.com/*</code> · <code>*://*.tiktok.com/*</code> ·
+    หรือพิมพ์แค่โดเมน <code>facebook.com</code> (ครอบซับโดเมน + ทุกหน้า) — หน้าที่ยกเว้นจะไม่มีแผงและไม่ถูกตรวจจับ</div>
+</details>
 <details>
   <summary>📜 Logs (ดีบัก)</summary>
   <pre id="logs">—</pre>

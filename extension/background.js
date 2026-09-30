@@ -11,11 +11,51 @@
 const MAX_ASSEMBLED = 800 * 1024 * 1024; // safety cap for page-read assembly (bytes)
 const OFFSCREEN_URL = "offscreen.html";
 
+// ---------------------------------------------------------------- site exclusions (v1.1.3)
+// Patterns in chrome.storage.local "vgExclusions" - one Chrome match pattern
+// ("https://www.facebook.com/*", "*://*.tiktok.com/*") or a bare domain
+// ("facebook.com" = the domain + subdomains, any path). Excluded pages get
+// no panel, no detection, no reporting and no streaming.
+let vgExclusionsCache = null;
+function vgExclusionRe(pattern) {
+  let p = String(pattern || "").trim().toLowerCase();
+  if (!p) return null;
+  if (!/^[a-z*]+:\/\//.test(p)) p = "*://" + p;
+  const m = p.match(/^([a-z*]+):\/\/([^\/]*)(.*)$/);
+  if (!m) return null;
+  const scheme = m[1], host = m[2];
+  let path = m[3];
+  if (!path || path === "/") path = "/*";
+  const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const schemeRe = scheme === "*" ? "https?" : esc(scheme);
+  const hostRe = host.includes("*")
+    ? esc(host).replace(/\\\*/g, "[^/]*")
+    : "(?:[^/]+\\.)?" + esc(host);
+  const pathRe = esc(path).replace(/\\\*/g, ".*");
+  try { return new RegExp("^" + schemeRe + "://" + hostRe + pathRe + "$"); }
+  catch (e) { return null; }
+}
+function vgIsExcludedUrl(patterns, url) {
+  const u = String(url || "").toLowerCase();
+  return (patterns || []).some((p) => { const re = vgExclusionRe(p); return !!re && re.test(u); });
+}
+async function vgGetExclusions() {
+  if (vgExclusionsCache) return vgExclusionsCache;
+  try {
+    const s = await chrome.storage.local.get("vgExclusions");
+    vgExclusionsCache = s.vgExclusions || [];
+  } catch (e) { vgExclusionsCache = []; }
+  return vgExclusionsCache;
+}
+
 // ---------------------------------------------------------------- storage/log
 async function tabKey(tabId) { return "tab:" + tabId; }
 
 async function addMedia(tabId, item) {
   if (!tabId || tabId < 0) return;
+  // v1.1.3: drop candidates from excluded sites (belt-and-suspenders - the
+  // content script already refuses to report from an excluded page)
+  if (await vgIsExcludedUrl(await vgGetExclusions(), item && item.page)) return;
   const key = await tabKey(tabId);
   const store = await chrome.storage.session.get(key);
   const list = store[key] || [];
@@ -88,9 +128,11 @@ function offscreen(msg) {
 // ---------------------------------------------------------------- sniffer
 const CONTENT_TYPES = /(video\/|audio\/|mpegurl|dash\+xml|octet-stream)/i;
 chrome.webRequest.onHeadersReceived.addListener(
-  (details) => {
+  async (details) => {
     try {
       if (details.tabId < 0) return;
+      // v1.1.3: the page (initiator) is excluded -> never sniff its media
+      if (await vgIsExcludedUrl(await vgGetExclusions(), details.initiator || details.originUrl || details.documentUrl)) return;
       const ct = (details.responseHeaders || []).find((h) => h.name.toLowerCase() === "content-type");
       const val = (ct && ct.value) || "";
       if (!CONTENT_TYPES.test(val) || /text\/html/i.test(val)) return;
@@ -103,6 +145,12 @@ chrome.webRequest.onHeadersReceived.addListener(
   { urls: ["<all_urls>"] },
   ["responseHeaders"]
 );
+
+// tell a tab's content script to re-check the exclusion list right away
+// (called after the popup adds a pattern for the current site)
+async function vgApplyExclusionToTab(tabId) {
+  try { await chrome.tabs.sendMessage(tabId, { type: "vg:exclusionsUpdated" }); } catch (e) {}
+}
 
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   const key = await tabKey(tabId);
@@ -226,6 +274,39 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         await addMedia(tabId, msg.item);
         sendResponse({ ok: true });
         break;
+
+      // ---- site exclusions (v1.1.3) ----------------------------------
+      case "vg:exclusions":
+        sendResponse({ ok: true, patterns: await vgGetExclusions() });
+        break;
+
+      case "vg:exclusion:add": {
+        const pat = String(msg.pattern || "").trim();
+        if (!pat) { sendResponse({ ok: false, error: "empty pattern" }); break; }
+        const list = await vgGetExclusions();
+        if (!list.includes(pat)) list.push(pat);
+        vgExclusionsCache = list;
+        await chrome.storage.local.set({ vgExclusions: list });
+        log("exclusions", `added ${pat} (${list.length} total)`);
+        if (tabId != null) await vgApplyExclusionToTab(tabId);
+        sendResponse({ ok: true, patterns: list });
+        break;
+      }
+
+      case "vg:exclusion:remove": {
+        const pat2 = String(msg.pattern || "").trim();
+        const list2 = (await vgGetExclusions()).filter((x) => x !== pat2);
+        vgExclusionsCache = list2;
+        await chrome.storage.local.set({ vgExclusions: list2 });
+        log("exclusions", `removed ${pat2} (${list2.length} total)`);
+        // every tab re-checks itself - an excluded page must learn it is
+        // un-excluded even though its content script ignores other traffic
+        for (const t of await chrome.tabs.query({})) {
+          chrome.tabs.sendMessage(t.id, { type: "vg:exclusionsUpdated" }).catch(() => {});
+        }
+        sendResponse({ ok: true, patterns: list2 });
+        break;
+      }
 
       case "vg:download": {
         const item = msg.item || {};
