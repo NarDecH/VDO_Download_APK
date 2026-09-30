@@ -50,8 +50,10 @@ object DownloadCleaner {
                     val f = File(local)
                     if (!f.exists()) continue
                     val title = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)).orEmpty()
-                    val uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) dm.getUriForDownloadedFile(id) else null
-                    out.add(Candidate(id, uri, f, title.ifEmpty { f.name }, f.length()))
+                    // no uri here: getUriForDownloadedFile returns the downloads-
+                    // provider URI, which we cannot delete from - the MediaStore
+                    // entry (when present) provides the deletable content URI
+                    out.add(Candidate(id, null, f, title.ifEmpty { f.name }, f.length()))
                 }
             }
         } catch (e: Exception) {
@@ -88,40 +90,55 @@ object DownloadCleaner {
     }
 
     /**
-     * Everything deletable in Downloads/VDOGrabber, deduped by file name
-     * (a finished direct download shows up in DM, MediaStore and on disk).
+     * Everything deletable in Downloads/VDOGrabber, MERGED by file name - the
+     * same finished file is typically a DM job AND a MediaStore row AND a
+     * path on disk, and deleting it for real needs those identities combined
+     * (a ghost DM row alone must not make the MediaStore URI unreachable).
      */
     fun systemList(ctx: Context): List<Candidate> {
-        val out = mutableListOf<Candidate>()
-        val seen = mutableSetOf<String>()
-        for (c in dmSuccessful(ctx)) if (seen.add(c.name)) out.add(c)
-        for (c in mediaStore(ctx)) if (seen.add(c.name)) out.add(c)
+        val byName = linkedMapOf<String, Candidate>()
+        fun add(c: Candidate) {
+            val prev = byName[c.name]
+            byName[c.name] = if (prev == null) c else Candidate(
+                id = if (prev.id >= 0) prev.id else c.id,
+                uri = prev.uri ?: c.uri,
+                raw = prev.raw ?: c.raw,
+                name = prev.name,
+                size = maxOf(prev.size, c.size),
+            )
+        }
+        dmSuccessful(ctx).forEach(::add)
+        mediaStore(ctx).forEach(::add)
         try {
             val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "VDOGrabber")
             dir.listFiles()?.filter { it.isFile }?.forEach { f ->
-                if (seen.add(f.name)) out.add(Candidate(-1, null, f, f.name, f.length()))
+                add(Candidate(-1, null, f, f.name, f.length()))
             }
         } catch (_: Exception) {}
-        return out.sortedByDescending { it.raw?.lastModified() ?: 0L }
+        return byName.values.sortedByDescending { it.raw?.lastModified() ?: 0L }
     }
 
     /**
-     * Delete a candidate: try DownloadManager.remove(), then the MediaStore
-     * URI, then the raw file - success when at least one identity is gone
-     * (and, when known, the file itself no longer exists). [ctx] is only
-     * needed for the DM/MediaStore identities; a raw-file candidate deletes
-     * without one (this is what makes the JVM unit test possible).
+     * Delete a candidate: try the MediaStore row first (points at the real
+     * file), then the DM row (its remove() is documented to delete the file,
+     * but fresh emulators can keep ghost rows that delete nothing), then the
+     * raw file itself. Success means at least one identity actually removed
+     * something - not just that a call "didn't throw". [ctx] is only needed
+     * for the DM/MediaStore identities; a raw-file candidate deletes without
+     * one (this is what makes the JVM unit test possible).
      */
     fun systemDelete(ctx: Context?, c: Candidate): Boolean {
         var ok = false
         try {
-            if (c.id >= 0 && ctx != null) {
-                val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
-                dm.remove(c.id) // deletes the completed file with the row
-                ok = c.raw == null || !c.raw.exists()
-            }
-            if (!ok && c.uri != null && ctx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            if (c.uri != null && ctx != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 ok = try { ctx.contentResolver.delete(c.uri, null, null) > 0 } catch (_: Exception) { false }
+            }
+            if (!ok && c.id >= 0 && ctx != null) {
+                try {
+                    val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                    dm.remove(c.id) // deletes the completed file with the row
+                } catch (_: Exception) {}
+                ok = c.raw != null && !c.raw.exists()
             }
             if (!ok && c.raw != null) {
                 // the real File.delete() result: false when the file is not
