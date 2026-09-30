@@ -1,9 +1,18 @@
-"""Persistent app settings (JSON in the data dir)."""
+"""Persistent app settings (JSON in the data dir).
+
+Also hosts the per-site exclusion matcher (v1.2.0) - a Python mirror of the
+regex logic used by the Chrome extension (extension/content.js) so both
+platforms interpret the same patterns the same way:
+  - full match patterns: "https://www.facebook.com/*", "*://*.tiktok.com/*"
+  - bare domains: "facebook.com" = the domain + all subdomains, any path
+  - ports are ignored when matching (host in URLs may carry :port)
+"""
 
 from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 
 DEFAULTS = {
@@ -16,7 +25,47 @@ DEFAULTS = {
     "notify_done": True,
     "start_page": "https://www.google.com",
     "theme": "dark",
+    "exclusions": [],           # v1.2.0: sites with no detection/toolbar (list of patterns)
 }
+
+
+# ------------------------------------------------------------ exclusion matcher
+def exclusion_re(pattern: str):
+    """Compile a user exclusion pattern into an anchored regex (None = bad).
+    Python mirror of vgExclusionRe() in extension/content.js + background.js.
+    Keep the three implementations in sync when changing the semantics."""
+    p = str(pattern or "").strip().lower()
+    if not p:
+        return None
+    if not re.match(r"^[a-z*]+://", p):
+        p = "*://" + p                      # bare "host/path" -> any scheme
+    m = re.match(r"^([a-z*]+)://([^/]*)(.*)$", p)
+    if not m:
+        return None
+    scheme, host, path = m.group(1), m.group(2), m.group(3)
+    if not path or path == "/":
+        path = "/*"
+    scheme_re = "https?" if scheme == "*" else re.escape(scheme)
+    # "*.host.tld" matches subdomains AND the bare host (Chrome patterns
+    # only cover subdomains - matching the apex too is friendlier); a bare
+    # host covers its subdomains too
+    if host.startswith("*."):
+        host_re = "(?:[^/]+\\.)?" + re.escape(host[2:]).replace(r"\*", "[^/]*")
+    elif "*" in host:
+        host_re = re.escape(host).replace(r"\*", "[^/]*")
+    else:
+        host_re = "(?:[^/]+\\.)?" + re.escape(host)
+    path_re = re.escape(path).replace(r"\*", ".*")
+    try:
+        return re.compile("^" + scheme_re + "://" + host_re + "(?::\\d+)?" + path_re + "$")
+    except re.error:
+        return None
+
+
+def url_excluded(patterns, url: str) -> bool:
+    """True when `url` matches any exclusion pattern (case-insensitive)."""
+    u = str(url or "").lower()
+    return any((r and r.search(u)) for r in (exclusion_re(p) for p in (patterns or [])))
 
 
 class Settings:

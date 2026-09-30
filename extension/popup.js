@@ -62,7 +62,8 @@ $("#exAddHost").addEventListener("click", () => {
     const t = tabs && tabs[0];
     if (!t || !t.url) return;
     try {
-      const host = new URL(t.url).host;
+      // hostname (NOT host): bare-domain patterns survive ports
+      const host = new URL(t.url).hostname;
       chrome.runtime.sendMessage({ type: "vg:exclusion:add", pattern: host }, renderExclusions);
     } catch (e) {}
   });

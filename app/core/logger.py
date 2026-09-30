@@ -21,7 +21,7 @@ import traceback
 from logging.handlers import RotatingFileHandler
 
 APP_NAME = "VDOGrabber"
-APP_VERSION = "1.1.9"
+APP_VERSION = "1.2.0"
 
 _levels = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
 

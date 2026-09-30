@@ -27,7 +27,7 @@ import webview  # noqa: E402
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
-from core.settings import Settings  # noqa: E402
+from core.settings import Settings, url_excluded  # noqa: E402
 from core.ytdlp_mgr import EngineManager  # noqa: E402
 
 
@@ -99,6 +99,11 @@ class Api:
             page_url = ""
         rep = build_report(payload_json, page_url)
         if not rep:
+            return
+        # v1.2.0: belt-and-suspenders - never accept media from an excluded page
+        if page_url and url_excluded(_APP.settings.get("exclusions") or [], page_url):
+            _APP.logm.log("media ignored (page excluded): %s" % page_url[:120],
+                          level="debug", event="media_ignored_excluded", page=page_url[:200])
             return
         rep["first_seen"] = time.time()
         if _APP.media.add(rep):
@@ -202,6 +207,40 @@ class Api:
         if key == "max_concurrent":
             _APP.downloads._sem = threading.Semaphore(int(value) or 3)
         return {"ok": True}
+
+    # --------------------------------------------- site exclusions (v1.2.0)
+    @staticmethod
+    def _norm_exclusion(pattern: str) -> str:
+        """Normalize a user-typed exclusion pattern (lowercase, trimmed;
+        a bare "www." host collapses to the registrable domain so it covers
+        the whole site, mirroring what a user means)."""
+        p = str(pattern or "").strip().lower()
+        if p and "://" not in p and p.startswith("www."):
+            p = p[4:]
+        return p
+
+    def exclusion_list(self) -> list:
+        return list(_APP.settings.get("exclusions") or [])
+
+    def exclusion_add(self, pattern: str) -> dict:
+        p = self._norm_exclusion(pattern)
+        if not p:
+            return {"ok": False, "error": "empty pattern", "patterns": self.exclusion_list()}
+        lst = _APP.settings.get("exclusions") or []
+        if p not in lst:
+            lst.append(p)
+            _APP.settings.set("exclusions", lst)
+        _APP.logm.log("exclusion added: %s (%d total)" % (p, len(lst)),
+                      event="exclusion_added", pattern=p, total=len(lst))
+        return {"ok": True, "patterns": list(lst)}
+
+    def exclusion_remove(self, pattern: str) -> dict:
+        p = self._norm_exclusion(pattern)
+        lst = [x for x in (_APP.settings.get("exclusions") or []) if x != p]
+        _APP.settings.set("exclusions", lst)
+        _APP.logm.log("exclusion removed: %s (%d total)" % (p, len(lst)),
+                      event="exclusion_removed", pattern=p, total=len(lst))
+        return {"ok": True, "patterns": list(lst)}
 
     def choose_download_dir(self) -> dict:
         """Native folder picker on the browser window."""
@@ -333,6 +372,9 @@ class App:
                 if self.browser:
                     alive = self.browser.evaluate_js("!!(window.__vgDetect && window.__vgToolbar)")
                     if not alive:
+                        # v1.2.0: respect exclusions even when the watchdog races a load
+                        if self._page_excluded(self.browser.get_current_url() or ""):
+                            continue
                         self.logm.log("watchdog re-injecting page hooks", level="debug", event="page_reinject")
                         self.browser.evaluate_js(DETECT_JS)
                         self.browser.evaluate_js(TOOLBAR_JS)
@@ -357,11 +399,25 @@ class App:
         except Exception as e:
             self.logm.exception("navigate", e)
 
+    def _page_excluded(self, url: str) -> bool:
+        """v1.2.0: does the current page match a user exclusion pattern?
+        Excluded pages get no detection and no toolbar - same semantics as
+        the Chrome extension (core.settings.url_excluded)."""
+        try:
+            return url_excluded(self.settings.get("exclusions") or [], url)
+        except Exception:
+            return False
+
     def _on_loaded(self):
         """Every completed page load: (re)inject hooks + toolbar, log it."""
         try:
             url = self.browser.get_current_url() or "?"
             self.logm.log("page loaded: %s" % url, event="page_loaded", url=url)
+            if self._page_excluded(url):
+                self.logm.log("page excluded by user settings - no detection, no toolbar",
+                              level="debug", event="page_excluded", url=url[:200])
+                self.push_control("page_loaded", {"url": url})
+                return
             self.browser.evaluate_js(DETECT_JS)
             self.browser.evaluate_js(TOOLBAR_JS)
             self.push_control("page_loaded", {"url": url})
@@ -510,12 +566,49 @@ def selftest() -> int:
         results["delete_file"] = {"ok": False, "error": repr(e)}
         app.logm.exception("selftest delete_file", e)
 
+    # --- 3.6) site exclusions (v1.2.0): matcher + Api + injection gate -------
+    try:
+        cases = [
+            # (pattern, url, expected)
+            ("facebook.com", "https://www.facebook.com/watch/?v=123", True),
+            ("facebook.com", "https://facebook.com/", True),
+            ("facebook.com", "https://notfacebook.com/video.mp4", False),
+            ("facebook.com", "https://mail.google.com/inbox", False),
+            ("*.tiktok.com/*", "https://www.tiktok.com/@user/video/1", True),
+            ("https://www.facebook.com/*", "https://www.facebook.com/reel/9", True),
+            ("https://www.facebook.com/*", "http://www.facebook.com/reel/9", False),
+            ("*://*.tiktok.com/*", "http://m.tiktok.com/x", True),
+            ("127.0.0.1", "http://127.0.0.1:8799/video.mp4", True),   # ports ignored
+            ("*://127.0.0.1/*", "http://127.0.0.1:8799/video.mp4", True),
+            ("", "https://example.com/v.mp4", False),                  # empty pattern
+        ]
+        from core.settings import exclusion_re
+        matcher_ok = all(bool(exclusion_re(p)) == bool(p) and url_excluded([p], u) == want
+                         for p, u, want in cases)
+        # full Api round-trip through real Settings (in the app's data dir)
+        r1 = app.api.exclusion_add("Example.org")
+        r2 = app.api.exclusion_add("www.example.org")     # dedupe via www-strip
+        gate_before = app._page_excluded("https://cdn.example.org/v.mp4")
+        r3 = app.api.exclusion_remove("example.org")
+        gate_after = app._page_excluded("https://cdn.example.org/v.mp4")
+        results["exclusions"] = {
+            "ok": bool(matcher_ok and r1["ok"] and r2["ok"] and gate_before
+                       and r3["ok"] and not gate_after
+                       and app.api.exclusion_list() == []),
+            "matcher": matcher_ok, "add_ok": bool(r1["ok"] and r2["ok"]),
+            "gate_on": bool(gate_before), "remove_ok": bool(r3["ok"]), "gate_off": not gate_after,
+            "list": app.api.exclusion_list(),
+        }
+    except Exception as e:
+        results["exclusions"] = {"ok": False, "error": repr(e)}
+        app.logm.exception("selftest exclusions", e)
+
     srv.shutdown()
     srv2.shutdown()
     print(json.dumps(results, ensure_ascii=False, indent=2))
     passed = (results["ytdlp"]["ok"] and results["detection"]["ok"]
               and results["pair_sync"]["ok"] and results["download"]["ok"]
-              and results["delete_file"]["ok"])
+              and results["delete_file"]["ok"] and results["exclusions"]["ok"])
     app.logm.log("SELFTEST %s" % ("PASS" if passed else "FAIL"), event="selftest", passed=passed,
                  results={k: v.get("ok") for k, v in results.items() if isinstance(v, dict)})
     return 0 if passed else 1

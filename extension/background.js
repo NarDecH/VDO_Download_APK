@@ -28,11 +28,16 @@ function vgExclusionRe(pattern) {
   if (!path || path === "/") path = "/*";
   const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const schemeRe = scheme === "*" ? "https?" : esc(scheme);
-  const hostRe = host.includes("*")
-    ? esc(host).replace(/\\\*/g, "[^/]*")
-    : "(?:[^/]+\\.)?" + esc(host);
+  // "*.host.tld" matches subdomains AND the bare host (Chrome patterns only
+  // cover subdomains - matching the apex too is friendlier); a bare host
+  // covers its subdomains as well
+  const hostRe = host.startsWith("*.")
+    ? "(?:[^/]+\\.)?" + esc(host.slice(2)).replace(/\\\*/g, "[^/]*")
+    : host.includes("*")
+      ? esc(host).replace(/\\\*/g, "[^/]*")
+      : "(?:[^/]+\\.)?" + esc(host);
   const pathRe = esc(path).replace(/\\\*/g, ".*");
-  try { return new RegExp("^" + schemeRe + "://" + hostRe + pathRe + "$"); }
+  try { return new RegExp("^" + schemeRe + "://" + hostRe + "(?::\\d+)?" + pathRe + "$"); }
   catch (e) { return null; }
 }
 function vgIsExcludedUrl(patterns, url) {

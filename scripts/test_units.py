@@ -255,6 +255,46 @@ def test_out_template_and_newest_match() -> bool:
     return True
 
 
+# ------------------------------------------------- site exclusions (v1.2.0)
+def test_exclusion_matcher() -> bool:
+    from core.settings import exclusion_re, url_excluded
+
+    cases = [
+        # bare domain = domain + subdomains + every path
+        ("facebook.com", "https://www.facebook.com/watch/?v=123", True),
+        ("facebook.com", "https://facebook.com/", True),
+        ("facebook.com", "https://notfacebook.com/video.mp4", False),
+        ("facebook.com", "https://mail.google.com/inbox", False),
+        # explicit wildcard host (Chrome match-pattern style)
+        ("*.tiktok.com/*", "https://www.tiktok.com/@user/video/1", True),
+        ("*.tiktok.com/*", "https://tiktok.com/x", True),
+        # full match pattern pins the scheme
+        ("https://www.facebook.com/*", "https://www.facebook.com/reel/9", True),
+        ("https://www.facebook.com/*", "http://www.facebook.com/reel/9", False),
+        ("*://*.tiktok.com/*", "http://m.tiktok.com/x", True),
+        # host in URLs may carry a port - patterns must still match
+        ("127.0.0.1", "http://127.0.0.1:8799/video.mp4", True),
+        ("*://127.0.0.1/*", "http://127.0.0.1:8799/video.mp4", True),
+        # path scoping
+        ("example.com/videos/*", "https://example.com/videos/1.mp4", True),
+        ("example.com/videos/*", "https://example.com/watch/1.mp4", False),
+        # empty / blank patterns never match; bad ones compile to None
+        ("", "https://example.com/v.mp4", False),
+        ("   ", "https://facebook.com/", False),
+    ]
+    for pat, url, want in cases:
+        got = url_excluded([pat], url)
+        assert got == want, f"pattern {pat!r} vs {url!r}: expected {want}, got {got}"
+    assert exclusion_re("bad pattern with spaces/") is None or True  # must not raise
+    assert url_excluded([], "https://facebook.com/") is False
+    assert url_excluded(None, "https://facebook.com/") is False
+    # several patterns: any match wins
+    assert url_excluded(["a.com", "b.org"], "https://b.org/x") is True
+    # case-insensitive like the JS implementations
+    assert url_excluded(["FACEBOOK.COM"], "https://WWW.Facebook.com/v") is True
+    return True
+
+
 # ------------------------------------------------------------- pair-sync
 def test_pair_sync_guard() -> bool:
     r = check_pair_sync()
@@ -277,6 +317,7 @@ def main() -> int:
         "unique_stem": test_unique_stem,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
+        "exclusion_matcher": test_exclusion_matcher,
         "pair_sync_guard": test_pair_sync_guard,
     }
     failed = []

@@ -342,6 +342,64 @@ def main():
                 break
         check("exclusion removed: panel mounts again", bool(remounted))
 
+        # ============ in-panel "exclude this site" button (v1.1.4) ==========
+        # The floating panel offers a two-step exclude button: click 1 arms
+        # it (\"ยืนยัน?\"), click 2 confirms and adds the CURRENT host as a
+        # bare-domain pattern, then the panel must vanish immediately.
+        exbtn_ok = None
+        for _ in range(10):
+            exbtn_ok = js(cdp, sid,
+                          "(() => { const r = document.querySelector('#vg-content-host') && document.querySelector('#vg-content-host').shadowRoot; return !!(r && r.getElementById('vg-exbtn')); })()")
+            if exbtn_ok:
+                break
+            time.sleep(0.5)
+        check("in-panel exclude button present", bool(exbtn_ok))
+
+        js(cdp, sid, "document.querySelector('#vg-content-host').shadowRoot.getElementById('vg-pill').click()")
+        time.sleep(0.3)
+        js(cdp, sid, "document.querySelector('#vg-content-host').shadowRoot.getElementById('vg-exbtn').click()")
+        time.sleep(0.3)
+        armed = js(cdp, sid,
+                   "(document.querySelector('#vg-content-host').shadowRoot.getElementById('vg-exbtn') || {}).textContent || ''")
+        check("exclude button arms on first click (two-step confirm)", "ยืนยัน" in str(armed), str(armed)[:48])
+
+        js(cdp, sid, "document.querySelector('#vg-content-host').shadowRoot.getElementById('vg-exbtn').click()")
+        gone = None
+        for _ in range(10):
+            time.sleep(0.5)
+            gone = js(cdp, sid, "!document.querySelector('#vg-content-host')")
+            if gone:
+                break
+        check("in-panel exclude: panel removed immediately", bool(gone))
+
+        # assert the stored pattern via the exclusion bridge: adding the same
+        # pattern again is a no-op, so the response doubles as a list read
+        stored = js(cdp, sid, f"({ASK})('debugAddExclusion', '127.0.0.1')")
+        check("in-panel exclude: host pattern '127.0.0.1' stored (hostname, no port)",
+              bool(stored and stored.get("ok")) and "127.0.0.1" in (stored or {}).get("patterns", [])
+              and "127.0.0.1:8799" not in (stored or {}).get("patterns", []),
+              json.dumps(stored or {}))
+
+        js(cdp, sid, "location.reload()")
+        still_gone = None
+        for _ in range(8):
+            time.sleep(1)
+            still_gone = js(cdp, sid, "!document.querySelector('#vg-content-host')")
+        check("in-panel exclusion persists after reload", still_gone is True, f"mounted={not still_gone}")
+
+        # clean up both forms (pre-1.1.4 patterns may carry a port)
+        rm2 = js(cdp, sid, f"({ASK})('debugRemoveExclusion', '127.0.0.1')")
+        rm3 = js(cdp, sid, f"({ASK})('debugRemoveExclusion', '127.0.0.1:8799')")
+        check("in-panel exclusion removed via bridge",
+              bool(rm2 and rm2.get("ok")) and not (rm2 or {}).get("patterns"), json.dumps(rm2 or {}))
+        remounted2 = False
+        for _ in range(16):
+            time.sleep(1)
+            remounted2 = js(cdp, sid, "!!document.querySelector('#vg-content-host')")
+            if remounted2:
+                break
+        check("in-panel exclusion removed: panel returns", bool(remounted2))
+
     finally:
         try:
             proc.terminate()

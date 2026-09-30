@@ -66,8 +66,33 @@ a{color:#7fb3ff}
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
-    <span class="vtag">v1.1.9</span>
+    <span class="vtag">v1.2.0</span>
     <span class="vtag-latest">LATEST</span>
+    <span class="vdate">1 ตุลาคม 2026</span>
+    <span style="flex:1"></span>
+    <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
+  </div>
+
+  <h3>ส่วนขยาย Chrome v1.1.4 <span class="en">Extension</span></h3>
+  <ul>
+    <li><b>ปุ่ม "🚫 ยกเว้นเว็บนี้" บนแผงลอยในหน้าเว็บ</b> — กดยืนยันสองครั้ง (กันคลิกพลาด) แล้วโดเมนปัจจุบัน
+        ถูกเพิ่มเป็นรายการยกเว้นและแผงหายจากหน้าทันที — ไม่ต้องเปิด popup</li>
+    <li><b>แก้ matcher รายการยกเว้นให้ตรงกันทั้งสามฝั่ง</b> — พอร์ตใน URL ไม่มีผลต่อการจับคู่ ·
+        ปุ่มยกเว้นใช้ hostname ไม่รวมพอร์ต · <code>*.domain</code> ครอบโดเมนหลักด้วย</li>
+  </ul>
+
+  <h3>เดสก์ท็อป <span class="en">Desktop</span></h3>
+  <ul>
+    <li><b>ฟีเจอร์ยกเว้นเว็บไซต์บนแอปเดสก์ท็อป</b> — การ์ด "🚫 ยกเว้นเว็บไซต์" ในแท็บ ⚙ ตั้งค่า เพิ่ม/ลบรายการได้
+        เก็บถาวรใน settings.json — หน้าที่ยกเว้นจะไม่ถูกฉีดตัวตรวจจับและไม่มีแถบเครื่องมือ</li>
+    <li><b>selftest + unit tests ครอบระบบยกเว้น</b> — selftest เพิ่มเฟส exclusion (matcher 11 เคส +
+        Api round-trip + gate) และ unit test ของ matcher (รวม 12 ข้อ)</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
+    <span class="vtag">v1.1.9</span>
     <span class="vdate">30 กันยายน 2026</span>
     <span style="flex:1"></span>
     <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
@@ -361,7 +386,7 @@ a{color:#7fb3ff}
 รองรับ playlist/queue หลายรายการ · โหมด cookie นำเข้าเพื่อเนื้อหาสมาชิก · desktop workflow บน CI</p>
 
 </div>
-<footer><div class="wrap">VDO Grabber v1.1.9 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
+<footer><div class="wrap">VDO Grabber v1.2.0 · <a href="readme.html">README</a> · <a href="research.html">RESEARCH</a> ·
 <a href="https://github.com/NarDecH/VDO_Download_APK/releases">Releases</a></div></footer>
 
 <script>

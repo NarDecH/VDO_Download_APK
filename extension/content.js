@@ -38,13 +38,16 @@
     if (!path || path === "/") path = "/*";
     const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const schemeRe = scheme === "*" ? "https?" : esc(scheme);
-    // "*.host.tld" matches subdomains (like Chrome match patterns); a bare
-    // host covers its subdomains too - friendlier than Chrome's own rule
-    const hostRe = host.includes("*")
-      ? esc(host).replace(/\\\*/g, "[^/]*")
-      : "(?:[^/]+\\.)?" + esc(host);
+    // "*.host.tld" matches subdomains AND the bare host (Chrome patterns
+    // only cover subdomains - matching the apex too is friendlier); a bare
+    // host covers its subdomains as well
+    const hostRe = host.startsWith("*.")
+      ? "(?:[^/]+\\.)?" + esc(host.slice(2)).replace(/\\\*/g, "[^/]*")
+      : host.includes("*")
+        ? esc(host).replace(/\\\*/g, "[^/]*")
+        : "(?:[^/]+\\.)?" + esc(host);
     const pathRe = esc(path).replace(/\\\*/g, ".*");
-    try { return new RegExp("^" + schemeRe + "://" + hostRe + pathRe + "$"); }
+    try { return new RegExp("^" + schemeRe + "://" + hostRe + "(?::\\d+)?" + pathRe + "$"); }
     catch (e) { return null; }
   }
   function vgIsExcluded(patterns, url) {
@@ -260,9 +263,13 @@
     .empty{color:#5c6b8c;text-align:center;padding:16px 0;font-size:12px}
     .status{color:#ffc371;font-size:11.5px;margin:6px 4px 0;min-height:16px}
     .count{background:rgba(255,255,255,.25);border-radius:9px;padding:0 7px;font-size:11px}
+    .exbtn{background:#7f1d1d;color:#fca5a5;border:0;border-radius:7px;padding:2px 9px;
+           font:600 10.5px 'Segoe UI',system-ui,sans-serif;cursor:pointer;float:right;margin-top:1px}
+    .exbtn:hover{background:#991b1b}
+    .exbtn.arm{background:#fca5a5;color:#450a0a}
   </style>
   <div class="panel" id="vg-panel">
-    <h4>🎬 วิดีโอที่ตรวจพบในหน้านี้</h4>
+    <h4>🎬 วิดีโอที่ตรวจพบในหน้านี้ <button class="exbtn" id="vg-exbtn" title="ไม่ตรวจจับ/ไม่แสดงแผงบนเว็บนี้อีก (ทั้งโดเมน + ซับโดเมน)">🚫 ยกเว้นเว็บนี้</button></h4>
     <div id="vg-list"><div class="empty">ยังไม่พบวิดีโอ — เล่นวิดีโอในหน้าสักครู่</div></div>
     <div class="status" id="vg-status"></div>
   </div>
@@ -294,6 +301,26 @@
           p.style.display = p.style.display === "block" ? "none" : "block";
           renderList();
         });
+        // v1.1.4: two-step "exclude this site" (no accidental clicks)
+        const exb = shadow.getElementById("vg-exbtn");
+        if (exb) {
+          let armTimer = null;
+          exb.addEventListener("click", () => {
+            if (exb.classList.contains("arm")) {
+              clearTimeout(armTimer);
+              exb.classList.remove("arm");
+              exb.textContent = "⏳ กำลังยกเว้น…";
+              excludeThisSite();
+            } else {
+              exb.classList.add("arm");
+              exb.textContent = "ยืนยัน? แผงจะหายจากเว็บนี้";
+              armTimer = setTimeout(() => {
+                exb.classList.remove("arm");
+                exb.textContent = "🚫 ยกเว้นเว็บนี้";
+              }, 4000);
+            }
+          });
+        }
         uiWired = true;
       }
       return uiWired;
@@ -360,6 +387,34 @@
     list.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => {
       try { window.location.href = b.getAttribute("data-open"); } catch (e) {}
     }));
+  }
+
+  // v1.1.4: exclude the CURRENT site (bare domain form = this host + its
+  // subdomains, every path) through the same message the popup sends,
+  // then make this page invisible immediately.
+  function excludeThisSite() {
+    try {
+      // hostname (NOT host): a bare-domain pattern must survive ports
+      // (http://127.0.0.1:8799/ -> "127.0.0.1", default ports are elided anyway)
+      const pattern = location.hostname || "";
+      if (!pattern) return;
+      const done = () => {
+        excluded = true;
+        items.clear();
+        if (uiHost && uiHost.isConnected) uiHost.remove();
+        logLocal("excluded from in-page button: " + pattern);
+      };
+      if (extAlive()) {
+        try {
+          chrome.runtime.sendMessage({ type: "vg:exclusion:add", pattern }, (resp) => {
+            void chrome.runtime.lastError; // pattern still stored? no - SW unreachable
+            done();
+          });
+        } catch (e) { done(); }
+      } else {
+        done();
+      }
+    } catch (e) {}
   }
 
   function copyText(text) {

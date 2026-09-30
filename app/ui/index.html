@@ -131,6 +131,15 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <input type="text" id="sStartPage">
     </div>
   </div>
+  <div class="card">
+    <h2>🚫 ยกเว้นเว็บไซต์</h2>
+    <div class="hint" style="margin:0 0 8px">เว็บในรายการนี้จะ<b>ไม่ถูกตรวจจับและไม่มีแถบเครื่องมือ</b> — พิมพ์แค่โดเมน เช่น <span class="mono">facebook.com</span> (ครอบซับโดเมนด้วย) หรือรูปแบบเต็ม <span class="mono">https://www.example.com/*</span></div>
+    <div class="row">
+      <input type="text" id="exInput" placeholder="โดเมนหรือ match pattern เช่น tiktok.com">
+      <button class="act grn" style="flex:0" onclick="exAdd()">+ เพิ่ม</button>
+    </div>
+    <div id="exList" style="margin-top:10px"></div>
+  </div>
 </section>
 
 <section class="tab" id="tab-about">
@@ -138,7 +147,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
     <h2 style="color:var(--txt)">VDO Grabber</h2>
     <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
-    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.1.9</span></div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.2.0</span></div>
     <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
     <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
     <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
@@ -159,16 +168,17 @@ function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api
 
 // ---------- demo mode (docs screenshots) --------------------------------
 const demoApi = {
-  get_state: async () => ({ version:'1.1.9', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+  get_state: async () => ({ version:'1.2.0', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
     settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
-               user_agent:'', auto_detect:true, start_page:'https://www.google.com' },
+               user_agent:'', auto_detect:true, start_page:'https://www.google.com',
+               exclusions:['facebook.com','*://*.tiktok.com/*'] },
     downloads: [ {id:'a1',url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',title:'Travel Blog',kind:'mp4',status:'done',percent:100,speed:'',eta:'',total:249561088,filepath:'C:\\Users\\NarDech\\Downloads\\VDOGrabber\\Sunset Beach 4K Drone Shot.mp4',title_base:'Sunset Beach 4K Drone Shot',ext:'mp4',error:''},
                  {id:'a2',url:'https://live.example.tv/hls/master.m3u8',title:'Live Concert — Stage 2',kind:'hls',status:'running',percent:63.4,speed:'8.42MiB/s',eta:'00:41',downloaded:158329744,total:249561088,filepath:'',title_base:'Live Concert — Stage 2',ext:'m3u8',error:''},
                  {id:'a3',url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',title:'Classic Music Video',kind:'page',status:'queued',percent:0,speed:'',eta:'',total:0,filepath:'',error:''} ],
     media: [ {url:'https://cdn.example.com/clips/sunset-beach-4k.mp4',kind:'mp4',label:'video element',width:1920,height:1080,via:'DOM scan',page_url:'https://example.com/travel',page_title:'Travel Blog'},
              {url:'https://live.example.tv/hls/master.m3u8',kind:'m3u8',label:'network (fetch)',width:null,height:null,via:'fetch hook',page_url:'https://live.example.tv/watch',page_title:'Live TV'},
              {url:'https://www.youtube.com/watch?v=dQw4w9WgXcQ',kind:'page',label:'link',width:null,height:null,via:'DOM scan',page_url:'https://www.youtube.com/',page_title:'YouTube'} ] }),
-  get_log_tail: async (n, l) => n==='app' ? "2026-09-29 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.1.9 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-09-29 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-09-29 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-09-29 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-09-29 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
+  get_log_tail: async (n, l) => n==='app' ? "2026-10-01 09:12:01.104 [INFO   ] [MainThread] vdo.app: VDO Grabber v1.2.0 starting | data=C:\\Users\\NarDech\\AppData\\Roaming\\VDOGrabber\n2026-10-01 09:12:02.310 [INFO   ] [warmup] vdo.app: yt-dlp ready: ...\\bin\\yt-dlp.exe (v2026.08.19)\n2026-10-01 09:12:07.882 [INFO   ] [MainThread] vdo.app: page loaded: https://example.com/travel\n2026-10-01 09:12:08.145 [DEBUG  ] [MainThread] vdo.app: media found: https://cdn.example.com/clips/sunset-beach-4k.mp4 (mp4) via DOM scan\n2026-10-01 09:12:15.002 [INFO   ] [dl-a2] vdo.download: download start #a2: https://live.example.tv/hls/master.m3u8"
     : n==='downloads' ? "[a1] START https://cdn.example.com/clips/sunset-beach-4k.mp4\n[a1] VGPROG| 42.1%| 6.11MiB/s| 00:30|105040512|249561088|||\n[a1] [download] 100% of  238.00MiB in 00:42\n[a2] START https://live.example.tv/hls/master.m3u8\n[a2] VGPROG| 63.4%| 8.42MiB/s| 00:41|158329744||6|10|"
     : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
   open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
@@ -177,6 +187,8 @@ const demoApi = {
   choose_download_dir(){ return {ok:false} }, downloads_list(){ return [] }, media_list(){ return [] },
   downloads_clear(){ return {ok:true, removed:1} }, media_clear(){ return {ok:true, removed:3} },
   download_open_file(){}, download_open_folder(){}, download_delete_file(){ return {ok:true} },
+  exclusion_list: async () => ({ ok:true, patterns:['facebook.com','*://*.tiktok.com/*'] }),
+  exclusion_add: async () => ({ ok:true, patterns:[] }), exclusion_remove: async () => ({ ok:true, patterns:[] }),
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -272,6 +284,7 @@ async function refresh(){
   state.settings = st.settings; state.version = st.version;
   renderDownloads(st.downloads || []); renderMedia(st.media || []);
   renderSettings(st.settings || {}); fillAbout(st);
+  renderExclusions();
 }
 async function tailLogs(){
   try { document.getElementById('logBox').textContent = await py().get_log_tail(curLog, 400); }
@@ -321,6 +334,29 @@ function clearMedia(){
   });
 }
 function pickDir(){ py().choose_download_dir().then(r => { if(r && r.ok) document.getElementById('sDownDir').value = r.path; }); }
+
+// ---------- site exclusions (v1.2.0) -------------------------------------
+async function renderExclusions(){
+  try {
+    const r = await py().exclusion_list();
+    const list = (r && r.patterns) || [];
+    document.getElementById('exList').innerHTML = list.length
+      ? list.map(p => `<div class="kv"><span class="mono">${esc(p)}</span><button class="act red" style="padding:2px 10px;flex:0" onclick="exRemove('${esc(p).replace(/'/g, "\\'")}')">ลบ</button></div>`).join('')
+      : '<div class="hint">ยังไม่มีรายการยกเว้น</div>';
+  } catch(e){ /* demo/backend not ready */ }
+}
+function exAdd(){
+  const v = document.getElementById('exInput').value.trim();
+  if (!v) return;
+  Promise.resolve(py().exclusion_add(v)).then(r => {
+    if (r && r.ok){ document.getElementById('exInput').value = ''; renderExclusions(); status('เพิ่มเว็บที่ยกเว้นแล้ว: ' + v); }
+    else status('เพิ่มไม่สำเร็จ: ' + ((r && r.error) || '?'));
+  });
+}
+function exRemove(p){
+  Promise.resolve(py().exclusion_remove(p)).then(() => { renderExclusions(); status('ลบรายการยกเว้นแล้ว: ' + p); });
+}
+document.getElementById('exInput').addEventListener('keydown', e => { if (e.key === 'Enter') exAdd(); });
 function saveSettings(){
   py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
   py().set_setting('max_concurrent', parseInt(document.getElementById('sMaxConc').value) || 3);

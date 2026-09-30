@@ -3,8 +3,8 @@
 # Windows version resource for VDOGrabber.exe
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 1, 7, 0),
-    prodvers=(1, 1, 7, 0),
+    filevers=(1, 2, 0, 0),
+    prodvers=(1, 2, 0, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -17,12 +17,12 @@ VSVersionInfo(
       StringTable('040904B0', [
         StringStruct('CompanyName', 'VDO Grabber Project'),
         StringStruct('FileDescription', 'VDO Grabber - open any website and download the playing video'),
-        StringStruct('FileVersion', '1.1.9.0'),
+        StringStruct('FileVersion', '1.2.0.0'),
         StringStruct('InternalName', 'VDOGrabber'),
         StringStruct('LegalCopyright', 'MIT License (c) 2026 VDO Grabber Project'),
         StringStruct('OriginalFilename', 'VDOGrabber.exe'),
         StringStruct('ProductName', 'VDO Grabber'),
-        StringStruct('ProductVersion', '1.1.9.0')])
+        StringStruct('ProductVersion', '1.2.0.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
