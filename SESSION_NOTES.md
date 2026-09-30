@@ -112,6 +112,20 @@
 - HLS MVP ยังไม่ทดสอบบนอุปกรณ์จริง (ดาวน์โหลด m3u8 จริง + updateMe ปุ่มอัปเดตเอนจิน ตาม plan ขั้น 5–6)
 - Strikethrough หมายเหตุ: `stream_title`/`stream_msg` strings เดิมยังอยู่ใน strings.xml (ไม่ถูกเรียกแล้ว — ลบได้)
 
+### รอบ v1.1.8 (ผู้ใช้: "ทำทุกอย่างที่คุณแนะนำ" — 4 ข้อ)
+- **① ตรวจหน้า Pages**: `/releases/latest` คืน v1.1.7 (published/Latest) ตั้งแต่ก่อนเริ่มงาน — หน้าเว็บดึง API เองถูกต้อง ไม่ต้องแก้โค้ด; แต่ docs/changelog.html ค้าง v1.0.1 → อัปเดตรายการครบ v1.1.0–v1.1.8 + footer 1.1.8
+- **② selftest desktop เพิ่มขั้น `delete_file`**: หลัง download ok → เลือก job done ที่มีไฟล์จริง → `app.api.download_delete_file(jid)` → assert ไฟล์หาย + การ์ดหลุดจาก list (ตัด `os.remove` ตรง ๆ ออก) — เป็น PASS gate ของ selftest แล้ว; กับดัก: `public()` ใช้ key `filepath` ไม่ใช่ `file`
+- **③ Android ลบไฟล์จาก UI**: ส่วน "ไฟล์ที่ดาวน์โหลดแล้ว" ในชีต 🎬 — `MainActivity.listDirectDownloads()` รวม DownloadManager (STATUS_SUCCESSFUL + LOCAL_FILENAME มีคำว่า VDOGrabber) + MediaStore Downloads (Q+) + File.listFiles, dedupe ตามชื่อ, เรียงตาม lastModified; ปุ่ม `mDel` เพิ่มใน item_media.xml (default gone); ยืนยันด้วย dialog แล้วลบตามลำดับ dm.remove() → contentResolver.delete() → File.delete(); เพิ่ม `Downloader.humanSize()` (pure + JVM test) และ strings `delete_confirm`/`downloads_section`/`downloads_title`
+- **④ guard draft ถาวร**: `gh release edit "$GITHUB_REF_NAME" --draft=false` ท้าย step "Attach to release" ทั้ง desktop.yml และ android.yml — กันกรณีย้าย/สร้าง tag ใหม่แล้ว release กลายเป็น draft (เหตุการณ์ v1.1.7)
+- bump 1.1.8 ครบทุกจุด + changelog.md; build_exe 31.9MB → selftest frozen PASS (EXIT 0) + selftest ซอร์ส PASS · unit tests 11/11 · CI เขียวทั้งคู่ (desktop 1m46s, android 8m49s — Kotlin คอมไพล์ผ่านบน CI เพราะเครื่องนี้ไม่มี SDK)
+- **release v1.1.8**: commit 65da0f6 → published/Latest อัตโนมัติ (guard ทำงาน) — assets 10 ไฟล์ครบ, `sha256sum -c checksums.txt` OK ทุกบรรทัด (รวม extension 1.1.2)
+
+### กับดักใหม่ที่เจอรอบนี้
+- `sha256sum` บน Git Bash ใส่ ` *` (binary marker) ก่อนชื่อไฟล์ และถ้ารันจากโฟลเดอร์อื่น พาธใน .sha256 จะไม่ตรงตอน `sha256sum -c` — สร้าง .sha256 จาก root ให้เหลือแค่ชื่อไฟล์เปล่าเสมอ แล้วตรวจ `sha256sum -c` หลังอัปโหลด release
+- `gh release download` ไม่เคารพโครงสร้างโฟลเดอร์ใน checksums.txt (แตกทุกไฟล์นั่งรวบ) — ไฟล์ที่อ้าง path ย่อยจะ FAILED open or read เสมอ
+- เครื่องนี้ไม่มี Android SDK/ANDROID_HOME → งาน Kotlin ตรวจด้วย CI เท่านั้น (local gradlew จะ fail ที่ SDK location)
+- ไฟล์ที่ไม่ใช่ของเซสชันค้างใน working tree: `M android/build.gradle.kts` (AGP 8.7.3→8.13.2), `?? android/gradle/gradle-daemon-jvm.properties` (gradle 9.8 toolchain 25), `M android/gradlew.bat` — ห้าม commit/ทิ้ง ให้ผู้ใช้ตัดสินใจ
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/
