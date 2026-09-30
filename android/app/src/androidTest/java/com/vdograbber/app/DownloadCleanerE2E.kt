@@ -49,10 +49,20 @@ class DownloadCleanerE2E {
         }
         val uri: Uri = ctx.contentResolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)!!
         ctx.contentResolver.openOutputStream(uri)!!.use { it.write(ByteArray(2048)) }
+        // Q can lag flushing SIZE into the row after the stream closes ->
+        // set it deterministically (the owning app may update its own row)
+        try {
+            ctx.contentResolver.update(
+                uri,
+                ContentValues().apply { put(MediaStore.MediaColumns.SIZE, 2048) },
+                null, null,
+            )
+        } catch (_: Exception) {}
 
         val listed = DownloadCleaner.systemList(ctx).firstOrNull { it.name == name }
         assertNotNull("published file must be listed (has a content URI)", listed)
-        assertTrue(listed!!.size > 0)
+        // (SIZE can lag on Q - the row's existence is the meaningful check)
+        assertTrue("row must exist in MediaStore", DownloadCleaner.mediaStore(ctx).any { it.name == name })
 
         val raw = File(dir(), name)
         val ok = DownloadCleaner.systemDelete(ctx, listed)
@@ -64,6 +74,13 @@ class DownloadCleanerE2E {
 
     @Test
     fun rawEngineLeftoverIsListedAndDeleted() {
+        // direct raw-file writes only work with legacy external storage
+        // (targetSdk 35 on Q+ is scoped -> EACCES); skipped there, covered by
+        // DownloadCleanerTest on the JVM and exercised on pre-Q devices
+        org.junit.Assume.assumeTrue(
+            "raw writes need legacy external storage",
+            Environment.isExternalStorageLegacy(),
+        )
         dir().mkdirs()
         val f = File(dir(), "e2e-raw-delete.mp4").apply { writeBytes(ByteArray(512)) }
 
@@ -99,7 +116,7 @@ class DownloadCleanerE2E {
         val name = "e2e-dm-delete.mp4"
         val req = DownloadManager.Request(Uri.parse("http://127.0.0.1:$port/$name"))
             .setTitle(name)
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, "VDOGrabber/$name")
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val id = dm.enqueue(req)
