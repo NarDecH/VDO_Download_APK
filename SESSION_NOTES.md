@@ -179,6 +179,15 @@
 - Android CI 36812949480 เขียว (E2E attempt 1 success, attempt 2/gate skipped) · assets 10 ครบ · **verify สุดท้าย**: `gh release download --clobber` **ทุกไฟล์** + `sha256sum -c checksums.txt` OK ทุกบรรทัด — บทเรียนซ้ำ: อย่าลบ/ไม่ดาวน์โหลดไฟล์ใหญ่ก่อน verify (pattern เฉพาะ .sha256 แล้ว -c จะ FAILED open or read เฉพาะไฟล์ที่ไม่อยู่ในเครื่องเสมอ)
 - Pages: index/changelog ดึง /releases/latest เอง — โชว์ v1.2.1 หลัง pages build (ไม่ต้องแก้มือ)
 
+### รอบแก้บั๊ก embed → HTML + cloud sync (ผู้ใช้แนบรูป: ปุ่มดาวน์โหลดไอเทม iframe player ได้ไฟล์ html)
+- **สาเหตุ**: ไอเทม `embed`/`page` ชี้หน้า HTML player → vg:download พาไปสาย direct download และเซฟ HTML
+- **แก้ 3 ชั้น (ext 1.1.6)**: (1) SW resolve ก่อนโหลด — หาใน store ของแท็บก่อน (item มี `page` = URL ผู้รายงาน เนื้อหาใน iframe รายงานด้วย location.href ของ iframe → แมตช์พอดี; ระวัง: field คือ `page` **ไม่ใช่** `page_url`) แล้ว fallback ถาม content script (`vg:resolveMedia` ตอบเฉพาะเมื่อเจอ — กัน race หลายเฟรม; listener ต้องมีพารามิเตอร์ `sendResponse`); (2) ไม่มีสื่อ = ปฏิเสธ (`page:true`) + popup/แผงแสดงคำแนะนำ แทนเซฟ HTML; (3) safety net ใน `watchDownload` — ดาวน์โหลดเสร็จแล้ว `mime` เป็น text/html → ลบไฟล์ + `vg:downloadFailed` (MV3 อ่านไฟล์ file: ไม่ได้ แต่ downloads.search ให้ mime); resolved เป็น m3u8/mpd → แนะนำแอปเดสก์ท็อป (`hls:true`)
+- **กับดัก fixture**: `embed-video.mp4` ไม่มีไฟล์จริง → เซิร์ฟเวอร์ทดสอบตอบ 404 HTML → ดาวน์โหลดได้ไฟล์ .htm (fix: ชี้ `sample.mp4` จริง); เคส refuse ต้องเปิดหน้า `nomedia.html` (store แท็บว่างจริง) จึง deterministic
+- E2E 48/48 (เฟสใหม่: embed click → ftyp, refuse, resolve page → mp4) — bridge `debugDownload` รับ value เป็น JSON string (ASK ส่งได้ value เดียว)
+- **cloud sync (ext 1.1.7 + app 1.2.2)**: secret gist เดียว `vdograbber-exclusions.json`; desktop: `exclusion_cloud_push/pull/status` (urllib + Bearer token, สร้าง gist เองครั้งแรกเมื่อ gist_id ว่าง); extension: fetch จาก popup ตรง (CORS ผ่าน) token ใน `chrome.storage.local.vgGithubPat` / gist id `vgGistId` · desktop เก็บใน settings `github_pat`/`gist_id` · **token ไม่ถูก log**: LogManager เขียน kwargs ลง events.jsonl → เพิ่ม redaction กองกลาง (token/github_pat/authorization → [redacted]) · pull ทั้งสองฝั่ง merge ผ่านกลไก import เดิม
+- ผิดพลาดที่แก้ทัน: เคยแทน tag v1.2.1 ใน timeline changelog.html ด้วย "ส่วนขยาย v1.1.6" ทั้งที่ยังไม่ปล่อย — timeline html สะท้อนเฉพาะ release ที่ published, ของที่ยังไม่ปล่อยอยู่แค่ใน md (Unreleased)
+- ยังไม่ได้ปล่อย tag v1.2.2 (รวม ext 1.1.6+1.1.7) — รอผู้ใช้ทดสอบก่อนค่อย release ตามขั้นตอนปกติ
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/
