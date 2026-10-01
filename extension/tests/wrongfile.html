@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>page with decoy + iframe player</title></head>
+<body style="margin:0">
+<!-- regression page for the "wrong file" bug: the page itself plays an
+     unrelated clip (decoy, like an ad) AND embeds an iframe player. Clicking
+     the iframe embed item must download the PLAYER's clip (clip2), never the
+     decoy (sample.mp4). -->
+<video muted autoplay loop src="sample.mp4" width="320" height="180" style="background:#111"></video>
+<iframe src="frameplayer.html" width="340" height="200" style="border:0"></iframe>
+</body>
+</html>

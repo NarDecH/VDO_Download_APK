@@ -64,7 +64,14 @@ async function addMedia(tabId, item) {
   const key = await tabKey(tabId);
   const store = await chrome.storage.session.get(key);
   const list = store[key] || [];
-  if (list.some((m) => m.url === item.url)) return;
+  const dup = list.findIndex((m) => m.url === item.url);
+  if (dup >= 0) {
+    // v1.1.8: same media seen twice (content scan + webRequest sniffer) -
+    // the sniffer knows the exact frame document that loaded the bytes, so
+    // its page attribution wins; the embed resolver matches against it.
+    if (item.via === "webRequest" && item.page) list[dup].page = item.page;
+    return;
+  }
   list.push({ ...item, ts: Date.now() });
   await chrome.storage.session.set({ [key]: list.slice(-60) });
   log("media", `${item.kind} ${item.url.slice(0, 110)} via ${item.via || item.label || "?"}`);
@@ -135,6 +142,40 @@ const CONTENT_TYPES = /(video\/|audio\/|mpegurl|dash\+xml|octet-stream)/i;
 // URL extensions that are actual media files (an iframe/page candidate may
 // point at an HTML player instead - saving that yields a useless .html)
 const MEDIA_URL_RE = /\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?$/i;
+// v1.1.8 (mirrors the desktop app's _page_fallback in app/core/downloader.py):
+// when a player page hides its stream inside JS/attributes, fetch the page
+// HTML and look for a media URL - absolute, relative or inside atob("...")
+// blobs that obfuscated players use.
+const HTML_MEDIA_RE = /[^\s"'<>\\]+?\.(?:mp4|webm|m3u8|mpd|mkv|mov|avi|flv|ts|3gp)(?:\?[^\s"'<>\\]*)?/i;
+const ATOB_BLOB_RE = /atob\(\s*["']([A-Za-z0-9+/=]{24,})["']\s*\)/g;
+function kindOfUrl(u) {
+  return /\.m3u8(\?|#|$)/i.test(u) ? "m3u8" : /\.mpd(\?|#|$)/i.test(u) ? "mpd" : "media";
+}
+function absMediaUrl(u, base) {
+  try { return new URL(u.startsWith("//") ? "https:" + u : u, base).href; }
+  catch (e) { return ""; }
+}
+async function scanPlayerHtml(pageUrl) {
+  try {
+    const r = await fetch(pageUrl, { credentials: "include" });
+    if (!r.ok) return null;
+    const html = await r.text();
+    const grab = (text) => {
+      const m = HTML_MEDIA_RE.exec(text);
+      return m ? absMediaUrl(m[0], pageUrl) : "";
+    };
+    const direct = grab(html);
+    if (direct) return { url: direct, kind: kindOfUrl(direct) };
+    for (const mm of html.matchAll(ATOB_BLOB_RE)) {
+      try {
+        const dec = atob(mm[1]);
+        const hit = grab(dec);
+        if (hit) return { url: hit, kind: kindOfUrl(hit) };
+      } catch (e) {}
+    }
+  } catch (e) {}
+  return null;
+}
 chrome.webRequest.onHeadersReceived.addListener(
   async (details) => {
     try {
@@ -147,7 +188,13 @@ chrome.webRequest.onHeadersReceived.addListener(
       const u = details.url;
       if (!/\.(mp4|m3u8|mpd|webm|mkv|flv|mov|avi|mp3|m4a|aac|ts|3gp)(\?|#|$)/i.test(u) && !/mpegurl|dash\+xml/i.test(val)) return;
       const kind = /mpegurl/i.test(val) || /\.m3u8/i.test(u) ? "m3u8" : /dash/i.test(val) || /\.mpd/i.test(u) ? "mpd" : "media";
-      addMedia(details.tabId, { url: u, kind, label: "network request", via: "webRequest" });
+      // v1.1.8: remember WHICH page loaded this media (documentUrl = the
+      // frame document that displayed it). The resolver matches embed/page
+      // candidates against this field - the real stream a cross-origin
+      // player loads is now attributable to the player, not lost in the
+      // tab-wide pile where the old catch-all grabbed the wrong file.
+      const page = details.documentUrl || details.initiator || details.originUrl || "";
+      addMedia(details.tabId, { url: u, kind, label: "network request", via: "webRequest", page });
     } catch (e) {}
   },
   { urls: ["<all_urls>"] },
@@ -402,10 +449,14 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           const store = await chrome.storage.session.get(key);
           const tabItems = store[key] || [];
           const want2 = want.replace(/\/$/, "");
+          // v1.1.8 strict resolve: ONLY media whose exact URL matches, or
+          // media the player page itself loaded (item.page == the player
+          // URL). The old third catch-all (`any pickable media in the tab`)
+          // downloaded ads / unrelated clips when a cross-origin iframe
+          // player was involved - the "wrong file" bug.
           const hit =
             tabItems.find((m) => m.url === want && pickable(m.url) && m.kind !== "embed" && m.kind !== "page") ||
-            tabItems.find((m) => pickable(m.url) && (m.page || "").replace(/\/$/, "") === want2) ||
-            tabItems.find((m) => pickable(m.url));
+            tabItems.find((m) => pickable(m.url) && (m.page || "").replace(/\/$/, "") === want2);
           if (hit) {
             log("download-resolved", `${workKind} -> ${hit.kind} ${hit.url.slice(0, 110)}`);
             workUrl = hit.url;
@@ -430,6 +481,19 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
                 resolved = true;
               }
             } catch (e) { log("resolve", "tab did not answer: " + e.message); }
+          }
+        }
+        // v1.1.8: nothing in the tab's store and the live content script came
+        // up empty - mirror the desktop app's last resort (downloader.py
+        // _page_fallback) and scan the player page HTML itself for a media
+        // URL (direct, relative, or atob-obfuscated).
+        if (isPlayerPage && !resolved && /^https?:/i.test(workUrl) && !MEDIA_URL_RE.test(workUrl)) {
+          const found = await scanPlayerHtml(workUrl);
+          if (found && found.url && found.url !== workUrl) {
+            log("download-resolved", `${workKind} -> ${found.kind} ${found.url.slice(0, 110)} (html scan)`);
+            workUrl = found.url;
+            workKind = found.kind;
+            resolved = true;
           }
         }
         // still a plain http(s) page with no media extension and no in-page

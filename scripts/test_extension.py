@@ -519,6 +519,94 @@ def main():
         check("resolved page download produced a video (mp4)", res_ok,
               (os.path.basename(res_file) + " header=" + repr(head2[:8])) if res_file else "no file within 60s")
 
+        # ==== strict iframe resolve - the "wrong file" bug (v1.1.8) ==========
+        # A page plays an unrelated clip (the decoy, like an ad) AND embeds
+        # an iframe player. The old resolver's final catch-all ("any pickable
+        # media in the tab") downloaded the DECOY when the embed item was
+        # clicked. The strict resolver accepts only media the player page
+        # itself loaded (sniffer page attribution) - here clip2.mp4.
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/wrongfile.html"}, session=sid)
+        wf_mounted = False
+        for _ in range(20):
+            time.sleep(1)
+            wf_mounted = bool(js(cdp, sid, "!!document.querySelector('#vg-content-host')"))
+            if wf_mounted:
+                break
+        check("wrongfile.html: content script mounted", wf_mounted)
+        time.sleep(4)  # both videos + the webRequest sniffer must register
+        before_wf = set(os.listdir(TMP_DL))
+        wf = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/frameplayer.html', 'kind': 'embed', 'name': 'e2e-wrongfile'}))})")
+        check("embed item on a decoy page resolves to the PLAYER's media",
+              bool(wf and wf.get("ok")), json.dumps(wf or {}))
+        wf_file = wait_for_new_file(TMP_DL, before_wf, 60)
+        wf_hash = ""
+        if wf_file:
+            wf_hash = hashlib.sha256(open(wf_file, "rb").read()).hexdigest()
+        decoy_hash = hashlib.sha256(open(os.path.join(TESTS, "sample.mp4"), "rb").read()).hexdigest()
+        clip2_hash = hashlib.sha256(open(os.path.join(TESTS, "video", "clip2.mp4"), "rb").read()).hexdigest()
+        clip3_hash = hashlib.sha256(open(os.path.join(TESTS, "video", "clip3.mp4"), "rb").read()).hexdigest()
+        check("wrong-file regression: got the player's clip2, never the decoy",
+              bool(wf_file) and open(wf_file, "rb").read(12)[4:8] == b"ftyp"
+              and wf_hash == clip2_hash and wf_hash != decoy_hash,
+              (os.path.basename(wf_file or "")) + " " + wf_hash[:12])
+
+        # ==== SW html-scan fallback - obfuscated player (v1.1.8) =============
+        # Mirrors the desktop app's _page_fallback: player-obf.html has NO
+        # video element and NO plain media URL - the stream lives inside
+        # atob("..."). It was never opened, so the tab store has nothing for
+        # it and the live content script must stay silent (notHere) -> the
+        # SW fetches the page HTML itself and decodes the URL.
+        obf = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/player-obf.html', 'kind': 'embed', 'name': 'e2e-obf'}))})")
+        check("SW html-scan decodes an atob-obfuscated player URL",
+              bool(obf and obf.get("ok")), json.dumps(obf or {}))
+        before_o = set(os.listdir(TMP_DL)) if not obf or not obf.get("ok") else set()
+        # the direct download starts inside the SW call above - look for the
+        # clip3 file either way (hash check proves WHICH url was decoded)
+        obf_deadline = time.time() + 60
+        obf_file = None
+        while time.time() < obf_deadline:
+            for f in os.listdir(TMP_DL):
+                if f.endswith((".crdownload", ".tmp")):
+                    continue
+                p = os.path.join(TMP_DL, f)
+                try:
+                    if os.path.getsize(p) > 0 and hashlib.sha256(open(p, "rb").read()).hexdigest() == clip3_hash:
+                        obf_file = p
+                        break
+                except OSError:
+                    pass
+            if obf_file:
+                break
+            time.sleep(0.5)
+        check("html-scan downloaded exactly the decoded stream (clip3)", bool(obf_file),
+              os.path.basename(obf_file or ""))
+        if before_o:
+            time.sleep(1)
+            check("refused-when-no-html-match left no junk file",
+                  set(os.listdir(TMP_DL)) - before_o == set(),
+                  str(set(os.listdir(TMP_DL)) - before_o))
+
+        # ==== JS-created <video> still resolves via detection (v1.1.8) =======
+        # player-hidden.html creates its <video> from an inline script; the
+        # DOM scanner must pick it up and the page candidate must resolve to
+        # that clip (detection path stays intact next to the new scan).
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/player-hidden.html"}, session=sid)
+        hidden_mounted = False
+        for _ in range(20):
+            time.sleep(1)
+            hidden_mounted = bool(js(cdp, sid, "!!document.querySelector('#vg-content-host')"))
+            if hidden_mounted:
+                break
+        check("player-hidden.html: content script mounted", hidden_mounted)
+        time.sleep(3)  # the script-created <video> must be detected
+        before_h = set(os.listdir(TMP_DL))
+        hid = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/player-hidden.html', 'kind': 'page', 'name': 'e2e-hidden'}))})")
+        check("page candidate resolves to a script-created <video> source",
+              bool(hid and hid.get("ok")) and bool((hid or {}).get("resolved")),
+              json.dumps(hid or {}))
+        hid_file = wait_for_hash(TMP_DL, clip2_hash, 60)
+        check("script-created video download produced clip2 (byte-identical)", bool(hid_file), hid_file or "timeout")
+
     finally:
         try:
             proc.terminate()

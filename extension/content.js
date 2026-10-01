@@ -530,24 +530,30 @@
         // exact-URL match from the detected-media map, then any other media
         // seen on this page, then the live <video> source. Everything here
         // is synchronous so the answer can ride the sendResponse channel.
+        // v1.1.8 strict answer: only speak when this tab really IS that page
+        // (or the URL matches an item exactly) - previously ANY media seen in
+        // the tab was offered, so ads/unrelated clips got downloaded when the
+        // player lived in a cross-origin iframe (the "wrong file" bug).
         try {
           const want = String(msg.url || "").replace(/#.*$/, "");
+          const here = location.href.replace(/#.*$/, "").replace(/\/$/, "");
+          const pageOk = !want || here === want || here === want.replace(/\/$/, "");
           const pickable = (u) => u && /^(https?:|blob:)/i.test(u) && !MEDIA_URL_HTML_RE.test(u);
           let hit = null;
-          if (want && items.has(want) && pickable(items.get(want).url)) hit = items.get(want);
-          if (!hit) {
+          if (pageOk && want && items.has(want) && pickable(items.get(want).url)) hit = items.get(want);
+          if (!hit && pageOk) {
             for (const it of items.values()) {
               if (pickable(it.url) && it.url !== want) { hit = it; break; }
             }
           }
-          if (!hit) {
+          if (!hit && pageOk) {
             document.querySelectorAll("video[src], video source[src]").forEach((v) => {
               const s = v.src || v.getAttribute("src") || "";
               if (!hit && s && pickable(s)) hit = { url: new URL(s, location.href).href, kind: "media" };
             });
           }
           if (hit) chrome.runtime.sendMessage({ type: "vg:log", msg: `resolveMedia: ${String(msg.url || "").slice(0, 60)} -> ${hit.url.slice(0, 60)} (${hit.kind})` }).catch(() => {});
-          sendResponse(hit ? { ok: true, url: hit.url, kind: hit.kind || "media" } : { ok: false });
+          sendResponse(hit ? { ok: true, url: hit.url, kind: hit.kind || "media" } : { ok: false, notHere: !pageOk });
         } catch (e) {
           sendResponse({ ok: false, error: String(e && e.message || e) });
         }

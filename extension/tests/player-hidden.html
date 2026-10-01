@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>hidden script player</title></head>
+<body style="margin:0">
+<script>
+  // the media URL never touches the DOM - only this inline script knows it
+  var streamUrl = "video/clip2.mp4";
+  var v = document.createElement("video");
+  v.src = streamUrl;
+  v.controls = true;
+  document.body.appendChild(v);
+</script>
+</body>
+</html>

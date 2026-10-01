@@ -188,6 +188,17 @@
 - ผิดพลาดที่แก้ทัน: เคยแทน tag v1.2.1 ใน timeline changelog.html ด้วย "ส่วนขยาย v1.1.6" ทั้งที่ยังไม่ปล่อย — timeline html สะท้อนเฉพาะ release ที่ published, ของที่ยังไม่ปล่อยอยู่แค่ใน md (Unreleased)
 - ยังไม่ได้ปล่อย tag v1.2.2 (รวม ext 1.1.6+1.1.7) — รอผู้ใช้ทดสอบก่อนค่อย release ตามขั้นตอนปกติ
 
+### รอบแก้บั๊ก iframe ผิดไฟล์ (ผู้ใช้แนบรูป: ไอเทม "iframe player" merrylion2.com/player.html ดาวน์โหลดได้ไฟล์อื่น) + release v1.2.2
+- **สาเหตุ 3 จุด (ext 1.1.7 เดิม)**: (1) fallback สุดท้ายใน vg:download คือ `tabItems.find((m) => pickable(m.url))` — หยิบสื่อใดก็ได้ในแท็บเมื่อไม่เจอ page-match; (2) สื่อจาก webRequest sniffer **ไม่มี field `page`** เลยจับคู่กับ player ไม่ได้ (ตกไปเจอ catch-all เสมอ); (3) `vg:resolveMedia` ของ content.js ตอบสื่อใดก็ได้ในแท็บแม้แท็บไม่ได้เปิดหน้า player นั้น
+- **แก้ (ext 1.1.8) เลียนแบบ desktop** (downloader.py `_page_fallback`):
+  - webRequest sniffer บันทึก `page = documentUrl` ให้ทุก request (ต้นทางจริงของสื่อ — คลิปใน cross-origin player จับคู่กับ player ได้แล้ว); addMedia dedupe แล้วให้ via=webRequest ชนะ (field `page` ไม่ใช่ page_url)
+  - vg:download: ตัด catch-all ทิ้ง — เหลือ exact URL หรือ `item.page == player URL` เท่านั้น
+  - vg:resolveMedia (content.js): ตอบเมื่อ `location.href == want` เท่านั้น (+ notHere flag)
+  - **SW html-scan ใหม่**: `scanPlayerHtml()` fetch หน้า player (credentials: include) → regex หา media (relative ได้) → ไม่เจอค่อยถอด `atob("...")` ทีละ blob — mirror `_page_fallback`/`_MEDIA_IN_HTML_RE`; ใช้ก่อนยอมปฏิเสธ (`HTML_MEDIA_RE` ไม่ต้องมี scheme เหมือน desktop เพราะ URL เป็น relative ได้)
+- **E2E 56/56** เฟสใหม่ 4 กลุ่ม: wrongfile.html (คลิปหลอก + iframe player → ต้องได้ clip2 ไม่ใช่ sample), player-obf.html (**ไม่มี video element เลย** บังคับให้ html-scan ทำงานแท้ ๆ — ตอบ resolved clip3 ผ่าน atob), player-hidden.html (video สร้างด้วย JS → detection path), ทดสอบ hash ตรงเป๊ะ (fixture clip2/clip3 ต้องไบต์ต่างกัน — รอบแรก clip3 ไบต์ซ้ำ clip2 ทำให้เช็คหลอกตัวเอง แก้ filler `\xab`)
+- unit 13/13 + selftest EXIT 0 ผ่านตามเดิม (ฝั่ง desktop ไม่แตะ logic)
+- bump v1.2.2: ext manifest 1.1.8 · logger.py 1.2.2 (แล้วแต่รอบก่อน) · version_info.txt (1,2,2,0) ×3 · android versionCode 12/1.2.2 · MainActivity log · changelog.md ([1.2.2] แยกหัว ext 1.1.8 / 1.1.7 / desktop · Unreleased ว่าง) · changelog.html footer 1.2.2 (**timeline ยัง v1.2.1 LATEST จนกว่าจะ published — กฎเดิม**)
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/

@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>obfuscated player</title></head>
+<body style="margin:0">
+<script>
+  // real-world obfuscated players ship the stream URL as base64; the
+  // service worker must decode atob("...") blobs when scanning the page
+  // (mirrors the desktop app's _page_fallback). Deliberately NO <video>
+  // element is created: the DOM scanner has nothing to report, so only the
+  // SW html-scan fallback can resolve this player page.
+  var conf = { u: atob("aHR0cDovLzEyNy4wLjAuMTo4Nzk5L3ZpZGVvL2NsaXAzLm1wNA==") };
+</script>
+</body>
+</html>
