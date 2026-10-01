@@ -461,8 +461,17 @@
       const id = newStream(name, "blob");
       setStatus("⏳ อ่าน blob จากหน้าเว็บ…");
       askMain({ type: "readBlob", id, url });
-    } else if (kind === "m3u8" || kind === "mpd") {
-      setStatus("📺 สตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
+    } else if (kind === "mpd") {
+      setStatus("📺 สตรีม DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
+    } else if (kind === "m3u8") {
+      // v1.1.9: the SW downloads HLS itself - sending the job again routes it
+      // through vg:download -> downloadHls (this fallback only runs after a
+      // hard failure, e.g. the SW restarted mid-stream)
+      setStatus("⏳ ลองรวมสตรีม HLS อีกครั้ง…");
+      chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
+        if (resp && resp.ok) setStatus("✅ ดาวน์โหลดสตรีม HLS แล้ว — ดูในแถบดาวน์โหลดของ Chrome");
+        else setStatus("📺 สตรีม HLS — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp)");
+      });
     } else {
       // http(s) media the browser refused (expired token / picky CDN):
       // re-fetch with the page's own credentials and stream it out
@@ -480,15 +489,17 @@
     }
     try { chrome.runtime.sendMessage({ type: "vg:log", msg: `content startDownload kind=${kind} url=${url.slice(0, 80)}` }); } catch (e) {}
     const name = (document.title || "video").replace(/[\\/:*?"<>|]+/g, " ").trim().slice(0, 80) || "video";
-    if (kind === "m3u8" || kind === "mpd") {
-      setStatus("📺 สตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
-      return;
-    }
     setStatus("⏳ กำลังส่งให้ตัวดาวน์โหลด…");
     chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
       const lastErr = chrome.runtime.lastError;
-      if (resp && resp.hls) {
-        setStatus("📺 ลิงก์นี้เป็นสตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp)");
+      if (resp && resp.ok && resp.hls) {
+        // v1.1.9: the extension assembled the HLS stream itself (.ts)
+        setStatus("✅ ดาวน์โหลดสตรีม HLS แล้ว (รวมชิ้นส่วนเป็นไฟล์เดียว) — ดูในแถบดาวน์โหลด");
+      } else if (resp && resp.ok) {
+        setStatus("✅ เริ่มดาวน์โหลดแล้ว — ดูในแถบดาวน์โหลดของ Chrome");
+      } else if (resp && resp.hls) {
+        // DASH / encrypted HLS - really needs yt-dlp on the desktop
+        setStatus("📺 สตรีมนี้ต้องใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp): " + (resp.error || "").slice(0, 60));
       } else if (resp && resp.page) {
         setStatus("⚠️ ไม่พบไฟล์วิดีโอในหน้านั้น — เล่นวิดีโอก่อนแล้วกดอีกครั้ง หรือใช้แอปเดสก์ท็อป");
       } else if (lastErr || !resp || !resp.ok) {
@@ -524,6 +535,12 @@
         return;
       }
       if (msg.type === "vg:netMedia") report(msg.url, msg.kind, "network", "webRequest");
+      else if (msg.type === "vg:hlsProgress") {
+        // v1.1.9: the SW assembles an HLS stream in the background - show which
+        // segment is downloading (the browser download bar stays silent until
+        // the assembled blob is handed over at the very end)
+        setStatus(`⏳ ดาวน์โหลดสตรีม HLS… ชิ้นส่วน ${msg.seg}/${msg.total}`);
+      }
       else if (msg.type === "vg:resolveMedia") {
         // v1.1.6: the SW asks what media THIS page is actually playing (the
         // popup/panel offered this page as an embed candidate). Prefer an

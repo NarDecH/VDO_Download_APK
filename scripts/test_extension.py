@@ -58,7 +58,8 @@ def serve():
                 self.send_error(404)
                 return
             ctype = "video/mp4" if path.endswith((".mp4", ".m4s")) else (
-                "application/vnd.apple.mpegurl" if path.endswith(".m3u8") else "text/html")
+                "application/vnd.apple.mpegurl" if path.endswith(".m3u8") else
+                "video/mp2t" if path.endswith(".ts") else "text/html")
             body = open(full, "rb").read()
             self.send_response(200)
             self.send_header("Content-Type", ctype)
@@ -606,6 +607,33 @@ def main():
               json.dumps(hid or {}))
         hid_file = wait_for_hash(TMP_DL, clip2_hash, 60)
         check("script-created video download produced clip2 (byte-identical)", bool(hid_file), hid_file or "timeout")
+
+        # ==== HLS assembly inside the extension (v1.1.9) =====================
+        # Real-world case (merrylion player.html): the stream is an m3u8
+        # playlist - Chrome cannot save it and the extension used to bounce
+        # the user to the desktop app. Now the SW fetches manifest + segments
+        # itself and assembles one .ts through the offscreen assembler.
+        hls_expected = hashlib.sha256(
+            open(os.path.join(TESTS, "hls", "seg1.ts"), "rb").read() +
+            open(os.path.join(TESTS, "hls", "seg2.ts"), "rb").read()).hexdigest()
+        hlsr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/hls/stream.m3u8', 'kind': 'm3u8', 'name': 'e2e-hls'}))})")
+        check("direct m3u8 item assembles an HLS stream in the extension",
+              bool(hlsr and hlsr.get("ok") and hlsr.get("hls")), json.dumps(hlsr or {}))
+        hls_file = wait_for_hash(TMP_DL, hls_expected, 60)
+        check("assembled HLS file is seg1+seg2 concatenated (byte-identical)", bool(hls_file), hls_file or "timeout")
+
+        # the player page path: embed candidate -> html-scan finds the m3u8 ->
+        # resolved kind=m3u8 -> same assembly (the full merrylion chain)
+        before_hls2 = set(os.listdir(TMP_DL))
+        hlsr2 = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/hlsplayer.html', 'kind': 'embed', 'name': 'e2e-hls2'}))})")
+        check("embed candidate resolves to m3u8 and assembles it too",
+              bool(hlsr2 and hlsr2.get("ok") and hlsr2.get("hls")), json.dumps(hlsr2 or {}))
+        hls2_file = wait_for_new_file(TMP_DL, before_hls2, 60)
+        hls2_ok = False
+        if hls2_file:
+            hls2_ok = hashlib.sha256(open(hls2_file, "rb").read()).hexdigest() == hls_expected
+        check("player-page HLS download matches the stream bytes", hls2_ok,
+              os.path.basename(hls2_file or ""))
 
     finally:
         try:

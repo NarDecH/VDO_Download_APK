@@ -201,6 +201,14 @@
 - **release v1.2.2 published**: build exe 31.9MB + frozen selftest EXIT 0 · ext zip 1.1.8 (แฮช 105afafc…) · commit 4f0cfbc + tag v1.2.2 (push tag DNS ล่ม → retry 25s ผ่าน — กับดักเดิมซ้ำ) · CI เขียวทั้งคู่ (desktop 1m46s, Android ~5min) · มือแนบ ext zip+sha256 หลัง desktop เขียว (ไม่ต้องรอ Android) · checksums.txt = ดาวน์โหลด assets ทั้งหมด + append บรรทัด ext + sha256sum -c OK 7 บรรทัด + upload --clobber · verify /releases/latest = v1.2.2, 10 assets · **หลัง publish ค่อยเพิ่ม v1.2.2 LATEST ใน timeline changelog.html (commit 57ef2f7)** — จบกฎ "timeline = published เท่านั้น" อย่างถูกลำดับครั้งแรก
 - **ค้าง**: ทดสอบ gist sync จริงทั้งสองฝั่ง — ต้องมี GitHub token จากผู้ใช้ (สร้างเองที่ github.com/settings/tokens สิทธิ์ gist; ห้ามส่ง token ผ่านแชท/log)
 
+### รอบ ext 1.1.9 — HLS ในตัวส่วนขยาย (ผู้ใช้: "iframe ไม่ดาวน์โหลดไฟล์")
+- **สาเหตุ**: เคส merrylion2.com เป็นสตรีม **m3u8 (HLS)** — ext 1.1.8 resolve ถูกแล้วแต่เจอ m3u8 จึงตอบ `hls:true` บังคับไปแอปเดสก์ท็อปเสมอ (Chrome รวม HLS เองไม่ได้) ผู้ใช้จึงเห็นเป็น "ไม่ดาวน์โหลด" (หลัง 1.1.8 ยังมีจุดตาย: strict resolve ทำให้คลิปโฆษณาหลุดมาน้อยลงแต่เคส HLS กลายเป็นปฏิเสธทันที)
+- **แก้ (v1.1.9)**: `downloadHls()` ใน background.js — SW fetch manifest เอง (credentials include) รองรับ master playlist (เลือก BANDWIDTH สูงสุด, จำกัด nesting depth 3) + `#EXT-X-MAP` init segment + ปฏิเสธ AES-128 ชัดเจน + cap 5000 segments; ดึง segment ทีละอัน → base64 → offscreen assembler (`video/mp2t`) → ไฟล์ **.ts** เดียว (ตั้งชื่อ .ts แทน .m3u8) · progress ส่ง `vg:hlsProgress` ไป content script (ชิ้นส่วน n/total)
+- **ลำดับเช็ค resp สำคัญ**: `resp.ok && resp.hls` (ต่อเองสำเร็จ) ต้องมาก่อน `resp.hls` (DASH/encrypted → desktop) — แก้ทั้ง content.js startDownload และ popup.js; pageReadFallback เคส m3u8 ส่งงานใหม่ผ่าน vg:download แทนการตัดต่อ (SW รีสตาร์ทกลางคัน)
+- เส้นทาง vg:download: m3u8 **resolved** → เส้นทางแรก · m3u8 **direct** (ไม่ผ่าน resolve) → ต้องเพิ่มเช็คหลัง block resolved เพราะโค้ดดาวน์โหลดตรงเดิมจะเซฟ playlist เป็นไฟล์เล็ก ๆ
+- E2E 60/60 (เฟสใหม่ 4: direct m3u8 → .ts ไบต์ตรง seg1+seg2, embed → html-scan → m3u8 → ประกอบ — fixtures hls/stream.m3u8 + seg1/seg2.ts ไบต์ต่างกัน, server เสิร์ฟ .ts เป็น video/mp2t แล้ว) · unit 13/13
+- ยังไม่ commit? — ทัน commit เป็น ext 1.1.9 บน Unreleased (ยังไม่ bump desktop) — รอทดสอบบนเว็บจริงก่อนค่อย release
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/

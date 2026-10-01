@@ -335,6 +335,92 @@ async function assembleAndDownload(id, mime, filename, tabId) {
   return { ok: true, filename };
 }
 
+// ---------------------------------------------------------------- HLS (v1.1.9)
+// Chrome cannot remux HLS - the extension used to refuse m3u8 with "use the
+// desktop app". But the SW has host_permissions <all_urls>, so it can fetch
+// the manifest + every segment itself (cross-origin, no CORS wall) and
+// assemble one .ts file through the offscreen assembler - the same pipeline
+// yt-dlp runs for the desktop app.
+const MAX_HLS_SEGS = 5000;
+const M3U8_ATTR_URL_RE = /(?:URI|URL)\s*=\s*"([^"]+)"/i;
+
+function b64(bytes) {
+  let bin = "";
+  const CH = 0x8000;
+  for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+  return btoa(bin);
+}
+function resolveUrl(u, base) {
+  try { return new URL(u, base).href; } catch (e) { return ""; }
+}
+
+async function collectPlaylist(url, depth = 0) {
+  const r = await fetch(url, { credentials: "include" });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const text = await r.text();
+  if (!/#EXTM3U/i.test(text)) throw new Error("not an M3U8 playlist");
+  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  // master playlist: take the highest-bandwidth variant and recurse
+  if (lines.some((l) => /^#EXT-X-STREAM-INF/i.test(l))) {
+    if (depth > 2) throw new Error("master playlist nesting too deep");
+    let best = null, bestBw = -1;
+    for (let i = 0; i < lines.length - 1; i++) {
+      if (!/^#EXT-X-STREAM-INF/i.test(lines[i])) continue;
+      const bw = parseInt((lines[i].match(/BANDWIDTH=(\d+)/i) || [])[1] || "0", 10);
+      const next = lines[i + 1].startsWith("#") ? null : lines[i + 1];
+      if (next && bw > bestBw) { bestBw = bw; best = next; }
+    }
+    if (!best) throw new Error("master playlist has no variant");
+    return collectPlaylist(resolveUrl(best, url), depth + 1);
+  }
+  const segs = [];
+  for (const l of lines) {
+    if (/^#EXT-X-KEY/i.test(l) && !/METHOD=NONE/i.test(l)) {
+      throw new Error("encrypted HLS (AES-128) - use the desktop app (yt-dlp)");
+    }
+    if (l.startsWith("#")) {
+      // #EXT-X-MAP (fMP4 init segment) must precede the media segments
+      if (/^#EXT-X-MAP/i.test(l)) {
+        const mm = M3U8_ATTR_URL_RE.exec(l);
+        if (mm) segs.push(resolveUrl(mm[1], url));
+      }
+      continue;
+    }
+    segs.push(resolveUrl(l, url));
+    if (segs.length > MAX_HLS_SEGS) throw new Error("too many segments (live stream?)");
+  }
+  if (!segs.length) throw new Error("media playlist has no segments");
+  return segs;
+}
+
+async function downloadHls(manifestUrl, filename, tabId) {
+  const id = "hls-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+  try {
+    var segs = await collectPlaylist(manifestUrl);
+  } catch (e) {
+    return { ok: false, error: "HLS manifest: " + (e.message || e) };
+  }
+  log("hls", `${segs.length} segments from ${manifestUrl.slice(0, 100)}`);
+  await ensureOffscreen();
+  const begin = await offscreen({ type: "asb:begin", id, mime: "video/mp2t" });
+  if (!begin || !begin.ok) return { ok: false, error: (begin && begin.error) || "assembler unavailable" };
+  try {
+    for (let i = 0; i < segs.length; i++) {
+      const r = await fetch(segs[i], { credentials: "include" });
+      if (!r.ok) throw new Error("HTTP " + r.status + " seg " + (i + 1));
+      const cr = await offscreen({ type: "asb:chunk", id, b64: b64(new Uint8Array(await r.arrayBuffer())) });
+      if (!cr || !cr.ok) throw new Error((cr && cr.error) || "assembler chunk failed");
+      if (tabId) chrome.tabs.sendMessage(tabId, { type: "vg:hlsProgress", seg: i + 1, total: segs.length }).catch(() => {});
+    }
+  } catch (e) {
+    await offscreen({ type: "asb:abort", id });
+    return { ok: false, error: "HLS segment failed: " + (e.message || e) };
+  }
+  const fname = String(filename || "video").replace(/\.(m3u8|mp4|ts)?$/i, ".ts");
+  const r = await assembleAndDownload(id, "video/mp2t", fname, tabId);
+  return r.ok ? { ok: true, hls: true, filename: r.filename } : { ok: false, hls: true, error: r.error };
+}
+
 // ---------------------------------------------------------------- messaging
 async function forceFallback() {
   const s = await chrome.storage.session.get("forceFallback");
@@ -503,11 +589,29 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: false, page: true, error: "no video found on that page - play the video first, or use the desktop app" });
           break;
         }
-        // resolved to an HLS/DASH manifest? Chrome cannot remux it - direct
-        // download would save a tiny playlist file, so route to the desktop app
+        // resolved to an HLS/DASH manifest? m3u8 is now downloaded IN the
+        // extension (manifest + segments fetched by the SW, assembled into
+        // one .ts); DASH (mpd) still needs yt-dlp on the desktop.
         if (resolved && (workKind === "m3u8" || workKind === "mpd")) {
+          if (workKind === "m3u8") {
+            const hr = await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId);
+            log(hr.ok ? "download" : "download-hls-failed", `hls ${workUrl.slice(0, 90)}: ${hr.ok ? hr.filename : hr.error}`);
+            sendResponse(hr.ok ? hr : { ok: false, hls: true, error: hr.error });
+            return;
+          }
           log("download-hls", `resolved to a ${workKind} stream - desktop app required`);
           sendResponse({ ok: false, hls: true, error: "HLS/DASH stream - use the VDOGrabber desktop app (yt-dlp)" });
+          break;
+        }
+        // a DIRECT m3u8/mpd item (no resolution needed) - same routing
+        if (/^https?:/i.test(workUrl) && (workKind === "m3u8" || workKind === "mpd")) {
+          if (workKind === "m3u8") {
+            const hr = await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId);
+            log(hr.ok ? "download" : "download-hls-failed", `hls direct ${workUrl.slice(0, 90)}: ${hr.ok ? hr.filename : hr.error}`);
+            sendResponse(hr.ok ? hr : { ok: false, hls: true, error: hr.error });
+            return;
+          }
+          sendResponse({ ok: false, hls: true, error: "DASH stream - use the VDOGrabber desktop app (yt-dlp)" });
           break;
         }
 
