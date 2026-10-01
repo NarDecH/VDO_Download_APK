@@ -38,6 +38,7 @@ pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8p
 .exlist .ex button:hover{background:#991b1b}
 .exhint{color:#5c6b8c;font-size:10.5px;margin-top:6px;line-height:1.45}
 .exhint code{color:#93a4c3}
+.exio{display:flex;gap:6px;margin-top:7px}
 </style>
 </head>
 <body>
@@ -58,6 +59,11 @@ pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8p
   <div class="exlist" id="exList"></div>
   <div class="exhint">รูปแบบ: <code>https://www.facebook.com/*</code> · <code>*://*.tiktok.com/*</code> ·
     หรือพิมพ์แค่โดเมน <code>facebook.com</code> (ครอบซับโดเมน + ทุกหน้า) — หน้าที่ยกเว้นจะไม่มีแผงและไม่ถูกตรวจจับ</div>
+  <div class="exio">
+    <button id="exExport" title="บันทึกรายการเป็นไฟล์ .json">⬇ ส่งออก</button>
+    <button id="exImport" title="ผสานรายการจากไฟล์ .json (ของแอป Windows หรือเครื่องอื่น)">⬆ นำเข้า</button>
+    <input id="exImportFile" type="file" accept=".json,application/json" style="display:none">
+  </div>
 </details>
 <details>
   <summary>📜 Logs (ดีบัก)</summary>

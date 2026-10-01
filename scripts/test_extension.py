@@ -400,6 +400,59 @@ def main():
                 break
         check("in-panel exclusion removed: panel returns", bool(remounted2))
 
+        # ========= exclusion import/export bridge (v1.2.1) ==================
+        # Same transfer file as the desktop app: export through the SW,
+        # wipe the list, import the document back (idempotent re-add), and
+        # make sure malformed input is rejected without polluting the list.
+        exs = js(cdp, sid, f"({ASK})('debugExportExclusions', '')")
+        check("bridge export returns a transfer document",
+              bool(exs and exs.get("ok")) and (exs or {}).get("count", -1) == 0
+              and '"patterns": []' in str((exs or {}).get("json", "")),
+              json.dumps(exs or {})[:120])
+
+        seed = js(cdp, sid, f"({ASK})('debugAddExclusion', '127.0.0.1')")
+        check("bridge: seed one pattern for the round-trip",
+              bool(seed and seed.get("ok")) and (seed or {}).get("patterns") == ["127.0.0.1"],
+              json.dumps(seed or {}))
+
+        doc = js(cdp, sid, f"({ASK})('debugExportExclusions', '')")
+        doc_str = json.dumps((doc or {}).get("json", ""))
+        check("bridge export carries the seeded pattern",
+              bool(doc and doc.get("ok")) and (doc or {}).get("count") == 1
+              and "127.0.0.1" in doc_str, doc_str[:120])
+
+        wiped = js(cdp, sid, f"({ASK})('debugRemoveExclusion', '127.0.0.1')")
+        check("bridge: list wiped before import", bool(wiped and wiped.get("ok"))
+              and not (wiped or {}).get("patterns"), json.dumps(wiped or {}))
+
+        imported = js(cdp, sid, f"({ASK})('debugImportExclusions', {json.dumps(doc.get('json'))})")
+        check("bridge import restores the exported list",
+              bool(imported and imported.get("ok")) and (imported or {}).get("added") == 1
+              and (imported or {}).get("patterns") == ["127.0.0.1"],
+              json.dumps(imported or {}))
+
+        again = js(cdp, sid, f"({ASK})('debugImportExclusions', {json.dumps(doc.get('json'))})")
+        check("bridge re-import is idempotent (no duplicates)",
+              bool(again and again.get("ok")) and (again or {}).get("added") == 0
+              and (again or {}).get("patterns") == ["127.0.0.1"],
+              json.dumps(again or {}))
+
+        junk = js(cdp, sid, f"({ASK})('debugImportExclusions', {json.dumps('{\"patterns\":[\"bad pattern x\"]}')})")
+        check("bridge import drops whitespace typos",
+              bool(junk and junk.get("ok")) and (junk or {}).get("added") == 0
+              and (junk or {}).get("patterns") == ["127.0.0.1"],
+              json.dumps(junk or {}))
+
+        notjson = js(cdp, sid, f"({ASK})('debugImportExclusions', 'not json at all')")
+        check("bridge import rejects non-JSON",
+              bool(notjson is not None) and not (notjson or {}).get("ok"),
+              json.dumps(notjson or {}))
+
+        cleaned = js(cdp, sid, f"({ASK})('debugRemoveExclusion', '127.0.0.1')")
+        check("bridge round-trip cleaned up",
+              bool(cleaned and cleaned.get("ok")) and not (cleaned or {}).get("patterns"),
+              json.dumps(cleaned or {}))
+
     finally:
         try:
             proc.terminate()

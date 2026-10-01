@@ -68,4 +68,27 @@ $("#exAddHost").addEventListener("click", () => {
     } catch (e) {}
   });
 });
+
+// ---- exclusion import/export (v1.2.1) - same JSON file as the Windows app
+$("#exExport").addEventListener("click", () => {
+  chrome.runtime.sendMessage({ type: "vg:exclusion:export" }, (resp) => {
+    if (chrome.runtime.lastError || !resp || !resp.ok) return;
+    const blob = new Blob([resp.json], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "vdograbber-exclusions.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  });
+});
+$("#exImport").addEventListener("click", () => $("#exImportFile").click());
+$("#exImportFile").addEventListener("change", (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = ""; // allow re-picking the same file later
+  if (!f) return;
+  f.text().then((txt) => chrome.runtime.sendMessage({ type: "vg:exclusion:import", json: txt }, (resp) => {
+    if (resp && resp.ok) renderExclusions();
+  }));
+});
 renderExclusions();

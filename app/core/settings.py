@@ -68,6 +68,32 @@ def url_excluded(patterns, url: str) -> bool:
     return any((r and r.search(u)) for r in (exclusion_re(p) for p in (patterns or [])))
 
 
+def norm_exclusion(pattern: str) -> str:
+    """Normalize a user-typed exclusion pattern (lowercase, trimmed; a bare
+    "www." host collapses to the registrable domain so it covers the whole
+    site, mirroring what a user means). Python mirror of the pattern cleanup
+    in extension/background.js."""
+    p = str(pattern or "").strip().lower()
+    if p and "://" not in p and p.startswith("www."):
+        p = p[4:]
+    return p
+
+
+def merge_exclusion_patterns(existing, patterns):
+    """Merge imported patterns onto `existing` for the transfer file
+    (v1.2.1 - same JSON document on desktop and the Chrome extension):
+    blanks, whitespace typos, duplicates and matcher-incompatible entries
+    are dropped. Returns (new_list, added_count)."""
+    out = list(existing or [])
+    added = 0
+    for raw in patterns or []:
+        p = norm_exclusion(raw)
+        if p and not any(c.isspace() for c in p) and p not in out and exclusion_re(p) is not None:
+            out.append(p)
+            added += 1
+    return out, added
+
+
 class Settings:
     def __init__(self, data_dir: str, log=None):
         self.path = os.path.join(data_dir, "settings.json")

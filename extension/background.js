@@ -313,6 +313,48 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
         break;
       }
 
+      // ---- exclusion import/export (v1.2.1) - shares the JSON file format
+      // with the desktop app (Api.exclusion_export / Api.exclusion_import)
+      // so a vdograbber-exclusions.json from one side imports on the other
+      case "vg:exclusion:export": {
+        const exlist = await vgGetExclusions();
+        const doc = {
+          app: "VDO Grabber",
+          kind: "exclusions",
+          version: 1,
+          exported: new Date().toISOString(),
+          patterns: exlist,
+        };
+        log("exclusions", `exported ${exlist.length} patterns`);
+        sendResponse({ ok: true, json: JSON.stringify(doc, null, 2), count: exlist.length });
+        break;
+      }
+
+      case "vg:exclusion:import": {
+        let doc2 = null;
+        try { doc2 = JSON.parse(String(msg.json || "")); } catch (e) { doc2 = null; }
+        if (!doc2 || !Array.isArray(doc2.patterns)) {
+          sendResponse({ ok: false, error: "no patterns array" });
+          break;
+        }
+        const list3 = await vgGetExclusions();
+        let added3 = 0;
+        for (const raw of doc2.patterns) {
+          const pat3 = String(raw || "").trim().toLowerCase();
+          // whitespace inside a pattern is always a typo - drop it
+          if (pat3 && !/\s/.test(pat3) && !list3.includes(pat3)) { list3.push(pat3); added3++; }
+        }
+        vgExclusionsCache = list3;
+        await chrome.storage.local.set({ vgExclusions: list3 });
+        log("exclusions", `imported +${added3} (${list3.length} total)`);
+        // same broadcast as remove: every open tab re-checks itself
+        for (const t of await chrome.tabs.query({})) {
+          chrome.tabs.sendMessage(t.id, { type: "vg:exclusionsUpdated" }).catch(() => {});
+        }
+        sendResponse({ ok: true, added: added3, total: list3.length, patterns: list3 });
+        break;
+      }
+
       case "vg:download": {
         const item = msg.item || {};
         log("download-request", `${item.kind} ${item.url.slice(0, 110)}`);

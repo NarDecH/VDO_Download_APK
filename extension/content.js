@@ -179,17 +179,21 @@
       const d = e.data;
       // exclusion management must work even ON an excluded page (otherwise
       // there is no way back from a page that got excluded while open)
-      const exclMgmt = d.__vg === "ui" && (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion");
+      const exclMgmt = d.__vg === "ui" && (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion" ||
+                                           d.type === "debugExportExclusions" || d.type === "debugImportExclusions");
       if (excluded && !exclMgmt) return;
 
       // debug bridge: page (E2E tests) asks for SW state through the content script
       if (d.__vg === "ui" && (d.type === "debugLogs" || d.type === "debugDownloads" || d.type === "debugSetFlag" ||
-                              d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion")) {
+                              d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion" ||
+                              d.type === "debugExportExclusions" || d.type === "debugImportExclusions")) {
         const type = { debugLogs: "vg:logs", debugDownloads: "vg:downloads", debugSetFlag: "vg:setFlag",
-                       debugAddExclusion: "vg:exclusion:add", debugRemoveExclusion: "vg:exclusion:remove" }[d.type];
+                       debugAddExclusion: "vg:exclusion:add", debugRemoveExclusion: "vg:exclusion:remove",
+                       debugExportExclusions: "vg:exclusion:export", debugImportExclusions: "vg:exclusion:import" }[d.type];
         const out = { type };
         if (d.type === "debugSetFlag" || d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.value = d.value;
         if (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.pattern = d.value;
+        if (d.type === "debugImportExclusions") out.json = d.json || d.value;
         if (extAlive()) {
           chrome.runtime.sendMessage(out, (resp) => {
             window.postMessage({ __vg: "main", type: d.type, reqId: d.reqId, resp: resp || { err: chrome.runtime.lastError && chrome.runtime.lastError.message } }, "*");

@@ -27,7 +27,7 @@ import webview  # noqa: E402
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
-from core.settings import Settings, url_excluded  # noqa: E402
+from core.settings import Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
 from core.ytdlp_mgr import EngineManager  # noqa: E402
 
 
@@ -211,13 +211,8 @@ class Api:
     # --------------------------------------------- site exclusions (v1.2.0)
     @staticmethod
     def _norm_exclusion(pattern: str) -> str:
-        """Normalize a user-typed exclusion pattern (lowercase, trimmed;
-        a bare "www." host collapses to the registrable domain so it covers
-        the whole site, mirroring what a user means)."""
-        p = str(pattern or "").strip().lower()
-        if p and "://" not in p and p.startswith("www."):
-            p = p[4:]
-        return p
+        """See core.settings.norm_exclusion (kept as an Api alias)."""
+        return norm_exclusion(pattern)
 
     def exclusion_list(self) -> list:
         return list(_APP.settings.get("exclusions") or [])
@@ -241,6 +236,33 @@ class Api:
         _APP.logm.log("exclusion removed: %s (%d total)" % (p, len(lst)),
                       event="exclusion_removed", pattern=p, total=len(lst))
         return {"ok": True, "patterns": list(lst)}
+
+    def exclusion_export(self) -> dict:
+        """Serialize the exclusion list as JSON for backup / cross-device sync.
+        The format is shared with the Chrome extension (vg:exclusion:export in
+        extension/background.js) so a file from one side imports on the other."""
+        lst = list(_APP.settings.get("exclusions") or [])
+        doc = {"app": APP_NAME, "kind": "exclusions", "version": 1,
+               "exported": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "patterns": lst}
+        _APP.logm.log("exclusions exported: %d patterns" % len(lst), event="exclusion_exported", total=len(lst))
+        return {"ok": True, "json": json.dumps(doc, ensure_ascii=False, indent=2), "count": len(lst)}
+
+    def exclusion_import(self, json_text: str) -> dict:
+        """Merge patterns from an exclusion export file (same format on both
+        platforms). Duplicates, blanks, whitespace typos and matcher-
+        incompatible entries are dropped (core.settings.merge_exclusion_patterns)."""
+        try:
+            doc = json.loads(str(json_text or ""))
+        except ValueError as e:
+            return {"ok": False, "error": "invalid json: %s" % e}
+        patterns = doc.get("patterns") if isinstance(doc, dict) else None
+        if not isinstance(patterns, list):
+            return {"ok": False, "error": "no patterns array"}
+        lst, added = merge_exclusion_patterns(_APP.settings.get("exclusions"), patterns)
+        _APP.settings.set("exclusions", lst)
+        _APP.logm.log("exclusions imported: +%d (%d total)" % (added, len(lst)),
+                      event="exclusion_imported", added=added, total=len(lst))
+        return {"ok": True, "added": added, "total": len(lst), "patterns": list(lst)}
 
     def choose_download_dir(self) -> dict:
         """Native folder picker on the browser window."""
@@ -591,12 +613,24 @@ def selftest() -> int:
         gate_before = app._page_excluded("https://cdn.example.org/v.mp4")
         r3 = app.api.exclusion_remove("example.org")
         gate_after = app._page_excluded("https://cdn.example.org/v.mp4")
+        # v1.2.1: export -> import round-trip of the transfer file (sharing
+        # the format with the Chrome extension); re-importing our own export
+        # must be a no-op, junk patterns/json must never pollute the list
+        exp = app.api.exclusion_export()
+        imp = app.api.exclusion_import(exp["json"])          # all duplicates
+        bad = app.api.exclusion_import('{"patterns":["bad pattern x"]}')
+        notjson = app.api.exclusion_import("not json at all")
+        transfer_ok = bool(exp.get("ok") and exp.get("count") == 0
+                           and imp.get("ok") and imp.get("added") == 0
+                           and bad.get("ok") and bad.get("added") == 0
+                           and not notjson.get("ok"))
         results["exclusions"] = {
             "ok": bool(matcher_ok and r1["ok"] and r2["ok"] and gate_before
-                       and r3["ok"] and not gate_after
+                       and r3["ok"] and not gate_after and transfer_ok
                        and app.api.exclusion_list() == []),
             "matcher": matcher_ok, "add_ok": bool(r1["ok"] and r2["ok"]),
             "gate_on": bool(gate_before), "remove_ok": bool(r3["ok"]), "gate_off": not gate_after,
+            "transfer_ok": transfer_ok,
             "list": app.api.exclusion_list(),
         }
     except Exception as e:

@@ -139,6 +139,12 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <button class="act grn" style="flex:0" onclick="exAdd()">+ เพิ่ม</button>
     </div>
     <div id="exList" style="margin-top:10px"></div>
+    <div class="row" style="margin-top:12px;align-items:center">
+      <button class="act" style="flex:0" onclick="exExport()">⬇ ส่งออก</button>
+      <button class="act" style="flex:0" onclick="exImport()">⬆ นำเข้า</button>
+      <input type="file" id="exImportFile" accept=".json,application/json" style="display:none">
+      <span class="hint" style="margin:0">ส่งออกเป็นไฟล์ .json เพื่อนำเข้าที่เครื่องอื่นหรือฝั่งส่วนขยาย Chrome — รายการจะถูกผสานเข้ากับที่มีอยู่</span>
+  </div>
   </div>
 </section>
 
@@ -189,6 +195,8 @@ const demoApi = {
   download_open_file(){}, download_open_folder(){}, download_delete_file(){ return {ok:true} },
   exclusion_list: async () => ({ ok:true, patterns:['facebook.com','*://*.tiktok.com/*'] }),
   exclusion_add: async () => ({ ok:true, patterns:[] }), exclusion_remove: async () => ({ ok:true, patterns:[] }),
+  exclusion_export: async () => ({ ok:true, json:'{"app":"VDO Grabber","kind":"exclusions","version":1,"exported":"","patterns":["facebook.com","*://*.tiktok.com/*"]}', count:2 }),
+  exclusion_import: async () => ({ ok:true, added:0, total:2 }),
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -357,6 +365,31 @@ function exRemove(p){
   Promise.resolve(py().exclusion_remove(p)).then(() => { renderExclusions(); status('ลบรายการยกเว้นแล้ว: ' + p); });
 }
 document.getElementById('exInput').addEventListener('keydown', e => { if (e.key === 'Enter') exAdd(); });
+
+// ---- exclusion import/export (v1.2.1) - same JSON file as the Chrome extension
+async function exExport(){
+  try {
+    const r = await py().exclusion_export();
+    if (!r || !r.ok){ status('ส่งออกไม่สำเร็จ: ' + ((r && r.error) || '?')); return; }
+    const blob = new Blob([r.json], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'vdograbber-exclusions.json';
+    document.body.appendChild(a); a.click(); a.remove();
+    status('ส่งออกรายการยกเว้นแล้ว (' + (r.count || 0) + ' รายการ) — vdograbber-exclusions.json');
+  } catch(e){ status('ส่งออกไม่สำเร็จ: ' + e); }
+}
+function exImport(){ document.getElementById('exImportFile').click(); }
+document.getElementById('exImportFile').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';                       // allow re-picking the same file later
+  if (!f) return;
+  try {
+    const r = await py().exclusion_import(await f.text());
+    if (r && r.ok) { renderExclusions(); status('นำเข้าแล้ว +' + (r.added||0) + ' รายการ (รวม ' + (r.total||0) + ')'); }
+    else status('นำเข้าไม่สำเร็จ: ' + ((r && r.error) || '?'));
+  } catch(err){ status('นำเข้าไม่สำเร็จ: ' + err); }
+});
 function saveSettings(){
   py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
   py().set_setting('max_concurrent', parseInt(document.getElementById('sMaxConc').value) || 3);

@@ -162,6 +162,16 @@
 - **checksums.txt ทำถูกกฎ (เรียนจาก v1.1.9)**: ดาวน์โหลดไฟล์ทั้งหมดจาก release ล่าสุดก่อน (--clobber) แล้ว append บรรทัด extension (hash + ชื่อไฟล์เปล่า) ค่อย upload — `sha256sum -c VDOGrabber-chrome-extension-1.1.4.zip.sha256` = OK · แพ็ก zip จากโฟลเดอร์ extension ตัด tests/ ด้วย python zipfile
 - ปลายทาง: v1.2.0 published/Latest, 10 assets ครบ (รวม chrome-extension-1.1.4.zip + .sha256) · UI ตรวจผ่าน register_preview — **BACKGROUND process_type ไม่ทำงานใน env นี้ (http.server ไม่ได้รัน)** → สร้าง _demo_check.html ด้วย sed แทน `const DEMO = true;` แล้วลบทิ้งหลังเสร็จ
 
+### รอบหน้า (v1.2.1 ได้แก่) — sync รายการยกเว้นสองฝั่ง + ปิดเคส Android CI
+- **เคส "E2E gate (both attempts failed)" ปิดสมบูรณ์**: ชื่อ step ใน android.yml (GitHub พิมพ์ชื่อ step skipped ลง log ด้วย) — `gh run view --json` ยืนยัน attempt 1 = success / attempt 2 + gate = skipped, raw log `0 failed (2 skipped ด้วย Assume)`; แก้ชื่อ step ให้ตรงความหมายแล้ว
+- **ไฟล์ถ่ายโอนรายการยกเว้น `vdograbber-exclusions.json` ฟอร์แมตเดียวทั้งสองแพลตฟอร์ม** — `{app, kind:"exclusions", version:1, exported, patterns[]}`:
+  - desktop: Api `exclusion_export()` / `exclusion_import(json_text)` ใน main.py + ปุ่ม "⬇ ส่งออก / ⬆ นำเข้า" ในการ์ดยกเว้นเว็บไซต์ (index.html, file picker → import(file.text())); demoApi stubs ครบ
+  - extension: popup ปุ่ม export (Blob ดาวน์โหลด) / import (file picker) → background `vg:exclusion:export` / `vg:exclusion:import` (import broadcast `vg:exclusionsUpdated` ทุก tab เหมือน remove) + debug bridge `debugExportExclusions`/`debugImportExclusions` (ทำงานได้แม้บนหน้า excluded; bridge รับ `d.json || d.value` เพราะ ASK helper ส่งได้แค่ value เดียว)
+  - validation สองฝั่งเหมือนกัน: trim/lowercase, drop blank, **drop ที่มีช่องว่างข้างใน** (pattern เป็นพิมพ์ผิดเสมอ), dedupe; desktop กรองเพิ่มผ่าน `merge_exclusion_patterns` ใน settings.py (pure + unit test ได้, Api เป็นแค่ thin wrapper — กับดัก: อย่าเขียน logic ลงใน Api เพราะ selftest ต้องผ่าน _APP)
+  - tests: unit `test_exclusion_transfer` (13/13), selftest เฟส exclusions เพิ่ม round-trip (export→re-import idempotent→junk ถูก drop→non-JSON ถูกปฏิเสธ), E2E 40/40 เฟส bridge export/import 9 checks
+  - DEMO ธงของ index.html เปลี่ยนเป็น query param `?demo=1` แล้ว — sed เป็น `const DEMO = true;` ตอนตรวจ UI ผ่าน register_preview (BACKGROUND ยังใช้ไม่ได้เหมือนเดิม)
+- ข้อจำกัดเครื่อง: code_search พัง (rg ENOENT) → grep; screenshot ของ preview บางครั้ง "no frames" → ใช้ snapshot + evaluate แทน
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/

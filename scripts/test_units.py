@@ -295,6 +295,45 @@ def test_exclusion_matcher() -> bool:
     return True
 
 
+# ------------------------------------- exclusion transfer file (v1.2.1)
+def test_exclusion_transfer() -> bool:
+    """Same JSON file imports on both desktop and the Chrome extension."""
+    import json as _json
+    from core.settings import merge_exclusion_patterns, norm_exclusion
+
+    # normalization: trim/lowercase + bare www. collapses to the domain
+    assert norm_exclusion("  Example.ORG ") == "example.org"
+    assert norm_exclusion("www.example.org") == "example.org"
+    assert norm_exclusion("https://WWW.x.com/*") == "https://www.x.com/*"  # only bare hosts
+
+    existing = ["facebook.com"]
+    merged, added = merge_exclusion_patterns(existing, [
+        "TIKTOK.com",              # added (normalized)
+        "facebook.com",             # duplicate -> dropped
+        "",                         # blank -> dropped
+        "  ",                       # whitespace-only -> dropped
+        "bad pattern/with spaces",  # whitespace inside -> dropped
+        "www.example.org",          # www-collapse -> added once
+        "https://a.com/*",          # valid full pattern -> added
+        None,                       # non-string -> dropped (norm -> "")
+    ])
+    assert merged == ["facebook.com", "tiktok.com", "example.org", "https://a.com/*"], merged
+    assert added == 3, added
+    # original list untouched (pure function)
+    assert existing == ["facebook.com"]
+    # empty import is a no-op
+    m2, a2 = merge_exclusion_patterns(["x.com"], [])
+    assert (m2, a2) == (["x.com"], 0)
+
+    # the export envelope the Api produces must round-trip through the parser
+    doc = {"app": "VDO Grabber", "kind": "exclusions", "version": 1,
+           "exported": "2026-10-01T00:00:00+0700", "patterns": ["a.com", "b.org"]}
+    m3, a3 = merge_exclusion_patterns([], doc["patterns"])
+    assert m3 == ["a.com", "b.org"] and a3 == 2
+    assert _json.loads(_json.dumps(doc))["kind"] == "exclusions"
+    return True
+
+
 # ------------------------------------------------------------- pair-sync
 def test_pair_sync_guard() -> bool:
     r = check_pair_sync()
@@ -318,6 +357,7 @@ def main() -> int:
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,
+        "exclusion_transfer": test_exclusion_transfer,
         "pair_sync_guard": test_pair_sync_guard,
     }
     failed = []
