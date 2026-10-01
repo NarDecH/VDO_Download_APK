@@ -88,7 +88,7 @@ jobs:
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
             cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
 
-      - name: E2E gate (both attempts failed)
+      - name: E2E gate (fail if both emulator attempts failed)
         if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome != 'success'
         run: |
           echo "E2E failed on two fresh emulators - real failure"
