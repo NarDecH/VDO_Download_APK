@@ -172,6 +172,13 @@
   - DEMO ธงของ index.html เปลี่ยนเป็น query param `?demo=1` แล้ว — sed เป็น `const DEMO = true;` ตอนตรวจ UI ผ่าน register_preview (BACKGROUND ยังใช้ไม่ได้เหมือนเดิม)
 - ข้อจำกัดเครื่อง: code_search พัง (rg ENOENT) → grep; screenshot ของ preview บางครั้ง "no frames" → ใช้ snapshot + evaluate แทน
 
+### รอบ release v1.2.1 (ผู้ใช้: "ดำเนินการต่อ")
+- **bump ครบทุกจุด**: logger.py APP_VERSION 1.2.1 · version_info.txt (1,2,1,0) ×3 จุด · android versionCode 11/1.2.1 · MainActivity log · extension manifest **1.1.5** · UI (abVer, demo get_state, demo log line) · changelog.md (จัดโครงใหม่: แยกหัว [1.2.0] ออกจาก [1.2.1] — รอบก่อนค้างเนื้อหา v1.2.0 ไว้ใน Unreleased โดยไม่ตั้งหัว) · changelog.html (v1.2.1 LATEST + footer)
+- selftest ซอร์ส + frozen EXIT 0 (build_exe 31.9MB) · ext zip แพ็กจากใน extension/ ด้วย python zipfile ตัด tests/ + .sha256 สร้างจากใน release/ (กฎเดิม) · commit c5b8fcb + tag v1.2.1 (push tag DNS ล่ม → retry 25s ผ่าน — กับดักเดิมซ้ำ)
+- **ลำดับการแนบไฟล์ที่ลื่นกว่ารอบก่อน**: upload ext zip+sha256 เลยหลัง desktop CI เขียว (ไม่ต้องรอ Android) → checksums = ดาวน์โหลด assets ทั้งหมดจาก release (--clobber) แล้ว append บรรทัด ext → verify → upload กลับ → Android จบแล้ว merge APK checksums เอง (workflow)
+- Android CI 36812949480 เขียว (E2E attempt 1 success, attempt 2/gate skipped) · assets 10 ครบ · **verify สุดท้าย**: `gh release download --clobber` **ทุกไฟล์** + `sha256sum -c checksums.txt` OK ทุกบรรทัด — บทเรียนซ้ำ: อย่าลบ/ไม่ดาวน์โหลดไฟล์ใหญ่ก่อน verify (pattern เฉพาะ .sha256 แล้ว -c จะ FAILED open or read เฉพาะไฟล์ที่ไม่อยู่ในเครื่องเสมอ)
+- Pages: index/changelog ดึง /releases/latest เอง — โชว์ v1.2.1 หลัง pages build (ไม่ต้องแก้มือ)
+
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
 python app/main.py --selftest          # ต้อง PASS ก่อน commit ที่แตะ app/
