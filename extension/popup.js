@@ -25,8 +25,16 @@ async function load() {
     $("#logs").textContent = (resp.logs || []).join("\n") || "—";
     document.querySelectorAll(".dl").forEach((b) => b.addEventListener("click", () => {
       const u = b.getAttribute("data-u");
-      chrome.runtime.sendMessage({ type: "vg:download", item: { url: u, kind: b.getAttribute("data-k"), name: tab.title || "video", page: tab.url } });
-      b.textContent = "ส่งแล้ว ✓";
+      const k = b.getAttribute("data-k");
+      b.textContent = "⏳ กำลังส่ง…";
+      // tabId lets the SW resolve embed/page candidates against the live tab
+      chrome.runtime.sendMessage({ type: "vg:download", tabId: tab.id, item: { url: u, kind: k, name: tab.title || "video", page: tab.url } }, (resp) => {
+        if (chrome.runtime.lastError || !resp) { b.textContent = "ส่งแล้ว ✓"; return; }
+        if (resp.hls) b.textContent = "📺 ใช้แอปเดสก์ท็อป";
+        else if (resp.page) b.textContent = "⚠️ ไม่พบวิดีโอ";
+        else if (resp.ok) b.textContent = "ส่งแล้ว ✓";
+        else b.textContent = "ล้มเหลว";
+      });
     }));
     document.querySelectorAll(".cp").forEach((b) => b.addEventListener("click", () => navigator.clipboard.writeText(b.getAttribute("data-u"))));
   });

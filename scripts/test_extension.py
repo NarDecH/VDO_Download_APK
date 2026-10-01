@@ -235,6 +235,23 @@ def main():
                       ".querySelector('.dl[data-k=\"embed\"]'); return b ? !!b.closest('.item').querySelector('[data-open]') : false; })()")
         check("embed item has 'open page' button", bool(open_btn))
 
+        # ==== embed item downloads the VIDEO, not the player HTML (v1.1.6) ===
+        # The iframe src (/embed.html) is only a player page. The SW must
+        # resolve it to the media that page plays (embed-video.mp4) before
+        # downloading - saving the page itself yielded a useless .html file.
+        before_embed_dl = set(os.listdir(TMP_DL))
+        dl_click = js(cdp, sid,
+                      "(() => { const b = document.querySelector('#vg-content-host').shadowRoot"
+                      ".querySelector('.dl[data-k=\"embed\"]'); if (!b) return false; b.click(); return true; })()")
+        check("embed download click dispatched", bool(dl_click))
+        embed_file = wait_for_new_file(TMP_DL, before_embed_dl, 60)
+        embed_ok = False
+        if embed_file:
+            head = open(embed_file, "rb").read(12)
+            embed_ok = head[4:8] == b"ftyp"
+        check("embed item download produced a video (mp4), not the player HTML", embed_ok,
+              (os.path.basename(embed_file) + " header=" + repr(head[:8])) if embed_file else "no file within 60s")
+
         # ---- download the blob item -------------------------------------
         blob_url = js(cdp, sid, "document.querySelector('#v').src") or ""
         clicked = click_when_ready(cdp, sid, "blob", 15, url_part=blob_url)
@@ -452,6 +469,55 @@ def main():
         check("bridge round-trip cleaned up",
               bool(cleaned and cleaned.get("ok")) and not (cleaned or {}).get("patterns"),
               json.dumps(cleaned or {}))
+
+        # ==== SW-side player-page refusal (v1.1.6) ==========================
+        # Asking the SW to download a plain HTML player page must NEVER start
+        # a download of that page (the old .html-file bug). Run this on a
+        # media-free page: the tab's store is empty and the live content
+        # script finds nothing -> the SW must refuse deterministically.
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/nomedia.html"}, session=sid)
+        refuse_mounted = False
+        for _ in range(20):
+            time.sleep(1)
+            refuse_mounted = bool(js(cdp, sid, "!!document.querySelector('#vg-content-host')"))
+            if refuse_mounted:
+                break
+        check("nomedia.html: content script mounted", refuse_mounted)
+        time.sleep(1)
+        before_refuse = set(os.listdir(TMP_DL))
+        refuse = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/nomedia.html', 'kind': 'embed', 'name': 'e2e-refuse'}))})")
+        check("SW refuses a player page with no in-page media match",
+              bool(refuse is not None) and not (refuse or {}).get("ok") and (refuse or {}).get("page") is True,
+              json.dumps(refuse or {}))
+        time.sleep(2)
+        check("refused download wrote no file", set(os.listdir(TMP_DL)) - before_refuse == set(),
+              str(set(os.listdir(TMP_DL)) - before_refuse))
+
+        # ...and the happy path: a player page whose <video> plays a real
+        # mp4. Navigate to it, let detection register the media, then ask
+        # the SW to download the PAGE candidate - it must resolve to the mp4.
+        cdp.send("Page.navigate", {"url": f"http://127.0.0.1:{PORT}/player.html"}, session=sid)
+        page_mounted = False
+        for _ in range(20):
+            time.sleep(1)
+            page_mounted = bool(js(cdp, sid, "!!document.querySelector('#vg-content-host')"))
+            if page_mounted:
+                break
+        check("player.html: content script mounted", page_mounted)
+        time.sleep(2)  # let the DOM scan register the media item
+        before_res = set(os.listdir(TMP_DL))
+        happy = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/player.html', 'kind': 'page', 'name': 'e2e-resolve'}))})")
+        check("SW resolves a page candidate to the playing video",
+              bool(happy and happy.get("ok")) and bool((happy or {}).get("resolved")),
+              json.dumps(happy or {}))
+        res_file = wait_for_new_file(TMP_DL, before_res, 60)
+        res_ok = False
+        head2 = b""
+        if res_file:
+            head2 = open(res_file, "rb").read(12)
+            res_ok = head2[4:8] == b"ftyp"
+        check("resolved page download produced a video (mp4)", res_ok,
+              (os.path.basename(res_file) + " header=" + repr(head2[:8])) if res_file else "no file within 60s")
 
     finally:
         try:

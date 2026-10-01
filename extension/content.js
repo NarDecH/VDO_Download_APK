@@ -14,6 +14,8 @@
   window.__vgContent = true;
 
   const MEDIA_RE = /\.(mp4|m3u8|mpd|webm|mkv|flv|mov|avi|mp3|m4a|aac|ts|3gp)(\?|#|$)/i;
+  // html player pages must never be picked as a download source (v1.1.6)
+  const MEDIA_URL_HTML_RE = /\.html?(\?|#|$)/i;
   const items = new Map();          // url -> {url, kind, label, via}
   const streams = new Map();        // assembly id -> {name, kind, mime, total, received, queue}
   let seq = 0;
@@ -186,14 +188,21 @@
       // debug bridge: page (E2E tests) asks for SW state through the content script
       if (d.__vg === "ui" && (d.type === "debugLogs" || d.type === "debugDownloads" || d.type === "debugSetFlag" ||
                               d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion" ||
-                              d.type === "debugExportExclusions" || d.type === "debugImportExclusions")) {
+                              d.type === "debugExportExclusions" || d.type === "debugImportExclusions" ||
+                              d.type === "debugDownload")) {
         const type = { debugLogs: "vg:logs", debugDownloads: "vg:downloads", debugSetFlag: "vg:setFlag",
                        debugAddExclusion: "vg:exclusion:add", debugRemoveExclusion: "vg:exclusion:remove",
-                       debugExportExclusions: "vg:exclusion:export", debugImportExclusions: "vg:exclusion:import" }[d.type];
+                       debugExportExclusions: "vg:exclusion:export", debugImportExclusions: "vg:exclusion:import",
+                       debugDownload: "vg:download" }[d.type];
         const out = { type };
         if (d.type === "debugSetFlag" || d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.value = d.value;
         if (d.type === "debugAddExclusion" || d.type === "debugRemoveExclusion") out.pattern = d.value;
         if (d.type === "debugImportExclusions") out.json = d.json || d.value;
+        if (d.type === "debugDownload") {
+          // value is JSON: {url, kind} - mirrors what the popup/panel sends
+          try { const p = JSON.parse(d.value); out.item = { url: p.url, kind: p.kind || "embed", name: p.name || "e2e", page: p.page || location.href }; }
+          catch (e) { out.item = { url: String(d.value || ""), kind: "embed", name: "e2e", page: location.href }; }
+        }
         if (extAlive()) {
           chrome.runtime.sendMessage(out, (resp) => {
             window.postMessage({ __vg: "main", type: d.type, reqId: d.reqId, resp: resp || { err: chrome.runtime.lastError && chrome.runtime.lastError.message } }, "*");
@@ -478,7 +487,11 @@
     setStatus("⏳ กำลังส่งให้ตัวดาวน์โหลด…");
     chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
       const lastErr = chrome.runtime.lastError;
-      if (lastErr || !resp || !resp.ok) {
+      if (resp && resp.hls) {
+        setStatus("📺 ลิงก์นี้เป็นสตรีม HLS/DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp)");
+      } else if (resp && resp.page) {
+        setStatus("⚠️ ไม่พบไฟล์วิดีโอในหน้านั้น — เล่นวิดีโอก่อนแล้วกดอีกครั้ง หรือใช้แอปเดสก์ท็อป");
+      } else if (lastErr || !resp || !resp.ok) {
         pageReadFallback(url, kind, name);
       } else {
         setStatus("✅ เริ่มดาวน์โหลดแล้ว — ดูในแถบดาวน์โหลดของ Chrome");
@@ -487,7 +500,7 @@
   }
 
   // messages from the service worker
-  chrome.runtime.onMessage.addListener((msg, sender) => {
+  chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
     try {
       if (sender.id !== chrome.runtime.id) return;
       // the SW tells us the exclusion list changed - even an excluded page
@@ -511,6 +524,35 @@
         return;
       }
       if (msg.type === "vg:netMedia") report(msg.url, msg.kind, "network", "webRequest");
+      else if (msg.type === "vg:resolveMedia") {
+        // v1.1.6: the SW asks what media THIS page is actually playing (the
+        // popup/panel offered this page as an embed candidate). Prefer an
+        // exact-URL match from the detected-media map, then any other media
+        // seen on this page, then the live <video> source. Everything here
+        // is synchronous so the answer can ride the sendResponse channel.
+        try {
+          const want = String(msg.url || "").replace(/#.*$/, "");
+          const pickable = (u) => u && /^(https?:|blob:)/i.test(u) && !MEDIA_URL_HTML_RE.test(u);
+          let hit = null;
+          if (want && items.has(want) && pickable(items.get(want).url)) hit = items.get(want);
+          if (!hit) {
+            for (const it of items.values()) {
+              if (pickable(it.url) && it.url !== want) { hit = it; break; }
+            }
+          }
+          if (!hit) {
+            document.querySelectorAll("video[src], video source[src]").forEach((v) => {
+              const s = v.src || v.getAttribute("src") || "";
+              if (!hit && s && pickable(s)) hit = { url: new URL(s, location.href).href, kind: "media" };
+            });
+          }
+          if (hit) chrome.runtime.sendMessage({ type: "vg:log", msg: `resolveMedia: ${String(msg.url || "").slice(0, 60)} -> ${hit.url.slice(0, 60)} (${hit.kind})` }).catch(() => {});
+          sendResponse(hit ? { ok: true, url: hit.url, kind: hit.kind || "media" } : { ok: false });
+        } catch (e) {
+          sendResponse({ ok: false, error: String(e && e.message || e) });
+        }
+        return;
+      }
       else if (msg.type === "vg:blobSaved") setStatus("✅ ดาวน์โหลดสำเร็จ: " + (msg.filename || ""));
       else if (msg.type === "vg:clearMedia") {
         items.clear();

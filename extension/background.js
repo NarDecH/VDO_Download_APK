@@ -132,6 +132,9 @@ function offscreen(msg) {
 
 // ---------------------------------------------------------------- sniffer
 const CONTENT_TYPES = /(video\/|audio\/|mpegurl|dash\+xml|octet-stream)/i;
+// URL extensions that are actual media files (an iframe/page candidate may
+// point at an HTML player instead - saving that yields a useless .html)
+const MEDIA_URL_RE = /\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?$/i;
 chrome.webRequest.onHeadersReceived.addListener(
   async (details) => {
     try {
@@ -227,6 +230,27 @@ function watchDownload(downloadId, tabId, item, blobUrl) {
       await offscreen({ type: "asb:revoke", blobUrl });
     }
     if (state === "complete") {
+      // v1.1.6 safety net: if a direct download actually saved an HTML page
+      // (expired link / mis-detected candidate), Chrome records the server's
+      // content-type - delete that useless file and tell the user instead of
+      // leaving a fake "video". (MV3 cannot read file: contents, but the
+      // downloads API exposes the mime type.)
+      try {
+        chrome.downloads.search({ id: downloadId }, (d) => {
+          const it0 = d && d[0];
+          if (!it0) return;
+          const file = it0.filename || "";
+          if (!/text\/html|application\/xhtml/i.test(it0.mime || "")) return;
+          chrome.downloads.removeFile(downloadId, () => {});
+          chrome.downloads.erase({ id: downloadId }, () => {});
+          log("download", `#${downloadId} saved HTML not a video - deleted ${file.split(/[\/]/).pop()}`);
+          if (tabId) chrome.tabs.sendMessage(tabId, {
+            type: "vg:downloadFailed",
+            item,
+            error: "ไม่ใช่ไฟล์วิดีโอ (หน้าเว็บ) — เล่นวิดีโอก่อนแล้วกดใหม่ หรือใช้แอปเดสก์ท็อป",
+          }).catch(() => {});
+        });
+      } catch (e) {}
       log("download", `#${downloadId} complete`);
       return;
     }
@@ -357,28 +381,94 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
 
       case "vg:download": {
         const item = msg.item || {};
-        log("download-request", `${item.kind} ${item.url.slice(0, 110)}`);
-        const ext = extOf(item.url, "");
-        const filename = safeName(item.name, item.kind === "m3u8" ? "m3u8" : ext);
+        // popup sends have no sender.tab - the popup passes the active tab id
+        const dlTabId = tabId != null ? tabId : (msg.tabId != null ? msg.tabId : null);
+        let workUrl = String(item.url || "");
+        let workKind = String(item.kind || "");
+        log("download-request", `${workKind} ${workUrl.slice(0, 110)}`);
+
+        // v1.1.6: embed/page candidates point at an HTML player page - the
+        // old flow downloaded that page and saved a useless .html file. The
+        // SW knows what media each page plays (per-tab store, every item
+        // carries the page URL that reported it), so resolve there first,
+        // then ask the live content scripts as a fallback.
+        const isPlayerPage = workKind === "embed" || workKind === "page" ||
+                             (/^https?:/i.test(workUrl) && !MEDIA_URL_RE.test(workUrl));
+        const pickable = (u) => u && /^(https?:|blob:)/i.test(u) && !/\.html?(\?|#|$)/i.test(u);
+        let resolved = false;
+        if (isPlayerPage && dlTabId != null) {
+          const want = workUrl.replace(/#.*$/, "");
+          const key = await tabKey(dlTabId);
+          const store = await chrome.storage.session.get(key);
+          const tabItems = store[key] || [];
+          const want2 = want.replace(/\/$/, "");
+          const hit =
+            tabItems.find((m) => m.url === want && pickable(m.url) && m.kind !== "embed" && m.kind !== "page") ||
+            tabItems.find((m) => pickable(m.url) && (m.page || "").replace(/\/$/, "") === want2) ||
+            tabItems.find((m) => pickable(m.url));
+          if (hit) {
+            log("download-resolved", `${workKind} -> ${hit.kind} ${hit.url.slice(0, 110)}`);
+            workUrl = hit.url;
+            workKind = hit.kind || "media";
+            resolved = true;
+          } else {
+            // last resort: ask the tab's content scripts what is playing
+            // (they answer only when they actually find something, so a
+            // tab-wide broadcast cannot be flaky)
+            try {
+              const res = await new Promise((resolve) => {
+                let done = false;
+                chrome.tabs.sendMessage(dlTabId, { type: "vg:resolveMedia", url: want }, (r) => {
+                  done = true; resolve(chrome.runtime.lastError ? null : r);
+                });
+                setTimeout(() => { if (!done) resolve(null); }, 2500);
+              });
+              if (res && res.ok && res.url && res.url !== workUrl) {
+                log("download-resolved", `${workKind} -> ${res.kind} ${res.url.slice(0, 110)} (live query)`);
+                workUrl = res.url;
+                workKind = res.kind || "media";
+                resolved = true;
+              }
+            } catch (e) { log("resolve", "tab did not answer: " + e.message); }
+          }
+        }
+        // still a plain http(s) page with no media extension and no in-page
+        // match? refuse - never save HTML disguised as a video
+        if (isPlayerPage && !resolved && /^https?:/i.test(workUrl) && !MEDIA_URL_RE.test(workUrl)) {
+          log("download-refused", `player page without in-page media: ${workUrl.slice(0, 110)}`);
+          sendResponse({ ok: false, page: true, error: "no video found on that page - play the video first, or use the desktop app" });
+          break;
+        }
+        // resolved to an HLS/DASH manifest? Chrome cannot remux it - direct
+        // download would save a tiny playlist file, so route to the desktop app
+        if (resolved && (workKind === "m3u8" || workKind === "mpd")) {
+          log("download-hls", `resolved to a ${workKind} stream - desktop app required`);
+          sendResponse({ ok: false, hls: true, error: "HLS/DASH stream - use the VDOGrabber desktop app (yt-dlp)" });
+          break;
+        }
+
+        const dlItem = { ...item, url: workUrl, kind: workKind };
+        const ext = extOf(workUrl, "");
+        const filename = safeName(item.name, workKind === "m3u8" ? "m3u8" : ext);
         let skip = false;
         try { skip = await forceFallback(); } catch (e) { log("error", "forceFallback: " + e.message); }
         // 1) direct http(s) download (cookies ride along with the browser profile)
-        if (/^https?:/i.test(item.url) && !skip) {
-          const r = await downloadUrl(item.url, filename);
-          log(r.ok ? "download" : "download-fallback", `direct ${item.kind}: ${r.ok ? "ok #" + r.id : r.error}`);
+        if (/^https?:/i.test(workUrl) && !skip) {
+          const r = await downloadUrl(workUrl, filename);
+          log(r.ok ? "download" : "download-fallback", `direct ${workKind}: ${r.ok ? "ok #" + r.id : r.error}`);
           if (r.ok) {
-            watchDownload(r.id, tabId, item);
-            sendResponse({ ok: true });
+            watchDownload(r.id, dlTabId, dlItem);
+            sendResponse(resolved ? { ok: true, resolved: workUrl } : { ok: true });
             return;
           }
-        } else if (item.url.startsWith("blob:") && !skip) {
+        } else if (workUrl.startsWith("blob:") && !skip) {
           // 2) page-created blob URL: let the downloads system resolve it
           //    while the page is alive (works for real Blob/File objects;
           //    MediaSource-backed blobs fail here and fall through)
-          const r = await downloadUrl(item.url, filename);
+          const r = await downloadUrl(workUrl, filename);
           log(r.ok ? "download" : "download-fallback", `blob direct: ${r.ok ? "ok #" + r.id : r.error}`);
           if (r.ok) {
-            watchDownload(r.id, tabId, item);
+            watchDownload(r.id, dlTabId, dlItem);
             sendResponse({ ok: true });
             return;
           }
