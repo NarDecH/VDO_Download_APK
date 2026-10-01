@@ -66,8 +66,44 @@ a{color:#7fb3ff}
 <div class="dot" style="top:32px"></div>
 <div class="release">
   <div class="vhead">
-    <span class="vtag">v1.2.1</span>
+    <span class="vtag">v1.2.2</span>
     <span class="vtag-latest">LATEST</span>
+    <span class="vdate">1 ตุลาคม 2026</span>
+    <span style="flex:1"></span>
+    <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
+  </div>
+
+  <h3>ส่วนขยาย Chrome v1.1.8 <span class="en">Extension</span></h3>
+  <ul>
+    <li><b>แก้บั๊ก "iframe ดาวน์โหลดผิดไฟล์"</b> (เช่น แผงโชว์ iframe player ของ merrylion2.com แต่ได้ไฟล์อื่น) —
+        ตัด fallback "หยิบสื่อใดก็ได้ในแท็บ" ทิ้ง ยอมรับเฉพาะสื่อที่หน้า player นั้นโหลดจริง
+        (webRequest จำต้นทาง document ของทุก request) หรือ URL ตรงเป๊ะ — โฆษณา/คลิปอื่นไม่หลุดมาอีก</li>
+    <li><b>สแกน HTML ของหน้า player เองใน service worker</b> — เลียนแบบ fallback ของแอปเดสก์ท็อป:
+        fetch หน้า player มาหา URL สื่อ (รวมแบบซ่อนใน <code>atob("...")</code> base64 ของ player ที่ obfuscate)
+        แล้วดาวน์โหลดจากลิงก์นั้นทันที แม้ไม่ได้เปิดหน้าทิ้งไว้</li>
+    <li>E2E ขยายเป็น 56 เช็ค — หน้าที่มีทั้งคลิปหลอก + iframe player ต้องได้คลิปของ player,
+        player แบบ atob และ player ที่สร้าง &lt;video&gt; ด้วย JS ผ่านครบ</li>
+  </ul>
+
+  <h3>ส่วนขยาย Chrome v1.1.6–1.1.7 <span class="en">Extension</span></h3>
+  <ul>
+    <li><b>แก้ปุ่มดาวน์โหลดของ iframe embed ที่ได้ไฟล์ HTML</b> — resolve หาไฟล์วิดีโอที่หน้า player เล่นอยู่จริง,
+        หน้า player ที่ไม่มีสื่อถูกปฏิเสธพร้อมคำแนะนำ + safety net ลบไฟล์ HTML ปลอมทิ้ง</li>
+    <li><b>☁️ ซิงค์รายการเว็บที่ยกเว้นผ่าน GitHub Gist</b> — ใส่ GitHub token (สิทธิ์ gist) ครั้งเดียว
+        แล้วอัปโหลด/ดาวน์โหลดรายการยกเว้นเดียวกันทุกเครื่อง ทั้งส่วนขยายและแอปเดสก์ท็อป
+        (token เก็บในเครื่องเท่านั้น ไม่ถูกเขียนลง log)</li>
+  </ul>
+
+  <h3>เดสก์ท็อป <span class="en">Desktop</span></h3>
+  <ul>
+    <li><b>☁️ ซิงค์รายการเว็บที่ยกเว้นผ่าน GitHub Gist</b> — ปุ่มอัปโหลด/ดาวน์โหลดในการ์ดยกเว้นเว็บไซต์
+        ใช้ secret gist เดียวกับส่วนขยาย พร้อม redact token ใน events.jsonl อัตโนมัติ</li>
+  </ul>
+</div>
+<div class="dot" style="top:150px"></div>
+<div class="release">
+  <div class="vhead">
+    <span class="vtag">v1.2.1</span>
     <span class="vdate">1 ตุลาคม 2026</span>
     <span style="flex:1"></span>
     <a class="vtag" style="background:var(--grn);font-size:13px;text-decoration:none" href="index.html">⬇ ดาวน์โหลด</a>
