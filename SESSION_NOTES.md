@@ -198,6 +198,8 @@
 - **E2E 56/56** เฟสใหม่ 4 กลุ่ม: wrongfile.html (คลิปหลอก + iframe player → ต้องได้ clip2 ไม่ใช่ sample), player-obf.html (**ไม่มี video element เลย** บังคับให้ html-scan ทำงานแท้ ๆ — ตอบ resolved clip3 ผ่าน atob), player-hidden.html (video สร้างด้วย JS → detection path), ทดสอบ hash ตรงเป๊ะ (fixture clip2/clip3 ต้องไบต์ต่างกัน — รอบแรก clip3 ไบต์ซ้ำ clip2 ทำให้เช็คหลอกตัวเอง แก้ filler `\xab`)
 - unit 13/13 + selftest EXIT 0 ผ่านตามเดิม (ฝั่ง desktop ไม่แตะ logic)
 - bump v1.2.2: ext manifest 1.1.8 · logger.py 1.2.2 (แล้วแต่รอบก่อน) · version_info.txt (1,2,2,0) ×3 · android versionCode 12/1.2.2 · MainActivity log · changelog.md ([1.2.2] แยกหัว ext 1.1.8 / 1.1.7 / desktop · Unreleased ว่าง) · changelog.html footer 1.2.2 (**timeline ยัง v1.2.1 LATEST จนกว่าจะ published — กฎเดิม**)
+- **release v1.2.2 published**: build exe 31.9MB + frozen selftest EXIT 0 · ext zip 1.1.8 (แฮช 105afafc…) · commit 4f0cfbc + tag v1.2.2 (push tag DNS ล่ม → retry 25s ผ่าน — กับดักเดิมซ้ำ) · CI เขียวทั้งคู่ (desktop 1m46s, Android ~5min) · มือแนบ ext zip+sha256 หลัง desktop เขียว (ไม่ต้องรอ Android) · checksums.txt = ดาวน์โหลด assets ทั้งหมด + append บรรทัด ext + sha256sum -c OK 7 บรรทัด + upload --clobber · verify /releases/latest = v1.2.2, 10 assets · **หลัง publish ค่อยเพิ่ม v1.2.2 LATEST ใน timeline changelog.html (commit 57ef2f7)** — จบกฎ "timeline = published เท่านั้น" อย่างถูกลำดับครั้งแรก
+- **ค้าง**: ทดสอบ gist sync จริงทั้งสองฝั่ง — ต้องมี GitHub token จากผู้ใช้ (สร้างเองที่ github.com/settings/tokens สิทธิ์ gist; ห้ามส่ง token ผ่านแชท/log)
 
 ### คำสั่งเดิมที่ใช้บ่อย
 ```bash
