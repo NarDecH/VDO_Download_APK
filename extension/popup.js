@@ -99,4 +99,69 @@ $("#exImportFile").addEventListener("change", (e) => {
     if (resp && resp.ok) renderExclusions();
   }));
 });
+
+// ---- exclusion cloud sync (v1.1.7) - one secret gist, shared with the app
+const GIST_FILENAME = "vdograbber-exclusions.json";
+const gistToken = async () => (await chrome.storage.local.get("vgGithubPat")).vgGithubPat || "";
+
+async function renderCloudStatus() {
+  const s = await chrome.storage.local.get(["vgGithubPat", "vgGistId"]);
+  const list = await new Promise((res) => chrome.runtime.sendMessage({ type: "vg:exclusions" }, (r) => res((r && r.patterns) || [])));
+  $("#exCloudStatus").textContent =
+    (s.vgGithubPat ? "token ✓" : "ไม่มี token") + (s.vgGistId ? " · gist ✓" : "") + " · " + list.length + " รายการ";
+}
+
+$("#exSaveToken").addEventListener("click", async () => {
+  const v = $("#exPat").value.trim();
+  if (!v) return;
+  await chrome.storage.local.set({ vgGithubPat: v });
+  $("#exPat").value = "";
+  renderCloudStatus();
+});
+
+$("#exCloudPush").addEventListener("click", async () => {
+  const token = await gistToken();
+  if (!token) { $("#exCloudStatus").textContent = "ใส่ token ก่อน"; return; }
+  $("#exCloudStatus").textContent = "กำลังอัปโหลด…";
+  chrome.runtime.sendMessage({ type: "vg:exclusion:export" }, async (doc) => {
+    if (!doc || !doc.ok) { $("#exCloudStatus").textContent = "export ไม่สำเร็จ"; return; }
+    const gistId = (await chrome.storage.local.get("vgGistId")).vgGistId || "";
+    const body = {
+      description: "VDO Grabber exclusion list (automatic sync)",
+      files: { [GIST_FILENAME]: { content: doc.json } },
+    };
+    try {
+      const resp = await fetch(gistId ? ("https://api.github.com/gists/" + gistId) : "https://api.github.com/gists", {
+        method: gistId ? "PATCH" : "POST",
+        headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" },
+        body: JSON.stringify(gistId ? body : { ...body, public: false }),
+      });
+      if (!resp.ok) { $("#exCloudStatus").textContent = "github " + resp.status; return; }
+      const out = await resp.json();
+      if (!gistId && out.id) await chrome.storage.local.set({ vgGistId: out.id });
+      $("#exCloudStatus").textContent = "อัปโหลดแล้ว " + (doc.count || 0) + " รายการ";
+    } catch (e) { $("#exCloudStatus").textContent = "ผิดพลาด: " + e.message; }
+  });
+});
+
+$("#exCloudPull").addEventListener("click", async () => {
+  const token = await gistToken();
+  const gistId = (await chrome.storage.local.get("vgGistId")).vgGistId || "";
+  if (!token || !gistId) { $("#exCloudStatus").textContent = "ต้องมี token + gist (กดอัปโหลดครั้งแรกก่อน)"; return; }
+  $("#exCloudStatus").textContent = "กำลังดึง…";
+  try {
+    const resp = await fetch("https://api.github.com/gists/" + gistId, {
+      headers: { "Authorization": "Bearer " + token, "Accept": "application/vnd.github+json" },
+    });
+    if (!resp.ok) { $("#exCloudStatus").textContent = "github " + resp.status; return; }
+    const out = await resp.json();
+    const text = out.files && out.files[GIST_FILENAME] && out.files[GIST_FILENAME].content;
+    if (!text) { $("#exCloudStatus").textContent = "gist ไม่มีไฟล์รายการ"; return; }
+    chrome.runtime.sendMessage({ type: "vg:exclusion:import", json: text }, (r) => {
+      if (r && r.ok) { renderExclusions(); $("#exCloudStatus").textContent = "ดึงแล้ว +" + r.added + " (รวม " + r.total + ")"; }
+      else $("#exCloudStatus").textContent = "เอกสารใน gist ไม่ถูกต้อง";
+    });
+  } catch (e) { $("#exCloudStatus").textContent = "ผิดพลาด: " + e.message; }
+});
 renderExclusions();
+renderCloudStatus();

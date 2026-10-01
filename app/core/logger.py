@@ -21,7 +21,7 @@ import traceback
 from logging.handlers import RotatingFileHandler
 
 APP_NAME = "VDOGrabber"
-APP_VERSION = "1.2.1"
+APP_VERSION = "1.2.2"
 
 _levels = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
 
@@ -46,6 +46,11 @@ class EventLog:
             "event": event_type,
         }
         rec.update(data)
+        # defense in depth: a GitHub token must never reach disk, even via a
+        # stray kwarg (v1.2.2 - exclusion cloud sync)
+        for key in ("token", "github_pat", "authorization"):
+            if key in rec:
+                rec[key] = "[redacted]"
         line = json.dumps(rec, ensure_ascii=False, default=str)
         try:
             with self._lock:

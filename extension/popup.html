@@ -39,6 +39,8 @@ pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8p
 .exhint{color:#5c6b8c;font-size:10.5px;margin-top:6px;line-height:1.45}
 .exhint code{color:#93a4c3}
 .exio{display:flex;gap:6px;margin-top:7px}
+.exio input[type=password]{flex:1;min-width:0;background:#0b1120;border:1px solid var(--line);border-radius:8px;color:#e8ecf4;padding:6px 9px;font:12px 'Segoe UI',system-ui,sans-serif;outline:0}
+.exio input[type=password]:focus{border-color:var(--acc2)}
 </style>
 </head>
 <body>
@@ -63,6 +65,17 @@ pre{background:#070b16;border:1px solid var(--line);border-radius:8px;padding:8p
     <button id="exExport" title="บันทึกรายการเป็นไฟล์ .json">⬇ ส่งออก</button>
     <button id="exImport" title="ผสานรายการจากไฟล์ .json (ของแอป Windows หรือเครื่องอื่น)">⬆ นำเข้า</button>
     <input id="exImportFile" type="file" accept=".json,application/json" style="display:none">
+  </div>
+  <div class="exhint" style="margin-top:9px"><b style="color:#93a4c3">☁️ ซิงค์ผ่าน GitHub</b> — gist เดียวกับแอปเดสก์ท็อป
+    (token แบบ <code>gist</code> เก็บในเบราว์เซอร์นี้เท่านั้น)</div>
+  <div class="exio">
+    <input id="exPat" type="password" placeholder="GitHub token (gist)" spellcheck="false" autocomplete="off">
+    <button id="exSaveToken" title="บันทึก token ในเครื่องนี้">บันทึก</button>
+  </div>
+  <div class="exio">
+    <button id="exCloudPush" title="อัปโหลดรายการขึ้น gist">☁️ อัปโหลด</button>
+    <button id="exCloudPull" title="ผสานรายการจาก gist">☁️ ดาวน์โหลด</button>
+    <span class="exhint" id="exCloudStatus" style="margin:0;flex:1"></span>
   </div>
 </details>
 <details>

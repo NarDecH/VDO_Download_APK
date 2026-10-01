@@ -145,6 +145,15 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <input type="file" id="exImportFile" accept=".json,application/json" style="display:none">
       <span class="hint" style="margin:0">ส่งออกเป็นไฟล์ .json เพื่อนำเข้าที่เครื่องอื่นหรือฝั่งส่วนขยาย Chrome — รายการจะถูกผสานเข้ากับที่มีอยู่</span>
   </div>
+    <div class="hint" style="margin-top:14px"><b>☁️ ซิงค์ผ่าน GitHub</b> — เก็บรายการไว้ใน secret gist เดียวกันทุกเครื่อง/ทุกเบราว์เซอร์
+      (ต้องการ <span class="mono">gist</span> token จาก <span class="mono">github.com/settings/tokens</span>)</div>
+    <div class="row" style="margin-top:6px;align-items:center">
+      <input type="password" id="exPat" placeholder="GitHub token (gist)" style="flex:2" autocomplete="off">
+      <button class="act" style="flex:0" onclick="exSaveToken()">บันทึก token</button>
+      <button class="act" style="flex:0" onclick="exCloudPush()">☁️ อัปโหลด</button>
+      <button class="act" style="flex:0" onclick="exCloudPull()">☁️ ดาวน์โหลด</button>
+      <span class="hint mono" id="exCloudStatus" style="margin:0;flex:1"></span>
+    </div>
   </div>
 </section>
 
@@ -153,7 +162,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <div class="logo" style="width:64px;height:64px;font-size:30px;margin:0 auto 12px;border-radius:18px">▼</div>
     <h2 style="color:var(--txt)">VDO Grabber</h2>
     <div style="color:var(--dim)">เปิดหน้าเว็บที่ต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่</div>
-    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.2.1</span></div>
+    <div class="kv" style="margin-top:16px;text-align:left"><b>เวอร์ชัน</b><span id="abVer">1.2.2</span></div>
     <div class="kv" style="text-align:left"><b>yt-dlp engine</b><span id="abYtdlp">…</span></div>
     <div class="kv" style="text-align:left"><b>ffmpeg</b><span id="abFf">…</span></div>
     <div class="kv" style="text-align:left"><b>โหมด</b><span id="abMode">…</span></div>
@@ -174,7 +183,7 @@ function py(){ return DEMO ? demoApi : (window.pywebview && window.pywebview.api
 
 // ---------- demo mode (docs screenshots) --------------------------------
 const demoApi = {
-  get_state: async () => ({ version:'1.2.1', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
+  get_state: async () => ({ version:'1.2.2', app_name:'VDO Grabber', ytdlp_version:'2026.08.19', has_ffmpeg:true,
     settings:{ download_dir:'C:\\Users\\NarDech\\Downloads\\VDOGrabber', max_concurrent:3, log_level:'DEBUG',
                user_agent:'', auto_detect:true, start_page:'https://www.google.com',
                exclusions:['facebook.com','*://*.tiktok.com/*'] },
@@ -197,6 +206,8 @@ const demoApi = {
   exclusion_add: async () => ({ ok:true, patterns:[] }), exclusion_remove: async () => ({ ok:true, patterns:[] }),
   exclusion_export: async () => ({ ok:true, json:'{"app":"VDO Grabber","kind":"exclusions","version":1,"exported":"","patterns":["facebook.com","*://*.tiktok.com/*"]}', count:2 }),
   exclusion_import: async () => ({ ok:true, added:0, total:2 }),
+  exclusion_cloud_status: async () => ({ ok:true, has_token:true, gist_id:'demo123', total:2 }),
+  exclusion_cloud_push: async () => ({ ok:true, total:2 }), exclusion_cloud_pull: async () => ({ ok:true, added:0, total:2 }),
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -292,7 +303,7 @@ async function refresh(){
   state.settings = st.settings; state.version = st.version;
   renderDownloads(st.downloads || []); renderMedia(st.media || []);
   renderSettings(st.settings || {}); fillAbout(st);
-  renderExclusions();
+  renderExclusions(); renderCloudStatus();
 }
 async function tailLogs(){
   try { document.getElementById('logBox').textContent = await py().get_log_tail(curLog, 400); }
@@ -380,6 +391,35 @@ async function exExport(){
   } catch(e){ status('ส่งออกไม่สำเร็จ: ' + e); }
 }
 function exImport(){ document.getElementById('exImportFile').click(); }
+
+// ---- exclusion cloud sync (v1.2.2) - one secret gist, every device --------
+async function renderCloudStatus(){
+  try {
+    const r = await py().exclusion_cloud_status();
+    if (r && r.ok) document.getElementById('exCloudStatus').textContent =
+      (r.has_token ? 'token ✓' : 'ยังไม่มี token') + (r.gist_id ? ' · gist ✓' : ' · ยังไม่มี gist') + ' · ' + (r.total || 0) + ' รายการ';
+  } catch(e){}
+}
+async function exSaveToken(){
+  const v = document.getElementById('exPat').value.trim();
+  if (!v) return;
+  await py().set_setting('github_pat', v);
+  document.getElementById('exPat').value = '';
+  status('บันทึก token แล้ว (เก็บในเครื่องนี้เท่านั้น)'); renderCloudStatus();
+}
+async function exCloudPush(){
+  status('กำลังอัปโหลดรายการยกเว้นขึ้น gist…');
+  const r = await py().exclusion_cloud_push();
+  status(r.ok ? ('☁️ อัปโหลดแล้ว ' + (r.total||0) + ' รายการ') : ('อัปโหลดไม่สำเร็จ: ' + (r.error||'?')));
+  renderCloudStatus();
+}
+async function exCloudPull(){
+  status('กำลังดึงรายการยกเว้นจาก gist…');
+  const r = await py().exclusion_cloud_pull();
+  if (r.ok){ renderExclusions(); status('☁️ ดึงแล้ว +' + (r.added||0) + ' รายการ (รวม ' + (r.total||0) + ')'); }
+  else status('ดึงไม่สำเร็จ: ' + (r.error||'?'));
+  renderCloudStatus();
+}
 document.getElementById('exImportFile').addEventListener('change', async (e) => {
   const f = e.target.files && e.target.files[0];
   e.target.value = '';                       // allow re-picking the same file later

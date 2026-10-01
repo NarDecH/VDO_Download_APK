@@ -26,6 +26,8 @@ DEFAULTS = {
     "start_page": "https://www.google.com",
     "theme": "dark",
     "exclusions": [],           # v1.2.0: sites with no detection/toolbar (list of patterns)
+    "github_pat": "",           # v1.2.2: GitHub token (gist scope) for cloud sync - stored locally only
+    "gist_id": "",              # secret gist that carries vdograbber-exclusions.json (empty = create on first sync)
 }
 
 

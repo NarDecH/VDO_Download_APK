@@ -12,11 +12,14 @@ Usage:
 
 from __future__ import annotations
 
+import base64
 import json
 import os
 import sys
 import threading
 import time
+import urllib.error
+import urllib.request
 import webbrowser
 
 # Make core importable both as `python app/main.py` and frozen.
@@ -236,6 +239,106 @@ class Api:
         _APP.logm.log("exclusion removed: %s (%d total)" % (p, len(lst)),
                       event="exclusion_removed", pattern=p, total=len(lst))
         return {"ok": True, "patterns": list(lst)}
+
+    # ---------------------------------------- exclusion cloud sync (v1.2.2)
+    # One secret GitHub gist carries vdograbber-exclusions.json so the desktop
+    # app and the Chrome extension (and other machines) share one list. The
+    # token lives in local settings only - never logged, never exported.
+    GIST_FILENAME = "vdograbber-exclusions.json"
+
+    def _github_api(self, method: str, path: str, token: str, payload=None):
+        req = urllib.request.Request(
+            "https://api.github.com" + path,
+            method=method,
+            headers={
+                "Authorization": "Bearer " + token,
+                "Accept": "application/vnd.github+json",
+                "User-Agent": APP_NAME,
+                "Content-Type": "application/json",
+            },
+            data=json.dumps(payload).encode("utf-8") if payload is not None else None,
+        )
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            return json.loads(resp.read().decode("utf-8") or "{}")
+
+    @staticmethod
+    def _gist_doc_text(doc) -> str:
+        """Extract the transfer-file text from a gist payload."""
+        try:
+            return str((doc.get("files") or {}).get(Api.GIST_FILENAME, {}).get("content") or "")
+        except Exception:
+            return ""
+
+    def exclusion_cloud_push(self) -> dict:
+        """Upload the local exclusion list into the gist (create it if needed).
+        A gist carries the filename+content we set; both sides merge on pull,
+        so push order does not lose data as long as devices pull-then-push."""
+        token = str(_APP.settings.get("github_pat") or "")
+        if not token:
+            return {"ok": False, "error": "no token - set github_pat in settings first"}
+        doc = json.loads(self.exclusion_export()["json"])
+        gist_id = str(_APP.settings.get("gist_id") or "")
+        body = {"description": "VDO Grabber exclusion list (automatic sync)",
+                "files": {self.GIST_FILENAME: {"content": json.dumps(doc, ensure_ascii=False, indent=2)}}}
+        try:
+            if gist_id:
+                out = self._github_api("PATCH", "/gists/" + gist_id, token, body)
+            else:
+                out = self._github_api("POST", "/gists", token, {**body, "public": False})
+                _APP.settings.set("gist_id", out.get("id") or "")
+        except urllib.error.HTTPError as e:
+            detail = ""
+            try:
+                detail = json.loads(e.read().decode("utf-8")).get("message", "")
+            except Exception:
+                pass
+            _APP.logm.log("gist push failed: %s %s" % (e.code, detail), level="error",
+                          event="exclusion_cloud_error", op="push", status=e.code)
+            return {"ok": False, "error": "github %s %s" % (e.code, detail)}
+        except Exception as e:
+            _APP.logm.exception("gist push", e)
+            return {"ok": False, "error": repr(e)}
+        lst = doc["patterns"]
+        _APP.logm.log("exclusions pushed to gist (%d patterns)" % len(lst),
+                      event="exclusion_cloud_pushed", total=len(lst))
+        return {"ok": True, "total": len(lst), "gist_id": _APP.settings.get("gist_id")}
+
+    def exclusion_cloud_pull(self) -> dict:
+        """Fetch the gist's document and merge it into the local list
+        (same rules as exclusion_import)."""
+        token = str(_APP.settings.get("github_pat") or "")
+        gist_id = str(_APP.settings.get("gist_id") or "")
+        if not token or not gist_id:
+            return {"ok": False, "error": "no token or gist_id - push once first"}
+        try:
+            out = self._github_api("GET", "/gists/" + gist_id, token)
+        except urllib.error.HTTPError as e:
+            _APP.logm.log("gist pull failed: %s" % e.code, level="error",
+                          event="exclusion_cloud_error", op="pull", status=e.code)
+            return {"ok": False, "error": "github %s" % e.code}
+        except Exception as e:
+            _APP.logm.exception("gist pull", e)
+            return {"ok": False, "error": repr(e)}
+        text = self._gist_doc_text(out)
+        try:
+            doc = json.loads(text or "{}")
+        except ValueError:
+            return {"ok": False, "error": "gist holds an invalid document"}
+        patterns = doc.get("patterns") if isinstance(doc, dict) else None
+        if not isinstance(patterns, list):
+            return {"ok": False, "error": "gist document has no patterns array"}
+        lst, added = merge_exclusion_patterns(_APP.settings.get("exclusions"), patterns)
+        _APP.settings.set("exclusions", lst)
+        _APP.logm.log("exclusions pulled from gist: +%d (%d total)" % (added, len(lst)),
+                      event="exclusion_cloud_pulled", added=added, total=len(lst))
+        return {"ok": True, "added": added, "total": len(lst), "patterns": list(lst)}
+
+    def exclusion_cloud_status(self) -> dict:
+        """Non-secret status for the settings UI (never returns the token)."""
+        token = str(_APP.settings.get("github_pat") or "")
+        gist_id = str(_APP.settings.get("gist_id") or "")
+        return {"ok": True, "has_token": bool(token), "gist_id": gist_id,
+                "total": len(_APP.settings.get("exclusions") or [])}
 
     def exclusion_export(self) -> dict:
         """Serialize the exclusion list as JSON for backup / cross-device sync.
