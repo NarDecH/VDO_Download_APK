@@ -30,8 +30,18 @@ import webview  # noqa: E402
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
-from core.settings import Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
+from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
+from core.sieve import DEVICE_CLIENT_NAME, SieveError, SieveManager, device_login  # noqa: E402
 from core.ytdlp_mgr import EngineManager  # noqa: E402
+
+
+def public_settings() -> dict:
+    """settings.json with credentials replaced by presence flags, safe to hand
+    to the Control Center UI (the raw values never leave the process)."""
+    data = {k: v for k, v in _APP.settings.data.items() if k not in SECRET_KEYS}
+    data["has_github_pat"] = bool(_APP.settings.get("github_pat"))
+    data["has_sieve_key"] = _APP.sieve.configured if _APP else False
+    return data
 
 
 class MediaStore:
@@ -193,7 +203,7 @@ class Api:
         return {
             "version": APP_VERSION,
             "app_name": APP_NAME,
-            "settings": _APP.settings.data,
+            "settings": public_settings(),
             "ytdlp_version": _APP.engines.ytdlp_version,
             "has_ffmpeg": bool(_APP.engines.ffmpeg_path()),
             "downloads": _APP.downloads.list(),
@@ -204,12 +214,63 @@ class Api:
 
     def set_setting(self, key: str, value) -> dict:
         _APP.settings.set(key, value)
-        _APP.logm.log("setting changed: %s = %r" % (key, value), event="setting_changed", key=key, value=value)
+        if key in SECRET_KEYS:
+            # never log a credential value; keep the live client in sync
+            _APP.logm.log("setting changed: %s = [redacted]" % key, event="setting_changed", key=key)
+            if key == "sieve_api_key":
+                _APP.sieve.client.api_key = str(value or "")
+        else:
+            _APP.logm.log("setting changed: %s = %r" % (key, value), event="setting_changed", key=key, value=value)
         if key == "log_level":
             _APP.logm.set_level(str(value))
         if key == "max_concurrent":
             _APP.downloads._sem = threading.Semaphore(int(value) or 3)
         return {"ok": True}
+
+    # -------------------------------------------- sieve scrape API (v1.3.0)
+    # Optional: every method is a no-op when SIEVE_API_KEY is not configured.
+    def sieve_status(self) -> dict:
+        """Non-secret status for the UI. Never returns the key."""
+        return {"ok": True, "configured": _APP.sieve.configured, "runs": _APP.sieve.list_runs()}
+
+    def sieve_login_start(self) -> dict:
+        """Begin the device login; the returned link/code are for the USER to
+        open and approve themselves - the app never approves on their behalf."""
+        return _APP.sieve.login_start()
+
+    def sieve_login_cancel(self) -> dict:
+        return _APP.sieve.login_cancel()
+
+    def sieve_set_key(self, key: str) -> dict:
+        """Store a user-supplied key (Settings -> API keys alternative)."""
+        return _APP.sieve.set_api_key(key)
+
+    def sieve_run_start(self, spec: dict) -> dict:
+        spec = spec or {}
+        urls = spec.get("target_urls")
+        if isinstance(urls, str):
+            urls = [u.strip() for u in urls.replace("\n", ",").split(",") if u.strip()]
+        opts = {
+            "target_urls": urls or None,
+            "fields": spec.get("fields") or None,
+            "schema": spec.get("schema") or None,
+            "output_schema": spec.get("output_schema") or None,
+            "table_shape": spec.get("table_shape") or None,
+            "compliance_mode": str(spec.get("compliance_mode") or "regular"),
+        }
+        return _APP.sieve.start(str(spec.get("instruction") or ""), **opts)
+
+    def sieve_run_list(self) -> dict:
+        return {"ok": True, "runs": _APP.sieve.list_runs()}
+
+    def sieve_followup(self, run_id: str, instruction: str) -> dict:
+        return _APP.sieve.followup(run_id, instruction)
+
+    def sieve_download_files(self, run_id: str) -> dict:
+        return _APP.sieve.download_files(run_id)
+
+    def sieve_credits(self) -> dict:
+        return _APP.sieve.credits()
 
     # --------------------------------------------- site exclusions (v1.2.0)
     @staticmethod
@@ -418,6 +479,7 @@ class App:
         self.engines = EngineManager(self.data_dir, self.logm)
         self.media = MediaStore(self.logm)
         self.downloads = DownloadManager(self.settings, self.engines, self.logm, push_ui=self._push)
+        self.sieve = SieveManager(self.settings, self.logm, self.data_dir, push_ui=self._push)
         self.api = Api()
         self.browser: webview.Window | None = None
         self.control: webview.Window | None = None
@@ -484,7 +546,16 @@ class App:
             except Exception as e:
                 self.logm.exception("engine warm-up", e)
         threading.Thread(target=warm, name="warmup", daemon=True).start()
+        threading.Thread(target=self._resume_sieve, name="sieve-resume", daemon=True).start()
         threading.Thread(target=self._watchdog, name="watchdog", daemon=True).start()
+
+    def _resume_sieve(self):
+        """Resume polling of runs persisted before a crash/restart. No-op when
+        Sieve is not configured."""
+        try:
+            self.sieve.resume_pending()
+        except Exception as e:
+            self.logm.exception("sieve resume", e)
 
     def _watchdog(self):
         """Re-inject detection/toolbar after full navigations that race the
@@ -751,7 +822,80 @@ def selftest() -> int:
     return 0 if passed else 1
 
 
+def sieve_login_cli() -> int:
+    """Interactive device login (`python app/main.py --sieve-login`).
+
+    The user opens the printed link and approves the code themselves; the app
+    only polls. The key is written to the local config store and never printed.
+    """
+    data_dir = default_data_dir()
+    logm = LogManager(data_dir)
+    settings = Settings(data_dir, logm)
+    mgr = SieveManager(settings, logm, data_dir)
+    if mgr.configured:
+        print("Sieve is already configured. Remove sieve_api_key from settings.json to replace it.")
+        return 0
+
+    def on_prompt(info: dict) -> None:
+        print("")
+        print("Open this link in a browser and sign in:")
+        print("  " + str(info.get("verification_uri_complete") or info.get("verification_uri") or ""))
+        print("Confirm the code matches:  " + str(info.get("user_code") or ""))
+        print("")
+        print("Notes:")
+        print("  - The tool name shown on the page is self-reported (supplied by this app).")
+        print("  - Approve ONLY a code you started yourself.")
+        print("  - The code expires in %d minutes and works once." % (int(info.get("expires_in") or 600) // 60))
+        print("Waiting for approval...")
+
+    try:
+        key = device_login(mgr.client, on_prompt=on_prompt, sleep=time.sleep)
+    except SieveError as e:
+        print("Login failed: %s" % e)
+        return 1
+    mgr.set_api_key(key)
+    print("Done. The key is stored locally and never printed.")
+    return 0
+
+
+def sieve_run_cli(instruction: str, urls=None) -> int:
+    """Headless one-shot run (`python app/main.py --sieve-run \"...\" --url U`).
+    Spends credits; only run it after the user agrees."""
+    data_dir = default_data_dir()
+    logm = LogManager(data_dir)
+    settings = Settings(data_dir, logm)
+    mgr = SieveManager(settings, logm, data_dir, push_ui=lambda *a, **k: None)
+    res = mgr.start(instruction, target_urls=urls or None)
+    if not res.get("ok"):
+        print("start failed: %s" % res.get("error"))
+        return 1
+    run_id = res["run"]["id"]
+    print("queued session_id=%s" % res["run"]["session_id"])
+    print("polling (this spends credits)...")
+    deadline = time.time() + 3600
+    while time.time() < deadline:
+        time.sleep(3)
+        if (mgr.get_run(run_id) or {}).get("status") in ("done", "refused", "error"):
+            break
+    run = mgr.get_run(run_id) or {}
+    print("status=%s" % run.get("status"))
+    if run.get("status") == "done":
+        print("files=%d schema_conformance=%s" % (len(run.get("files") or []), run.get("schema_conformance")))
+        dl = mgr.download_files(run_id)
+        print("downloaded: %s" % (dl.get("files") or dl.get("error")))
+        return 0
+    print("run ended: %s" % run.get("error"))
+    return 1
+
+
 def main() -> int:
+    if "--sieve-login" in sys.argv:
+        return sieve_login_cli()
+    if "--sieve-run" in sys.argv:
+        i = sys.argv.index("--sieve-run")
+        instruction = sys.argv[i + 1] if i + 1 < len(sys.argv) else ""
+        urls = [a.split("=", 1)[1] for a in sys.argv if a.startswith("--url=")]
+        return sieve_run_cli(instruction, urls)
     if "--selftest" in sys.argv:
         try:
             return selftest()

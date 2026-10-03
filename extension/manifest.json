@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "VDO Grabber",
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "ตรวจจับและดาวน์โหลดวิดีโอที่กำลังแสดงอยู่ — รองรับ blob:, HLS (m3u8), DASH (mpd) และ direct mp4/webm",
   "icons": {
     "16": "icons/icon16.png",

@@ -344,8 +344,249 @@ def test_pair_sync_guard() -> bool:
     return True
 
 
+# ------------------------------------------- sieve scrape API (v1.3.0)
+def _sieve_fake_transport(script):
+    """Record requests; return (calls, transport). `script` entries are either
+    (status, headers, body) tuples or an Exception to raise, consumed in order.
+    A 400 body must be bytes; HTTP is the only faked boundary."""
+    calls = []
+
+    def transport(method, url, headers, data, timeout):
+        calls.append({"method": method, "url": url, "headers": dict(headers), "data": data, "timeout": timeout})
+        item = script[min(len(calls) - 1, len(script) - 1)]
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    return calls, transport
+
+
+def _sieve_settings(**over):
+    d = {"sieve_api_key": "dc_sk_test", "download_dir": tempfile.mkdtemp(prefix="vg-sieve-")}
+    d.update(over)
+    return type("S", (), {"get": staticmethod(lambda k, d=d: d.get(k)),
+                          "set": staticmethod(lambda k, v, d=d: d.__setitem__(k, v))})()
+
+
+def _sieve_log():
+    events = type("L", (), {"log": staticmethod(lambda *a, **k: None),
+                            "exception": staticmethod(lambda *a, **k: None)})()
+    return events
+
+
+def test_sieve_request_building() -> bool:
+    import json
+    from core.sieve import SIEVE_BASE_URL, SieveClient
+
+    calls, transport = _sieve_fake_transport([(202, {}, json.dumps(
+        {"status": "queued", "session_id": "sc_1", "poll": "/api/scrapes/sc_1"}).encode())])
+    c = SieveClient(api_key="dc_sk_test", transport=transport)
+    out = c.start_scrape("Extract the text and author of each quote",
+                         target_urls=["https://quotes.toscrape.com"], fields=["text", "author"],
+                         output_schema={"type": "object"}, table_shape="long")
+    assert out["session_id"] == "sc_1"
+    req = calls[0]
+    assert req["method"] == "POST" and req["url"] == SIEVE_BASE_URL + "/api/scrapes", req["url"]
+    assert req["headers"]["Authorization"] == "Bearer dc_sk_test"
+    assert req["headers"]["Content-Type"] == "application/json"
+    body = json.loads(req["data"].decode())
+    assert body["instruction"].startswith("Extract")
+    assert body["compliance_mode"] == "regular"          # default unless user chooses
+    assert body["target_urls"] == ["https://quotes.toscrape.com"]
+    assert body["output_schema"] == {"type": "object"} and body["table_shape"] == "long"
+    # relative file links get the base URL prefixed
+    assert c.url_for("/api/x") == SIEVE_BASE_URL + "/api/x"
+    assert c.url_for("http://other/y") == "http://other/y"
+    return True
+
+
+def test_sieve_status_handling() -> bool:
+    from core.sieve import SieveError, followup_ready, parse_scrape_status, turn_count
+
+    assert parse_scrape_status({"status": "running"}) == "running"
+    assert parse_scrape_status({"status": "done"}) == "done"
+    assert parse_scrape_status({"status": "refused"}) == "refused"
+    for bad in ({}, {"status": "finished"}, {"status": None}):
+        try:
+            parse_scrape_status(bad)
+            raise AssertionError("unknown status must raise")
+        except SieveError as e:
+            assert e.kind == "unknown_status"
+    # follow-up turn check: done AND turns advanced, else the previous answer
+    assert turn_count({"turns": [1, 2]}) == 2
+    assert turn_count({"turn_count": 4}) == 4
+    assert followup_ready({"status": "done", "turns": [1, 2, 3]}, 2) is True
+    assert followup_ready({"status": "done", "turns": [1, 2]}, 2) is False
+    assert followup_ready({"status": "running", "turns": [1, 2, 3]}, 2) is False
+    return True
+
+
+def test_sieve_error_mapping() -> bool:
+    from core.sieve import map_http_error
+
+    cases = {
+        400: ("client", False), 401: ("auth", False), 402: ("credits", False),
+        404: ("not_found", False), 409: ("in_flight", True), 429: ("rate_limit", True),
+        500: ("server", True), 503: ("server", True),
+    }
+    for status, (kind, retryable) in cases.items():
+        e = map_http_error(status, '{"error":"boom"}')
+        assert (e.kind, e.retryable) == (kind, retryable), (status, e.kind, e.retryable)
+    # the human detail survives mapping
+    assert "boom" in map_http_error(400, '{"error":"boom"}').message
+    assert map_http_error(401, "").kind == "auth"
+    return True
+
+
+def test_sieve_secret_never_reaches_logs() -> bool:
+    import json
+    from core.logger import EventLog
+
+    path = os.path.join(tempfile.mkdtemp(prefix="vg-events-"), "events.jsonl")
+    ev = EventLog(path)
+    ev.write("credential", sieve_api_key="dc_sk_secret", api_key="dc_sk_secret",
+             token="ghp_secret", authorization="Bearer dc_sk_secret", note="ok")
+    with open(path, "r", encoding="utf-8") as f:
+        line = f.read()
+    assert "dc_sk_secret" not in line, "the sieve key must never reach events.jsonl"
+    assert "ghp_secret" not in line
+    assert json.loads(line)["note"] == "ok"
+    assert line.count("[redacted]") >= 4
+    return True
+
+
+def test_sieve_retry_after() -> bool:
+    from core.sieve import SieveClient, SieveError, retry_after_seconds
+
+    assert retry_after_seconds({"Retry-After": "12"}) == 12.0
+    assert retry_after_seconds({}) is None
+    # a 429 must carry the server's Retry-After so the poll loop waits it out
+    _, transport = _sieve_fake_transport([(429, {"Retry-After": "7"}, b'{"error":"slow down"}')])
+    c = SieveClient(api_key="dc_sk_test", transport=transport)
+    try:
+        c.get_scrape("sc_1")
+        raise AssertionError("429 must raise")
+    except SieveError as e:
+        assert e.kind == "rate_limit" and e.retryable is True and e.retry_after == 7.0
+    return True
+
+
+def test_sieve_never_retries_post_on_timeout() -> bool:
+    from core.sieve import SieveClient, SieveError
+
+    calls, transport = _sieve_fake_transport([SieveError("timed out", kind="timeout", retryable=True)])
+    c = SieveClient(api_key="dc_sk_test", transport=transport)
+    try:
+        c.start_scrape("anything")
+        raise AssertionError("timeout must surface")
+    except SieveError as e:
+        assert e.kind == "timeout"
+    assert len(calls) == 1, "POST /api/scrapes must be sent exactly once (no auto-retry)"
+    return True
+
+
+def test_sieve_device_token_mapping() -> bool:
+    import json
+    from core.sieve import SieveClient
+
+    def body(payload):
+        return (400, {}, json.dumps(payload).encode())
+
+    for code, want in (("authorization_pending", "pending"), ("slow_down", "slow_down"),
+                       ("access_denied", "denied"), ("expired_token", "expired")):
+        _, transport = _sieve_fake_transport([body({"error": code})])
+        c = SieveClient(transport=transport)
+        assert c.device_token("d1")["status"] == want, code
+    _, transport = _sieve_fake_transport([(200, {}, json.dumps(
+        {"api_key": "dc_sk_new", "token_type": "Bearer", "key_name": "laptop"}).encode())])
+    c = SieveClient(transport=transport)
+    out = c.device_token("d1")
+    assert out["status"] == "ok" and out["api_key"] == "dc_sk_new"
+    return True
+
+
+def test_sieve_unconfigured_is_noop() -> bool:
+    from core.sieve import SieveClient, SieveError, SieveManager
+
+    calls, transport = _sieve_fake_transport([(202, {}, b'{"session_id":"x"}')])
+    client = SieveClient(api_key="", transport=transport)
+    mgr = SieveManager(_sieve_settings(sieve_api_key=""), _sieve_log(),
+                       tempfile.mkdtemp(prefix="vg-sieve-"), client=client)
+    assert mgr.configured is False
+    res = mgr.start("do something")
+    assert res["ok"] is False and not len(calls), "unconfigured app must not call the API"
+    assert mgr.download_files("nope")["ok"] is False
+    assert mgr.credits()["ok"] is False
+    try:
+        client.start_scrape("x")
+        raise AssertionError("no key must raise auth")
+    except SieveError as e:
+        assert e.kind == "auth"
+    return True
+
+
+def test_sieve_persists_before_polling() -> bool:
+    import json
+    from core.sieve import SieveClient, SieveManager
+
+    _, transport = _sieve_fake_transport([(202, {}, json.dumps(
+        {"status": "queued", "session_id": "sc_persist", "poll": "/api/scrapes/sc_persist"}).encode())])
+    client = SieveClient(api_key="dc_sk_test", transport=transport)
+    data_dir = tempfile.mkdtemp(prefix="vg-sieve-")
+    mgr = SieveManager(_sieve_settings(), _sieve_log(), data_dir, client=client)
+    seen = {}
+
+    def fake_poll(run_id):
+        # at this point the run MUST already be durable (crash-safe resume)
+        with open(os.path.join(data_dir, "sieve_runs.json"), "r", encoding="utf-8") as f:
+            seen["store"] = json.load(f)
+
+    mgr._start_poll = fake_poll
+    res = mgr.start("Extract quotes", target_urls=["https://quotes.toscrape.com"])
+    assert res["ok"]
+    sid = res["run"]["session_id"]
+    run_id = res["run"]["id"]
+    assert seen["store"][run_id]["session_id"] == sid == "sc_persist"
+    # a restart loads the pending run back
+    mgr2 = SieveManager(_sieve_settings(), _sieve_log(), data_dir, client=client)
+    assert mgr2.get_run(run_id)["session_id"] == sid
+    return True
+
+
+def test_sieve_file_download_uses_bearer_and_relative_url() -> bool:
+    from core.sieve import SIEVE_BASE_URL, SieveClient
+
+    calls, transport = _sieve_fake_transport([(200, {}, b"col1,col2\n1,2\n")])
+    c = SieveClient(api_key="dc_sk_test", transport=transport)
+    data = c.download_file("/api/scrapes/sc_1/files/quotes.csv")
+    assert data == b"col1,col2\n1,2\n"
+    assert calls[0]["url"] == SIEVE_BASE_URL + "/api/scrapes/sc_1/files/quotes.csv"
+    assert calls[0]["headers"]["Authorization"] == "Bearer dc_sk_test"
+    return True
+
+
+def test_sieve_poll_backoff() -> bool:
+    from core.sieve import POLL_MAX, POLL_START, next_poll_delay
+
+    assert next_poll_delay(0) == POLL_START          # first poll: 5s
+    assert next_poll_delay(POLL_START) > POLL_START  # then back off
+    assert next_poll_delay(1000) == POLL_MAX         # capped at ~30s, never shorter
+    return True
+
+
 def main() -> int:
     tests = {
+        "sieve_request_building": test_sieve_request_building,
+        "sieve_status_handling": test_sieve_status_handling,
+        "sieve_error_mapping": test_sieve_error_mapping,
+        "sieve_retry_after": test_sieve_retry_after,
+        "sieve_secret_never_reaches_logs": test_sieve_secret_never_reaches_logs,
+        "sieve_no_retry_post_on_timeout": test_sieve_never_retries_post_on_timeout,
+        "sieve_device_token_mapping": test_sieve_device_token_mapping,
+        "sieve_unconfigured_noop": test_sieve_unconfigured_is_noop,
+        "sieve_persist_before_poll": test_sieve_persists_before_polling,
+        "sieve_file_download": test_sieve_file_download_uses_bearer_and_relative_url,
+        "sieve_poll_backoff": test_sieve_poll_backoff,
         "media_store_lru": test_media_store_lru,
         "prune_keeps_running": test_prune_keeps_running_jobs,
         "prune_noop_under_limit": test_prune_noop_under_limit,

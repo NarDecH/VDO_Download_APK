@@ -64,6 +64,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
   <nav>
     <button data-tab="downloads" class="on">⬇ ดาวน์โหลด <span id="nDl"></span></button>
     <button data-tab="media">🎬 วิดีโอที่ตรวจพบ</button>
+    <button data-tab="sieve">🕸 Scrape (Sieve)</button>
     <button data-tab="logs">📜 Logs</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
     <button data-tab="about">ℹ เกี่ยวกับ</button>
@@ -91,6 +92,36 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <span class="hint" style="align-self:center">รายการวิดีโอที่ตรวจพบจากทุกหน้าเว็บในเซสชันนี้</span>
   </div>
   <div id="mediaList"><div class="empty">ยังไม่มีข้อมูล — เปิดเว็บในหน้าต่างเบราว์เซอร์ แล้วเล่น/สแกนวิดีโอ</div></div>
+</section>
+
+<section class="tab" id="tab-sieve">
+  <div class="card">
+    <h2>🕸 Sieve scrape API <span class="hint" id="sieveState" style="display:inline"></span></h2>
+    <div class="hint" style="margin:0 0 8px">ดึงข้อมูลจากหน้าเว็บด้วยคำสั่งภาษาธรรมชาติ (ใช้เครดิตของบัญชี Sieve) — ฟีเจอร์นี้ทำงานเฉพาะเมื่อตั้งค่า API key แล้วเท่านั้น</div>
+    <div id="sieveLogin">
+      <button class="act grn" style="flex:0" onclick="sieveLogin()">🔑 เชื่อมต่อด้วย Device Login</button>
+      <div class="row" style="margin-top:8px;align-items:center">
+        <input type="password" id="sieveKey" placeholder="หรือวาง API key (dc_sk_...)" style="flex:2" autocomplete="off">
+        <button class="act" style="flex:0" onclick="sieveSaveKey()">บันทึก key</button>
+        <button class="act" style="flex:0" onclick="sieveCredits()">ตรวจเครดิต</button>
+      </div>
+      <div id="sieveLoginBox" class="hint" style="display:none;margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="card" id="sieveRunForm">
+    <h2>เริ่มงานดึงข้อมูลใหม่</h2>
+    <label>คำสั่ง (ภาษาธรรมชาติ) *</label>
+    <input type="text" id="svInstruction" placeholder="เช่น ดึงข้อความและชื่อผู้เขียนของแต่ละ quote">
+    <label>URL เป้าหมาย (คั่นด้วยจุลภาค/ขึ้นบรรทัดใหม่ — เว้นว่างได้)</label>
+    <input type="text" id="svUrls" placeholder="https://quotes.toscrape.com">
+    <div class="row">
+      <div><label>รูปแบบตาราง</label><select id="svShape"><option value="">ค่าเริ่มต้น</option><option value="long">long</option><option value="wide">wide</option></select></div>
+      <div><label>Compliance</label><select id="svCompliance"><option value="regular">regular (แนะนำ)</option><option value="conservative">conservative</option><option value="yolo">yolo (ผู้ใช้เลือกเอง)</option></select></div>
+    </div>
+    <div style="margin-top:10px"><button class="act grn" onclick="sieveStart()">▶ เริ่มงาน</button>
+    <button class="act" onclick="refreshSieve()">⟳ รีเฟรช</button></div>
+  </div>
+  <div id="sieveRuns"></div>
 </section>
 
 <section class="tab" id="tab-logs">
@@ -208,6 +239,12 @@ const demoApi = {
   exclusion_import: async () => ({ ok:true, added:0, total:2 }),
   exclusion_cloud_status: async () => ({ ok:true, has_token:true, gist_id:'demo123', total:2 }),
   exclusion_cloud_push: async () => ({ ok:true, total:2 }), exclusion_cloud_pull: async () => ({ ok:true, added:0, total:2 }),
+  sieve_status: async () => ({ ok:true, configured:true, runs:[
+    {id:'s1', session_id:'sc_demo1', instruction:'Extract the text and author of each quote', status:'done', created:1759120300, files:[{name:'quotes.csv',size:2048,ext:'csv',url:'/api/scrapes/sc_demo1/files/quotes.csv'}], schema_conformance:{status:'pass'}, error:''} ] }),
+  sieve_login_start: async () => ({ ok:true, user_code:'WDJB-MJHT', verification_uri_complete:'https://scrape.usesieve.com/device?code=WDJB-MJHT', expires_in:600, interval:5 }),
+  sieve_set_key: async () => ({ ok:true }), sieve_credits: async () => ({ ok:true, credits:{plan:'demo', used:3, remaining:97} }),
+  sieve_run_start: async () => ({ ok:true, run:{id:'s2'} }), sieve_run_list: async () => ({ ok:true, runs:[] }),
+  sieve_followup: async () => ({ ok:true }), sieve_download_files: async () => ({ ok:true, files:['/tmp/quotes.csv'] }), sieve_login_cancel: async () => ({ ok:true }),
 };
 
 // ---------- tabs ---------------------------------------------------------
@@ -303,7 +340,7 @@ async function refresh(){
   state.settings = st.settings; state.version = st.version;
   renderDownloads(st.downloads || []); renderMedia(st.media || []);
   renderSettings(st.settings || {}); fillAbout(st);
-  renderExclusions(); renderCloudStatus();
+  renderExclusions(); renderCloudStatus(); refreshSieve();
 }
 async function tailLogs(){
   try { document.getElementById('logBox').textContent = await py().get_log_tail(curLog, 400); }
@@ -430,6 +467,81 @@ document.getElementById('exImportFile').addEventListener('change', async (e) => 
     else status('นำเข้าไม่สำเร็จ: ' + ((r && r.error) || '?'));
   } catch(err){ status('นำเข้าไม่สำเร็จ: ' + err); }
 });
+// ---------- Sieve scrape API (v1.3.0) ------------------------------------
+function sieveOk(configured){
+  document.getElementById('sieveLogin').style.display = configured ? 'none' : 'block';
+  document.getElementById('sieveRunForm').style.display = configured ? 'block' : 'none';
+}
+async function refreshSieve(){
+  try {
+    const r = await py().sieve_status();
+    const runs = (r && r.runs) || [];
+    document.getElementById('sieveState').textContent = r && r.configured ? '· เชื่อมต่อแล้ว' : '· ยังไม่ได้ตั้งค่า key';
+    sieveOk(!!(r && r.configured));
+    const el = document.getElementById('sieveRuns');
+    if (!runs.length){ el.innerHTML = '<div class="card"><div class="empty">ยังไม่มีงานดึงข้อมูล</div></div>'; return; }
+    el.innerHTML = runs.map(x => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(x.instruction||x.session_id||x.id)}</b>
+        <span class="badge st-${esc(x.status)}">${esc(x.status)}</span></div>
+      <div class="url mono">session: ${esc(x.session_id||'')} · turns ${x.turn_count||0}${x.schema_conformance&&x.schema_conformance.status?' · schema: '+esc(x.schema_conformance.status):''}</div>
+      ${x.error?`<div style="color:var(--red);margin-top:6px">${esc(String(x.error))}</div>`:''}
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        ${x.status==='done'&&(x.files||[]).length?`<button class="act grn" style="padding:4px 12px" onclick="sieveDownload('${esc(x.id)}')">⬇ ดาวน์โหลดไฟล์ (${(x.files||[]).length})</button>`:''}
+        ${['queued','running'].includes(x.status)?`<input type="text" id="fu_${esc(x.id)}" placeholder="ถามต่อ…" style="flex:2"><button class="act" style="padding:4px 12px" onclick="sieveFollowup('${esc(x.id)}')">ส่ง</button>`:''}
+      </div>
+    </div>`).join('');
+  } catch(e){}
+}
+async function sieveLogin(){
+  status('กำลังขอ device code…');
+  const r = await py().sieve_login_start();
+  if (!r || !r.ok){ status('ขอ device code ไม่สำเร็จ: ' + ((r&&r.error)||'?')); return; }
+  const box = document.getElementById('sieveLoginBox');
+  box.style.display = 'block';
+  box.innerHTML = '<b>เปิดลิงก์นี้ในเบราว์เซอร์แล้วอนุมัติเอง:</b><br><a href="#" onclick="py().open_external(\'' + esc(String(r.verification_uri_complete||r.verification_uri||'')) + '\');return false">' + esc(String(r.verification_uri_complete||r.verification_uri||'')) + '</a><br>'
+    + 'รหัส: <span class="mono">' + esc(String(r.user_code||'')) + '</span> · หมดอายุใน ' + Math.round((r.expires_in||600)/60) + ' นาที<br>'
+    + '<span style="color:var(--yel)">ชื่อเครื่องมือบนหน้าเว็บเป็นค่าที่แอปส่งเอง · อนุมัติเฉพาะรหัสที่คุณเริ่มเองเท่านั้น</span>';
+  status('รอการอนุมัติจากเบราว์เซอร์…');
+}
+function sieveSaveKey(){
+  const v = document.getElementById('sieveKey').value.trim();
+  if (!v) return;
+  Promise.resolve(py().sieve_set_key(v)).then(r => {
+    document.getElementById('sieveKey').value = '';
+    status(r && r.ok ? 'บันทึก Sieve API key แล้ว (เก็บในเครื่องนี้เท่านั้น)' : ('บันทึกไม่สำเร็จ: ' + ((r&&r.error)||'?')));
+    refreshSieve();
+  });
+}
+async function sieveCredits(){
+  const r = await py().sieve_credits();
+  status(r && r.ok ? ('Sieve credits: ' + JSON.stringify(r.credits)) : ('ตรวจเครดิตไม่สำเร็จ: ' + ((r&&r.error)||'?')));
+}
+function sieveStart(){
+  const instruction = document.getElementById('svInstruction').value.trim();
+  if (!instruction){ status('กรุณากรอกคำสั่ง'); return; }
+  const spec = { instruction, target_urls: document.getElementById('svUrls').value.trim(),
+    table_shape: document.getElementById('svShape').value, compliance_mode: document.getElementById('svCompliance').value };
+  Promise.resolve(py().sieve_run_start(spec)).then(r => {
+    status(r && r.ok ? 'เริ่มงาน Sieve แล้ว — ใช้เวลาหลายนาที' : ('เริ่มไม่สำเร็จ: ' + ((r&&r.error)||'?')));
+    refreshSieve();
+  });
+}
+function sieveDownload(id){
+  Promise.resolve(py().sieve_download_files(id)).then(r => {
+    status(r && r.ok ? ('ดาวน์โหลดไฟล์แล้ว ' + (r.files||[]).length + ' ไฟล์') : ('ดาวน์โหลดไม่สำเร็จ: ' + ((r&&r.error)||'?')));
+  });
+}
+function sieveFollowup(id){
+  const inp = document.getElementById('fu_' + id);
+  const v = inp ? inp.value.trim() : '';
+  if (!v) return;
+  Promise.resolve(py().sieve_followup(id, v)).then(r => {
+    if (r && r.ok){ inp.value = ''; status('ส่งคำถามต่อแล้ว'); }
+    else status(r && r.kind === 'in_flight' ? 'มีคำถามก่อนหน้ากำลังทำงาน — รอแล้วลองอีกครั้ง' : ('ส่งไม่สำเร็จ: ' + ((r&&r.error)||'?')));
+    refreshSieve();
+  });
+}
 function saveSettings(){
   py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
   py().set_setting('max_concurrent', parseInt(document.getElementById('sMaxConc').value) || 3);
@@ -463,8 +575,15 @@ window.__onEvent = function (event, payload) {
     status('ล้างรายการดาวน์โหลดแล้ว ' + (payload.removed||0) + ' รายการ');
   } else if (event === 'media_cleared') {
     state.media = []; renderMedia([]); status('ล้างรายการวิดีโอที่ตรวจพบแล้ว');
-  } else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
+  }  else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
   else if (event === 'engine_progress') { status('กำลังเตรียม ' + payload.engine + '… ' + payload.percent + '%'); }
+  else if (event === 'sieve_run_update') { refreshSieve(); }
+  else if (event === 'sieve_login') {
+    const s = payload && payload.status;
+    status(s === 'ok' ? 'เชื่อมต่อ Sieve สำเร็จ ✓' : s === 'denied' ? 'คุณปฏิเสธการอนุมัติ' : s === 'expired' ? 'โค้ดหมดอายุ — ลองใหม่' : ('เชื่อมต่อไม่สำเร็จ: ' + ((payload&&payload.error)||'')));
+    if (s !== 'pending'){ const b = document.getElementById('sieveLoginBox'); if (b) b.style.display = 'none'; }
+    refreshSieve();
+  }
 };
 
 if (DEMO) { refresh(); tailLogs(); }

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" type="static" mediaPresentationDuration="PT12S" profiles="urn:mpeg:dash:profile:isoff-live:2011">
+  <Period>
+    <AdaptationSet contentType="video" mimeType="video/mp4">
+      <!-- SegmentTemplate WITHOUT @duration (real-world merrylion2.com
+           layout): the segment list lives in <SegmentTimeline><S t d r/>.
+           r="1" repeats the first entry, the second S omits @t (continues
+           from the previous time). $Number%05d$ exercises the padding:
+           seg00001..seg00003 -> init + 3 media segments assembled by the SW. -->
+      <SegmentTemplate timescale="1000" startNumber="1"
+                       initialization="init.mp4" media="seg$Number%05d$.m4s">
+        <SegmentTimeline>
+          <S t="0" d="4000" r="1" />
+          <S d="4000" />
+        </SegmentTimeline>
+      </SegmentTemplate>
+      <Representation id="v1" bandwidth="800000" width="640" height="360" codecs="avc1.64001e" />
+      <Representation id="v2" bandwidth="1200000" width="1280" height="720" codecs="avc1.64001f" />
+    </AdaptationSet>
+  </Period>
+</MPD>

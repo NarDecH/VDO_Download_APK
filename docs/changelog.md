@@ -4,6 +4,31 @@
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-10-03
+
+### ส่วนขยาย Chrome v1.1.10
+- **ดาวน์โหลดสตรีม DASH (mpd) ได้ในตัวส่วนขยายแล้ว** — เคสที่ผู้ใช้แจ้ง: กดดาวน์โหลดที่ iframe player
+  แล้วขึ้น "สตรีมนี้ต้องใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp): HLS/DASH stream - use the VDOGrabber
+  desktop app (yt-dlp)" เพราะ v1.1.9 ทำ HLS ได้แต่ยังส่งต่อ DASH ให้แอปเดสก์ท็อป — ตอนนี้ service worker
+  **ดึง MPD + ชิ้นส่วนทั้งหมดเอง** เลือก Representation คุณภาพสูงสุด (ถ่วงน้ำหนัก bandwidth, ชอบ video)
+  แล้วประกอบเป็นไฟล์ .mp4 (fMP4) เดียวผ่าน offscreen assembler เหมือนที่ทำกับ .ts ของ HLS พร้อม progress
+  บนแผงลอย (`vg:dashProgress`)
+- รองรับ SegmentTemplate ที่ประกาศบน MPD/Period/AdaptationSet/Representation (inherit ค่าตาม scope,
+  template เจาะจงมากที่สุดชนะ, รองรับ $RepresentationID$/$Bandwidth$/$Number$ (มี padding)/$Time$) และ
+  SegmentList/SegmentURL (อ่าน `sourceURL` แบบไม่สนตัวพิมพ์แล้ว)
+- **เคสที่ผู้ใช้แจ้งเพิ่ม: MPD จริงจาก merrylion2.com ใช้ SegmentTemplate + SegmentTimeline (ไม่มี
+  @duration) แต่ยังโดนปฏิเสธผิด ๆ ว่า "unsupported DASH layout (SegmentBase/indexed)"** — ตอนนี้นับ
+  ชิ้นส่วนจาก `<S t d r>` ทุกรายการ (รวม @r ที่ซ้ำ, @t ที่ระบุเองหรือไต่ต่อจากก่อนหน้า, @r ติดลบ =
+  นับถึงสุดสตรีมตาม mediaPresentationDuration) · รองรับ **SegmentBase/indexRange** (โปรไฟล์ on-demand)
+  ด้วย: สื่อเป็น fMP4 ไฟล์เดียวที่ฝัง index ไว้ข้างใน → ดาวน์โหลดทั้งไฟล์จากข้อความใน `<BaseURL>` ของ
+  Representation ที่เลือก · เหลือปฏิเสธอย่างชัดเจนเฉพาะเลย์เอาต์ที่ไม่รู้จักจริง ๆ หรือสตรีมสด
+- E2E ขยายเป็น 68 เช็ค: ไอเทม mpd ตรงและเส้นทาง embed → html-scan → mpd → ประกอบไฟล์ ต้องได้ไบต์ตรงกับ
+  init+seg1+seg2 · เพิ่ม mpd แบบ SegmentTimeline (ได้ init+seg00001..00003 ผ่าน $Number%05d$ ครบไบต์ตรง)
+  และแบบ SegmentBase/index (ได้ไฟล์ `<BaseURL>` ของ representation bandwidth สูงสุดเป๊ะ — ไฟล์ของ rep อื่น
+  ตั้งใจให้ 404 กันเลือกผิด) (fixtures ใหม่ `dashplayer.html`, `dash/stream.mpd`, `dash/timeline.mpd`,
+  `dash/segmentbase.mpd`, `dash/init.mp4`, `dash/seg1.m4s`, `dash/seg2.m4s`, `dash/seg0000x.m4s`,
+  `dash/single.mp4`)
+
 ### ส่วนขยาย Chrome v1.1.9
 - **ดาวน์โหลดสตรีม HLS (m3u8) ได้ในตัวส่วนขยายแล้ว** — เคสที่ผู้ใช้แจ้ง: ไอเทม iframe player
   (เช่น merrylion2.com) "ไม่ดาวน์โหลดไฟล์" เพราะตัว resolve หาเจอสตรีม m3u8 แล้ว แต่ Chrome
@@ -14,6 +39,21 @@
   เมื่อสตรีมเข้ารหัส AES-128 (ยังต้องใช้แอปเดสก์ท็อป) · DASH (mpd) ยังส่งต่อแอปเดสก์ท็อปเหมือนเดิม
 - E2E ขยายเป็น 60 เช็ค: ไอเทม m3u8 ตรงและเส้นทาง embed → html-scan → m3u8 → ประกอบไฟล์
   ต้องได้ไบต์ตรงกับชิ้นส่วนต้นทาง (fixtures ใหม่ `hlsplayer.html`, `hls/stream.m3u8`, `hls/seg1.ts`, `hls/seg2.ts`)
+
+### Desktop v1.3.0
+
+- **แท็บใหม่ "🕸 Scrape (Sieve)" เชื่อมต่อ Sieve scrape API (scrape.usesieve.com)** — เครื่องมือสกัดข้อมูล
+  หน้าเว็บเพิ่มเติมใน Control Center: เชื่อมต่อด้วย **Device Login** (แอปสร้างลิงก์ให้เปิดในเบราว์เซอร์
+  แล้วอนุมัติรหัสอุปกรณ์ — ไม่ต้องคอปปี้ key เอง) หรือวาง API key (`dc_sk_...`) พร้อมปุ่มตรวจเครดิต
+  รัน scrape job และดูสถานะ/ผลลัพธ์ย้อนหลังได้ในแท็บเดียวกัน · ไม่มี key = โมดูลทั้งหมด dormant
+  (ไม่มี request ออกไปไหน แอปทำงานเหมือนเดิมทุกอย่าง)
+- ความปลอดภัยตามหลักการเดิม: key เก็บใน settings.json เฉพาะเครื่อง (มี `SIEVE_API_KEY` env fallback)
+  **ไม่ถูกเขียนลง log / ถูก redact ใน events.jsonl / ไม่ถูก export / ไม่คืนค่ากลับ UI** · ทุก run บันทึกลง
+  `sieve_runs.json` **ก่อน**เริ่ม poll กัน run ซ้ำเมื่อแอปล้มกลางทาง (POST ใช้เครดิตทันทีที่ถูกยอมรับ)
+- HTTP client บน stdlib urllib เดิม (ไม่เพิ่ม dependency) · transport inject ได้ — unit tests ใหม่
+  จำลอง response/retry/status ได้โดยไม่ยิงเน็ตจริง
+
+[1.3.0]: https://github.com/NarDecH/VDO_Download_APK/releases/tag/v1.3.0
 
 ## [1.2.2] — 2026-10-01
 

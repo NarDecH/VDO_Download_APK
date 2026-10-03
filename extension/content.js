@@ -462,7 +462,14 @@
       setStatus("⏳ อ่าน blob จากหน้าเว็บ…");
       askMain({ type: "readBlob", id, url });
     } else if (kind === "mpd") {
-      setStatus("📺 สตรีม DASH — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp) เพื่อรวมไฟล์");
+      // v1.1.10: the SW downloads DASH itself - sending the job again routes
+      // it through vg:download -> downloadDash (this fallback only runs after
+      // a hard failure, e.g. the SW restarted mid-stream)
+      setStatus("⏳ ลองรวมสตรีม DASH อีกครั้ง…");
+      chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
+        if (resp && resp.ok) setStatus("✅ ดาวน์โหลดสตรีม DASH แล้ว — ดูในแถบดาวน์โหลดของ Chrome");
+        else setStatus("📺 สตรีม DASH รวมไฟล์ไม่สำเร็จ — " + ((resp && resp.error) || "ใช้แอปเดสก์ท็อป").slice(0, 80));
+      });
     } else if (kind === "m3u8") {
       // v1.1.9: the SW downloads HLS itself - sending the job again routes it
       // through vg:download -> downloadHls (this fallback only runs after a
@@ -470,7 +477,7 @@
       setStatus("⏳ ลองรวมสตรีม HLS อีกครั้ง…");
       chrome.runtime.sendMessage({ type: "vg:download", item: { url, kind, name, page: location.href } }, (resp) => {
         if (resp && resp.ok) setStatus("✅ ดาวน์โหลดสตรีม HLS แล้ว — ดูในแถบดาวน์โหลดของ Chrome");
-        else setStatus("📺 สตรีม HLS — ใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp)");
+        else setStatus("📺 สตรีม HLS รวมไฟล์ไม่สำเร็จ — " + ((resp && resp.error) || "ใช้แอปเดสก์ท็อป").slice(0, 80));
       });
     } else {
       // http(s) media the browser refused (expired token / picky CDN):
@@ -498,8 +505,9 @@
       } else if (resp && resp.ok) {
         setStatus("✅ เริ่มดาวน์โหลดแล้ว — ดูในแถบดาวน์โหลดของ Chrome");
       } else if (resp && resp.hls) {
-        // DASH / encrypted HLS - really needs yt-dlp on the desktop
-        setStatus("📺 สตรีมนี้ต้องใช้ VDOGrabber เวอร์ชันเดสก์ท็อป (yt-dlp): " + (resp.error || "").slice(0, 60));
+        // stream refused by the SW (encrypted HLS / unsupported DASH layout /
+        // too big): show WHY instead of the old blanket "use the desktop app"
+        setStatus("📺 สตรีมนี้รวมไฟล์ในส่วนขยายไม่ได้: " + (resp.error || "").slice(0, 80));
       } else if (resp && resp.page) {
         setStatus("⚠️ ไม่พบไฟล์วิดีโอในหน้านั้น — เล่นวิดีโอก่อนแล้วกดอีกครั้ง หรือใช้แอปเดสก์ท็อป");
       } else if (lastErr || !resp || !resp.ok) {
@@ -540,6 +548,10 @@
         // segment is downloading (the browser download bar stays silent until
         // the assembled blob is handed over at the very end)
         setStatus(`⏳ ดาวน์โหลดสตรีม HLS… ชิ้นส่วน ${msg.seg}/${msg.total}`);
+      }
+      else if (msg.type === "vg:dashProgress") {
+        // v1.1.10: same progress feed for DASH assembly
+        setStatus(`⏳ ดาวน์โหลดสตรีม DASH… ชิ้นส่วน ${msg.seg}/${msg.total}`);
       }
       else if (msg.type === "vg:resolveMedia") {
         // v1.1.6: the SW asks what media THIS page is actually playing (the

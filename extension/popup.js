@@ -30,10 +30,11 @@ async function load() {
       // tabId lets the SW resolve embed/page candidates against the live tab
       chrome.runtime.sendMessage({ type: "vg:download", tabId: tab.id, item: { url: u, kind: k, name: tab.title || "video", page: tab.url } }, (resp) => {
         if (chrome.runtime.lastError || !resp) { b.textContent = "ส่งแล้ว ✓"; return; }
-        // v1.1.9: ok+hls = the extension assembled the HLS stream itself (.ts);
-        // hls without ok (DASH / encrypted HLS) still needs the desktop app
-        if (resp.ok && resp.hls) b.textContent = "ส่งแล้ว ✓ (HLS)";
-        else if (resp.hls) b.textContent = "📺 ใช้แอปเดสก์ท็อป";
+        // v1.1.9/v1.1.10: ok+hls = the extension assembled the stream itself;
+        // hls without ok = the SW refused it (encrypted HLS / unsupported DASH
+        // layout) - the error says why
+        if (resp.ok && resp.hls) b.textContent = resp.dash ? "ส่งแล้ว ✓ (DASH)" : "ส่งแล้ว ✓ (HLS)";
+        else if (resp.hls) b.textContent = "📺 รวมสตรีมไม่ได้";
         else if (resp.page) b.textContent = "⚠️ ไม่พบวิดีโอ";
         else if (resp.ok) b.textContent = "ส่งแล้ว ✓";
         else b.textContent = "ล้มเหลว";

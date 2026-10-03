@@ -21,7 +21,7 @@ import traceback
 from logging.handlers import RotatingFileHandler
 
 APP_NAME = "VDOGrabber"
-APP_VERSION = "1.2.2"
+APP_VERSION = "1.3.0"
 
 _levels = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
 
@@ -46,9 +46,9 @@ class EventLog:
             "event": event_type,
         }
         rec.update(data)
-        # defense in depth: a GitHub token must never reach disk, even via a
-        # stray kwarg (v1.2.2 - exclusion cloud sync)
-        for key in ("token", "github_pat", "authorization"):
+        # defense in depth: credentials must never reach disk, even via a
+        # stray kwarg (v1.2.2 exclusion cloud sync; v1.3.0 Sieve key)
+        for key in ("token", "github_pat", "authorization", "api_key", "sieve_api_key", "bearer"):
             if key in rec:
                 rec[key] = "[redacted]"
         line = json.dumps(rec, ensure_ascii=False, default=str)
@@ -129,6 +129,8 @@ class LogManager:
         """Zip all logs + settings into a single diagnostics bundle."""
         import zipfile
 
+        from .settings import SECRET_KEYS
+
         dest_dir = dest_dir or os.path.join(os.path.expanduser("~"), "Desktop")
         os.makedirs(dest_dir, exist_ok=True)
         stamp = time.strftime("%Y%m%d-%H%M%S")
@@ -140,7 +142,16 @@ class LogManager:
                     z.write(p, fn)
             sp = os.path.join(self.data_dir, "settings.json")
             if os.path.exists(sp):
-                z.write(sp, "settings.json")
+                # never ship credentials in an error report: strip secret keys
+                try:
+                    with open(sp, "r", encoding="utf-8") as f:
+                        doc = json.load(f)
+                    for k in SECRET_KEYS:
+                        if k in doc:
+                            doc[k] = "[redacted]"
+                except Exception:
+                    doc = {"(settings.json unreadable)": True}
+                z.writestr("settings.json", json.dumps(doc, ensure_ascii=False, indent=2))
         self.log("diagnostics exported -> %s" % out, event="diagnostics_export", path=out)
         return out
 

@@ -393,6 +393,239 @@ async function collectPlaylist(url, depth = 0) {
   return segs;
 }
 
+// ---------------------------------------------------------------- DASH (v1.1.10)
+// Chrome cannot remux DASH either - and mpd used to be bounced to the desktop
+// app even after HLS learned to assemble itself. The SW fetches the MPD,
+// takes the highest-bandwidth Representation, and concatenates init segment
+// + every media segment into one file through the offscreen assembler. For
+// the common "SegmentTemplate with one template, many numbered segments"
+// profile this yields a playable fMP4 (.mp4). SegmentTemplate+SegmentTimeline
+// (merrylion-style players: no @duration) enumerates its <S t d r> entries,
+// and SegmentBase/indexed layouts are one self-contained fMP4 file downloaded
+// whole; anything else is refused with a clear message instead of junk.
+const MAX_DASH_SEGS = 5000;
+const MPD_XML_TAGS = /<(\/?)([A-Za-z0-9_:.-]*)((?:\s+[A-Za-z0-9_:.-]+\s*=\s*(?:"[^"]*"|'[^']*'))*)\s*(\/?)>/g;
+const XML_ATTR_RE = /([A-Za-z0-9_:.-]+)\s*=\s*("([^"]*)"|'([^']*)')/g;
+
+function xmlAttrs(tagText) {
+  const out = {};
+  for (const m of tagText.matchAll(XML_ATTR_RE)) out[m[1]] = m[3] !== undefined ? m[3] : m[4];
+  return out;
+}
+// attribute names are case-sensitive in XML but camelCase in the DASH spec
+// (startNumber, indexRange, sourceURL) - readers use this uniform lowercase view
+function lowerAttrs(a) { const o = {}; for (const k of Object.keys(a)) o[k.toLowerCase()] = a[k]; return o; }
+function resolveTemplate(tpl, rep) {
+  // $RepresentationID$/$Bandwidth$/$Number$/$Time$ - enough for static VOD
+  return String(tpl || "")
+    .replace(/\$RepresentationID\$/g, rep.id || "")
+    .replace(/\$Bandwidth\$/g, rep.bandwidth || "0")
+    .replace(/\$Number(?:%0(\d+)d)?\$/g, (_, w) => w ? String(rep._number).padStart(Number(w), "0") : String(rep._number))
+    .replace(/\$Time(?:%0(\d+)d)?\$/g, (_, w) => w ? String(rep._time).padStart(Number(w), "0") : String(rep._time))
+    .replace(/\$\$/g, "$");
+}
+function highestRepresentation(mpdText) {
+  // Flatten the MPD into one "best" Representation: attributes on MPD/
+  // Period/AdaptationSet are defaults inherited by Representations that omit
+  // them, and <SegmentTemplate> (an ELEMENT, not an attribute) is tracked per
+  // scope - the most specific template wins. Scoring happens when the
+  // representation CLOSES, because a rep-level <SegmentTemplate> arrives
+  // after its opening tag.
+  let best = null, bestBw = -1;
+  let period = {}, adapt = {}, cur = null;
+  let tplMpd = {}, tplPeriod = null, tplAdapt = null, tplRep = null;
+  let curTpl = null, tl = null; // open <SegmentTemplate> + its <SegmentTimeline> entries
+  let inPeriod = false, inAdapt = false;
+  const flush = () => {
+    if (!cur) return;
+    const rep = { ...period, ...adapt, ...tplMpd, ...(tplPeriod || {}), ...(tplAdapt || {}), ...(tplRep || {}), ...cur };
+    const bw = parseInt(rep.bandwidth || "0", 10);
+    // prefer video over audio when both declare equal bandwidth
+    const isVideo = (rep.contentType || rep.mimeType || "").includes("video");
+    const score = bw * 2 + (isVideo ? 1 : 0);
+    if (bw > 0 && score > bestBw) { bestBw = score; best = { ...rep, _number: 0, _time: 0 }; }
+    cur = null; tplRep = null;
+  };
+  for (const m of (mpdText.matchAll(MPD_XML_TAGS))) {
+    const closing = m[1] === "/", name = m[2].toLowerCase();
+    const attrs = xmlAttrs(m[3]);
+    if (closing) {
+      if (name === "representation") flush();
+      else if (name === "adaptationset") { adapt = {}; inAdapt = false; tplAdapt = null; }
+      else if (name === "period") { period = {}; inPeriod = false; tplPeriod = null; }
+      else if (name === "segmenttimeline") { if (curTpl && tl) curTpl._timeline = tl; tl = null; }
+      else if (name === "segmenttemplate") curTpl = null;
+      continue;
+    }
+    if (name === "period") { period = attrs; inPeriod = true; tplPeriod = null; }
+    else if (name === "adaptationset") { adapt = attrs; inAdapt = true; tplAdapt = null; }
+    else if (name === "segmenttemplate") {
+      // attr names are camelCase (startNumber) - lowercase so the collector
+      // reads rep.startnumber uniformly
+      const low = lowerAttrs(attrs);
+      if (cur) tplRep = low;
+      else if (inAdapt) tplAdapt = low;
+      else if (inPeriod) tplPeriod = low;
+      else tplMpd = low;
+      curTpl = low;
+    }
+    else if (name === "segmenttimeline") tl = []; // <S> entries follow
+    else if (name === "s" && tl) tl.push(attrs);  // <S t d r> - single-letter keys, already lowercase
+    else if (name === "representation") {
+      cur = attrs;
+      if (m[4] === "/") { tplRep = null; flush(); } // self-closing <Representation/>
+    }
+  }
+  flush();
+  return best;
+}
+function collectDashSegments(mpdUrl, mpdText) {
+  const rep = highestRepresentation(mpdText);
+  if (!rep) throw new Error("MPD has no usable Representation");
+  const segs = [];
+  // 1) SegmentTemplate (on the Representation or inherited from MPD/Period/
+  //    AdaptationSet - highestRepresentation merged it into `rep`).
+  if (rep.media) {
+    const timescale = parseFloat(rep.timescale || "1");
+    const startNum = parseInt(rep.startnumber || "1", 10);
+    const mpdDur = (mpdText.match(/mediaPresentationDuration\s*=\s*"([^"]+)"/i) || [])[1];
+    // 1a) <SegmentTimeline><S t d r/></SegmentTimeline> lists every segment
+    //     explicitly (merrylion-style: no @duration on the template). @r
+    //     repeats an entry; @t is absolute in @timescale, omitted @t
+    //     continues from the previous entry.
+    if (Array.isArray(rep._timeline) && rep._timeline.length) {
+      if (rep.initialization) segs.push(resolveUrl(resolveTemplate(rep.initialization, rep), mpdUrl));
+      let num = startNum, t = 0, count = 0;
+      const totalTicks = mpdDur ? isoDuration(mpdDur) * timescale : 0;
+      for (const s of rep._timeline) {
+        const d = parseInt(s.d || "0", 10);
+        if (!(d > 0)) throw new Error("DASH SegmentTimeline entry has no @d");
+        const start = (s.t !== undefined && s.t !== "") ? parseInt(s.t, 10) : t;
+        let r = parseInt(s.r || "0", 10);
+        if (r < 0) {
+          // negative repeat runs until the media end (live edge)
+          if (!(totalTicks > 0)) throw new Error("DASH SegmentTimeline: negative @r needs mediaPresentationDuration");
+          r = Math.max(0, Math.ceil((totalTicks - start) / d) - 1);
+        }
+        for (let i = 0; i <= r; i++) {
+          rep._number = num++; rep._time = start + i * d;
+          segs.push(resolveUrl(resolveTemplate(rep.media, rep), mpdUrl));
+          if (++count > MAX_DASH_SEGS) throw new Error("too many segments (live stream?)");
+        }
+        t = start + (r + 1) * d;
+      }
+      return segs;
+    }
+    // 1b) @duration style: count = ceil(totalSeconds * timescale / duration)
+    //     from mediaPresentationDuration; without it the count is unknowable.
+    const dur = parseFloat(rep.duration || "0");
+    if (dur > 0) {
+      const totalSec = mpdDur ? isoDuration(mpdDur) : 0;
+      let count = totalSec > 0 ? Math.ceil(totalSec * timescale / dur) : 0;
+      if (!(count > 0)) throw new Error("cannot derive DASH segment count - use the desktop app (yt-dlp)");
+      if (count > MAX_DASH_SEGS) throw new Error("too many segments (live stream?)");
+      if (rep.initialization) segs.push(resolveUrl(resolveTemplate(rep.initialization, rep), mpdUrl));
+      for (let n = startNum; n < startNum + count; n++) {
+        rep._number = n;
+        segs.push(resolveUrl(resolveTemplate(rep.media, rep), mpdUrl));
+      }
+      return segs;
+    }
+  }
+  // 2) explicit SegmentList / SegmentURL entries
+  const listUrls = [];
+  let initUrl = "";
+  for (const m of (mpdText.matchAll(MPD_XML_TAGS))) {
+    const name = m[2].toLowerCase();
+    if (m[1] === "/") continue;
+    const a = lowerAttrs(xmlAttrs(m[3])); // sourceURL is camelCase in the spec
+    if (name === "initialization" && a.sourceurl) initUrl = a.sourceurl;
+    else if (name === "segmenturl" && a.media) listUrls.push(a.media);
+  }
+  if (listUrls.length) {
+    if (initUrl) segs.push(resolveUrl(initUrl, mpdUrl));
+    for (const u of listUrls.slice(0, MAX_DASH_SEGS)) segs.push(resolveUrl(u, mpdUrl));
+    return segs;
+  }
+  // 3) SegmentBase/indexed (on-demand profile): no per-segment URLs - the
+  //    whole media is ONE self-contained fMP4 file and the index is just a
+  //    byte range inside it, so downloading the file IS the video. The media
+  //    URL is the <BaseURL> ELEMENT TEXT (not an attribute!) - the chosen
+  //    Representation's own BaseURL first, else inherited from
+  //    AdaptationSet/Period/MPD.
+  let baseRep = "", baseAny = "", indexed = false;
+  let inRep = false, inBestRep = false;
+  for (const m of (mpdText.matchAll(MPD_XML_TAGS))) {
+    const closing = m[1] === "/", name = m[2].toLowerCase();
+    if (closing) {
+      if (name === "representation") { inRep = false; inBestRep = false; }
+      continue;
+    }
+    const a = lowerAttrs(xmlAttrs(m[3]));
+    if (name === "representation") {
+      inRep = true;
+      inBestRep = rep.id !== undefined && String(a.id) === String(rep.id);
+      if (a.indexrange) indexed = true;
+    }
+    else if (name === "segmentbase") { if (a.indexrange) indexed = true; }
+    else if (name === "representationindex") { if (a.sourceurl) indexed = true; }
+    else if (name === "baseurl") {
+      const end = m.index + m[0].length;
+      const text = mpdText.slice(end, mpdText.indexOf("<", end)).trim();
+      if (inBestRep && !baseRep) baseRep = text;
+      if (!baseAny) baseAny = text;
+    }
+  }
+  const single = baseRep || baseAny;
+  if (single && (indexed || baseRep)) return [resolveUrl(single, mpdUrl)];
+  if (indexed) throw new Error("DASH SegmentBase has no <BaseURL> - use the desktop app (yt-dlp)");
+  throw new Error("unsupported DASH layout - use the desktop app (yt-dlp)");
+}
+function isoDuration(s) {
+  const m = /^-?P(?:(\d+(?:\.\d+)?)Y)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)D)?(?:T(?:(\d+(?:\.\d+)?)H)?(?:(\d+(?:\.\d+)?)M)?(?:(\d+(?:\.\d+)?)S)?)?$/.exec(String(s || ""));
+  if (!m) return 0;
+  const [y, mo, d, h, mi, se] = m.slice(1).map((v) => parseFloat(v || "0"));
+  return ((y * 365 + mo * 30 + d) * 86400) + h * 3600 + mi * 60 + se;
+}
+
+async function downloadDash(mpdUrl, filename, tabId) {
+  const id = "dash-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
+  let mpdText = "";
+  try {
+    const r = await fetch(mpdUrl, { credentials: "include" });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    mpdText = await r.text();
+  } catch (e) {
+    return { ok: false, hls: true, error: "DASH manifest: " + (e.message || e) };
+  }
+  if (!/<mpd[\s>]/i.test(mpdText)) return { ok: false, hls: true, error: "DASH manifest: not an MPD" };
+  let segs;
+  try {
+    segs = collectDashSegments(mpdUrl, mpdText);
+  } catch (e) {
+    return { ok: false, hls: true, error: e.message || String(e) };
+  }
+  log("dash", `${segs.length} segments from ${mpdUrl.slice(0, 100)}`);
+  await ensureOffscreen();
+  const begin = await offscreen({ type: "asb:begin", id, mime: "video/mp4" });
+  if (!begin || !begin.ok) return { ok: false, hls: true, error: (begin && begin.error) || "assembler unavailable" };
+  try {
+    for (let i = 0; i < segs.length; i++) {
+      const r = await fetch(segs[i], { credentials: "include" });
+      if (!r.ok) throw new Error("HTTP " + r.status + " seg " + (i + 1));
+      const cr = await offscreen({ type: "asb:chunk", id, b64: b64(new Uint8Array(await r.arrayBuffer())) });
+      if (!cr || !cr.ok) throw new Error((cr && cr.error) || "assembler chunk failed");
+      if (tabId) chrome.tabs.sendMessage(tabId, { type: "vg:dashProgress", seg: i + 1, total: segs.length }).catch(() => {});
+    }
+  } catch (e) {
+    await offscreen({ type: "asb:abort", id });
+    return { ok: false, hls: true, error: "DASH segment failed: " + (e.message || e) }
+  }
+  const fname = String(filename || "video").replace(/\.(mpd|mp4|m4s|ts)?$/i, ".mp4");
+  const r = await assembleAndDownload(id, "video/mp4", fname, tabId);
+  return r.ok ? { ok: true, hls: true, dash: true, filename: r.filename } : { ok: false, hls: true, error: r.error };
+}
+
 async function downloadHls(manifestUrl, filename, tabId) {
   const id = "hls-" + Date.now() + "-" + Math.floor(Math.random() * 1e6);
   try {
@@ -589,30 +822,25 @@ chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
           sendResponse({ ok: false, page: true, error: "no video found on that page - play the video first, or use the desktop app" });
           break;
         }
-        // resolved to an HLS/DASH manifest? m3u8 is now downloaded IN the
-        // extension (manifest + segments fetched by the SW, assembled into
-        // one .ts); DASH (mpd) still needs yt-dlp on the desktop.
+        // resolved to an HLS/DASH manifest? v1.1.9/v1.1.10: BOTH are now
+        // downloaded IN the extension (manifest + segments fetched by the SW,
+        // assembled into one file through the offscreen assembler).
         if (resolved && (workKind === "m3u8" || workKind === "mpd")) {
-          if (workKind === "m3u8") {
-            const hr = await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId);
-            log(hr.ok ? "download" : "download-hls-failed", `hls ${workUrl.slice(0, 90)}: ${hr.ok ? hr.filename : hr.error}`);
-            sendResponse(hr.ok ? hr : { ok: false, hls: true, error: hr.error });
-            return;
-          }
-          log("download-hls", `resolved to a ${workKind} stream - desktop app required`);
-          sendResponse({ ok: false, hls: true, error: "HLS/DASH stream - use the VDOGrabber desktop app (yt-dlp)" });
-          break;
+          const sr = workKind === "m3u8"
+            ? await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId)
+            : await downloadDash(workUrl, safeName(item.name, "mp4"), dlTabId);
+          log(sr.ok ? "download" : "download-stream-failed", `${workKind} ${workUrl.slice(0, 90)}: ${sr.ok ? sr.filename : sr.error}`);
+          sendResponse(sr.ok ? sr : { ok: false, hls: true, error: sr.error });
+          return;
         }
         // a DIRECT m3u8/mpd item (no resolution needed) - same routing
         if (/^https?:/i.test(workUrl) && (workKind === "m3u8" || workKind === "mpd")) {
-          if (workKind === "m3u8") {
-            const hr = await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId);
-            log(hr.ok ? "download" : "download-hls-failed", `hls direct ${workUrl.slice(0, 90)}: ${hr.ok ? hr.filename : hr.error}`);
-            sendResponse(hr.ok ? hr : { ok: false, hls: true, error: hr.error });
-            return;
-          }
-          sendResponse({ ok: false, hls: true, error: "DASH stream - use the VDOGrabber desktop app (yt-dlp)" });
-          break;
+          const sr = workKind === "m3u8"
+            ? await downloadHls(workUrl, safeName(item.name, "ts"), dlTabId)
+            : await downloadDash(workUrl, safeName(item.name, "mp4"), dlTabId);
+          log(sr.ok ? "download" : "download-stream-failed", `${workKind} direct ${workUrl.slice(0, 90)}: ${sr.ok ? sr.filename : sr.error}`);
+          sendResponse(sr.ok ? sr : { ok: false, hls: true, error: sr.error });
+          return;
         }
 
         const dlItem = { ...item, url: workUrl, kind: workKind };

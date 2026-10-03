@@ -59,6 +59,7 @@ def serve():
                 return
             ctype = "video/mp4" if path.endswith((".mp4", ".m4s")) else (
                 "application/vnd.apple.mpegurl" if path.endswith(".m3u8") else
+                "application/dash+xml" if path.endswith(".mpd") else
                 "video/mp2t" if path.endswith(".ts") else "text/html")
             body = open(full, "rb").read()
             self.send_response(200)
@@ -634,6 +635,59 @@ def main():
             hls2_ok = hashlib.sha256(open(hls2_file, "rb").read()).hexdigest() == hls_expected
         check("player-page HLS download matches the stream bytes", hls2_ok,
               os.path.basename(hls2_file or ""))
+
+        # ==== DASH assembly inside the extension (v1.1.10) ===================
+        # Same story as HLS: an mpd manifest used to be refused with
+        # "HLS/DASH stream - use the VDOGrabber desktop app (yt-dlp)". The SW
+        # now parses the MPD, picks the highest-bandwidth Representation and
+        # concatenates init + media segments into one .mp4 through the
+        # offscreen assembler.
+        dash_expected = hashlib.sha256(
+            open(os.path.join(TESTS, "dash", "init.mp4"), "rb").read() +
+            open(os.path.join(TESTS, "dash", "seg1.m4s"), "rb").read() +
+            open(os.path.join(TESTS, "dash", "seg2.m4s"), "rb").read()).hexdigest()
+        dashr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/dash/stream.mpd', 'kind': 'mpd', 'name': 'e2e-dash'}))})")
+        check("direct mpd item assembles a DASH stream in the extension",
+              bool(dashr and dashr.get("ok") and dashr.get("dash")), json.dumps(dashr or {}))
+        dash_file = wait_for_hash(TMP_DL, dash_expected, 60)
+        check("assembled DASH file is init+seg1+seg2 concatenated (byte-identical)", bool(dash_file), dash_file or "timeout")
+
+        # the player page path: embed candidate -> html-scan finds the mpd ->
+        # resolved kind=mpd -> same assembly (mirrors the HLS embed chain)
+        before_d = set(os.listdir(TMP_DL))
+        dashr2 = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/dashplayer.html', 'kind': 'embed', 'name': 'e2e-dash2'}))})")
+        check("embed candidate resolves to mpd and assembles it too",
+              bool(dashr2 and dashr2.get("ok") and dashr2.get("dash")), json.dumps(dashr2 or {}))
+        dash2_file = wait_for_new_file(TMP_DL, before_d, 60)
+        dash2_ok = False
+        if dash2_file:
+            dash2_ok = hashlib.sha256(open(dash2_file, "rb").read()).hexdigest() == dash_expected
+        check("player-page DASH download matches the stream bytes", dash2_ok,
+              os.path.basename(dash2_file or ""))
+
+        # ==== DASH SegmentTimeline + SegmentBase single-file (v1.1.10) ========
+        # Real-world case (merrylion2.com player.html): SegmentTemplate without
+        # @duration - the segment list lives in <SegmentTimeline><S t d r/>
+        # (used to be refused as "unsupported DASH layout (SegmentBase/indexed)").
+        # Plus the on-demand profile: SegmentBase/indexRange = ONE self-contained
+        # fMP4 file, downloaded whole via the chosen Representation's <BaseURL>.
+        tl_expected = hashlib.sha256(
+            open(os.path.join(TESTS, "dash", "init.mp4"), "rb").read() +
+            open(os.path.join(TESTS, "dash", "seg00001.m4s"), "rb").read() +
+            open(os.path.join(TESTS, "dash", "seg00002.m4s"), "rb").read() +
+            open(os.path.join(TESTS, "dash", "seg00003.m4s"), "rb").read()).hexdigest()
+        tlr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/dash/timeline.mpd', 'kind': 'mpd', 'name': 'e2e-dash-tl'}))})")
+        check("direct mpd with SegmentTimeline enumerates <S t d r> entries",
+              bool(tlr and tlr.get("ok") and tlr.get("dash")), json.dumps(tlr or {}))
+        tl_file = wait_for_hash(TMP_DL, tl_expected, 60)
+        check("SegmentTimeline download is init+seg00001..3 (byte-identical)", bool(tl_file), tl_file or "timeout")
+
+        sb_expected = hashlib.sha256(open(os.path.join(TESTS, "dash", "single.mp4"), "rb").read()).hexdigest()
+        sbr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/dash/segmentbase.mpd', 'kind': 'mpd', 'name': 'e2e-dash-sb'}))})")
+        check("direct mpd with SegmentBase/index downloads the single fMP4",
+              bool(sbr and sbr.get("ok") and sbr.get("dash")), json.dumps(sbr or {}))
+        sb_file = wait_for_hash(TMP_DL, sb_expected, 60)
+        check("SegmentBase download is exactly the chosen <BaseURL> file (byte-identical)", bool(sb_file), sb_file or "timeout")
 
     finally:
         try:

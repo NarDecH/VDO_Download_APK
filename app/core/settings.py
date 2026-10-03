@@ -28,7 +28,13 @@ DEFAULTS = {
     "exclusions": [],           # v1.2.0: sites with no detection/toolbar (list of patterns)
     "github_pat": "",           # v1.2.2: GitHub token (gist scope) for cloud sync - stored locally only
     "gist_id": "",              # secret gist that carries vdograbber-exclusions.json (empty = create on first sync)
+    "sieve_api_key": "",        # v1.3.0: Sieve scrape API key (dc_sk_...) - server-side only, never logged/exported
 }
+
+# Settings that are credentials: never surfaced to the UI state, never logged,
+# never written into a diagnostics bundle. Keep in sync with the redaction
+# lists in core/logger.py (EventLog) and Api.get_state (app/main.py).
+SECRET_KEYS = ("github_pat", "sieve_api_key")
 
 
 # ------------------------------------------------------------ exclusion matcher
