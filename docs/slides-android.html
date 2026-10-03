@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber Android — สไลด์แนะนำเวอร์ชัน Android</title>
+<style>
+  :root {
+    --bg: #0b1020; --panel: #121a30; --panel2: #0f1730; --line: #233252;
+    --text: #e7edf7; --muted: #9fb0cd; --green: #22c55e; --blue: #3b82f6;
+    --amber: #f59e0b; --red: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: "Segoe UI", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+    overflow: hidden;
+  }
+  .deck { position: relative; height: 100%; }
+  .slide {
+    position: absolute; inset: 0; display: none; flex-direction: column;
+    padding: 56px 72px 76px; overflow: auto;
+  }
+  .slide.active { display: flex; }
+  .kicker { color: var(--green); font-weight: 700; letter-spacing: .12em; font-size: 13px; text-transform: uppercase; }
+  h1 { font-size: 44px; margin: 10px 0 8px; line-height: 1.25; }
+  h2 { font-size: 30px; margin: 6px 0 18px; line-height: 1.3; }
+  p  { color: var(--muted); font-size: 17px; line-height: 1.7; margin: 6px 0; }
+  ul { color: var(--muted); font-size: 17px; line-height: 1.85; margin: 8px 0; padding-left: 22px; }
+  li b, p b { color: var(--text); }
+  code { background: #0a0f1f; border: 1px solid var(--line); border-radius: 6px; padding: 1px 7px; font-size: 14px; color: #9fd0ff; }
+  .row { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 10px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+    padding: 14px 18px; flex: 1 1 200px; min-width: 180px;
+  }
+  .card h3 { margin: 0 0 6px; font-size: 16px; color: var(--text); }
+  .card p { font-size: 14px; margin: 0; }
+  .tag { display: inline-block; background: #0a0f1f; border: 1px solid var(--line); border-radius: 999px;
+         padding: 3px 12px; font-size: 13px; color: var(--muted); margin: 3px 4px 0 0; }
+  .accent { color: var(--green); font-weight: 700; }
+  .blue { color: var(--blue); font-weight: 700; }
+  .flow { display: flex; align-items: stretch; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+  .flow .step { background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; flex: 1 1 150px; }
+  .flow .step b { display: block; color: var(--text); margin-bottom: 4px; font-size: 15px; }
+  .flow .step span { color: var(--muted); font-size: 13.5px; line-height: 1.6; display: block; }
+  .flow .arr { align-self: center; color: var(--green); font-size: 22px; padding: 0 2px; }
+  table { border-collapse: collapse; width: 100%; margin-top: 12px; font-size: 15px; }
+  th, td { border: 1px solid var(--line); padding: 8px 12px; text-align: left; color: var(--muted); }
+  th { color: var(--text); background: var(--panel2); }
+  .footer {
+    position: fixed; left: 0; right: 0; bottom: 0; height: 46px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 26px; background: rgba(10, 15, 31, .92); border-top: 1px solid var(--line);
+    font-size: 13px; color: var(--muted); z-index: 5;
+  }
+  .footer .btns button {
+    background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 14px; margin-left: 8px; cursor: pointer; font-size: 13px;
+  }
+  .footer .btns button:hover { border-color: var(--green); }
+  .progress { position: fixed; top: 0; left: 0; height: 3px; background: var(--green); width: 0; z-index: 6; transition: width .2s; }
+  .center { justify-content: center; }
+  .big-ico { font-size: 52px; margin-bottom: 6px; }
+  .verchip { display:inline-block; background: #052e16; color: var(--green); border: 1px solid #14532d;
+             border-radius: 10px; padding: 4px 14px; font-weight: 700; margin-top: 10px; }
+  @media print {
+    body { overflow: visible; background: #fff; }
+    .slide { display: flex !important; position: relative; page-break-after: always; height: 100vh; color: #111; }
+    .slide, .slide * { color: #111 !important; }
+    .card, .flow .step, code, th, td, .tag, .verchip { background: #f5f5f5 !important; border-color: #ccc !important; }
+    .footer, .progress { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="progress" id="prog"></div>
+<div class="deck" id="deck">
+
+  <!-- 1 · TITLE -->
+  <section class="slide center active">
+    <div class="kicker">VDO Grabber · สายผลิตภัณฑ์ Android</div>
+    <h1>🎬 เปิดเว็บไหนก็ได้ แล้วดาวน์โหลด<br>วิดีโอที่กำลังเล่นอยู่</h1>
+    <p>แอป Android ของ VDO Grabber — เบราว์เซอร์ WebView ที่ตรวจจับวิดีโอในหน้าเว็บอัตโนมัติ<br>
+       และดาวน์โหลดได้ทั้งไฟล์ตรงและสตรีม HLS/DASH ด้วยเอนจิน yt-dlp บนเครื่อง</p>
+    <span class="verchip">v1.3.0 · versionCode 13</span>
+    <p style="margin-top:18px">Kotlin · WebView · youtubedl-android 0.17.3 (+ ffmpeg) · minSdk 26 → targetSdk 35</p>
+  </section>
+
+  <!-- 2 · OVERVIEW -->
+  <section class="slide">
+    <div class="kicker">ภาพรวม</div>
+    <h2>โครงสร้างแอป: 10 ไฟล์ Kotlin บทบาทชัดเจน</h2>
+    <div class="flow">
+      <div class="step"><b>WebView + Bridge</b><span>เปิดเว็บใดก็ได้ ฉีดตัวตรวจจับทุกหน้า (document_start)</span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>Detector (4 ชั้น)</b><span>ส่งสื่อที่เจอกลับผ่าน <code>AndroidBridge.reportMedia</code></span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>เลือกเส้นทาง</b><span>ไฟล์ตรง → DownloadManager · m3u8/mpd → StreamDownloadService</span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>Downloads/VDOGrabber</b><span>publish เข้า MediaStore + ลบ/จัดการย้อนหลังได้</span></div>
+    </div>
+    <div class="row" style="margin-top:18px">
+      <div class="card"><h3>MainActivity.kt</h3><p>WebView, Bridge, bottom sheet 🎬, ปุ่มดาวน์โหลด/ยกเว้นเว็บ, shouldInterceptRequest</p></div>
+      <div class="card"><h3>Detector.kt</h3><p>INJECT_JS — ฉบับ Android ของ app/core/detector.py (ต้อง sync กันเสมอ)</p></div>
+      <div class="card"><h3>Downloader.kt</h3><p>คิวไฟล์ตรงผ่าน platform DownloadManager + ตัวช่วย pure functions</p></div>
+      <div class="card"><h3>StreamDownloadService.kt</h3><p>foreground service เรียก yt-dlp บนเครื่อง พร้อม notification</p></div>
+    </div>
+    <div class="row">
+      <div class="card"><h3>DownloadCleaner.kt</h3><p>ลิสต์/ลบไฟล์ที่ดาวน์โหลดแล้ว (3 identity)</p></div>
+      <div class="card"><h3>MediaStore.kt / FileLog.kt / LogsActivity.kt</h3><p>รายการสื่อของเซสชัน · log 3 ไฟล์ · หน้าอ่าน log</p></div>
+      <div class="card"><h3>StreamArgs.kt · DeleteFileActivity.kt</h3><p>ประกอบ args ของ yt-dlp (JVM-tested) · trampoline ลบไฟล์จากแจ้งเตือน</p></div>
+      <div class="card"><h3>androidTest ×2</h3><p>StreamEngineTest · DownloadCleanerE2E — วัดผลบน emulator จริง</p></div>
+    </div>
+  </section>
+
+  <!-- 3 · DETECTOR -->
+  <section class="slide">
+    <div class="kicker">การตรวจจับ</div>
+    <h2>Detector.kt — ตัวตรวจจับ 4 ชั้น ฉีดในทุกหน้า</h2>
+    <div class="row">
+      <div class="card"><h3>1 · DOM scan</h3><p><code>&lt;video&gt;</code>, <code>&lt;source&gt;</code>, <code>&lt;audio&gt;</code>, meta <code>og:video</code>, JSON-LD และลิงก์สื่อทุกชนิด</p></div>
+      <div class="card"><h3>2 · Hook fetch/XHR</h3><p>ดัก request <b>m3u8 / mpd / mp4</b> ที่ JS เรียกเอง (รันใน MAIN world จึงเห็นของจริง)</p></div>
+      <div class="card"><h3>3 · Resource timing</h3><p>เก็บ URL จาก <code>performance</code> entries ที่หลุดจากสองชั้นแรก</p></div>
+      <div class="card"><h3>4 · Iframe scan</h3><p>frame same-origin สแกนลึก · cross-origin player รายงานเป็น <code>embed</code> เพื่อชวน "เปิดหน้า embed"</p></div>
+    </div>
+    <ul style="margin-top:16px">
+      <li>รู้จักนามสกุลสื่อกว้าง: <code>mp4 · m3u8 · mpd · webm · mkv · ts · mp3 · m4a …</code> รวม <code>blob:</code></li>
+      <li>ทุกผลลัพธ์ dedupe ด้วย URL แล้วส่งเป็น JSON เข้า Bridge → เพิ่มรายการ + event <code>media_found</code></li>
+      <li><b>กติกา repo:</b> Detector.INJECT_JS ต้อง maintain เป็นคู่กับ DETECT_JS ฝั่ง desktop เสมอ</li>
+      <li>ทดสอบหน้าเพจจริง: ปุ่ม/ชิป "🎬 พบวิดีโอ" อัปเดตทันทีเมื่อพบสื่อใหม่</li>
+    </ul>
+  </section>
+
+  <!-- 4 · TWO ROUTES -->
+  <section class="slide">
+    <div class="kicker">การดาวน์โหลด</div>
+    <h2>สองเส้นทาง — เลือกอัตโนมัติจากชนิด URL</h2>
+    <div class="row">
+      <div class="card" style="border-color:#14532d">
+        <h3 class="accent">ไฟล์ตรง (mp4 / webm / mp3 …)</h3>
+        <p><b>Downloader.kt</b> → platform <b>DownloadManager</b></p>
+        <p>· แนบ cookie ของ WebView (CookieManager) ให้โหลดโดเมนที่ต้องล็อกอินได้</p>
+        <p>· แจ้งเตือนความคืบหน้าของระบบ · เขียนลง Downloads/VDOGrabber</p>
+      </div>
+      <div class="card" style="border-color:#1e3a8a">
+        <h3 class="blue">สตรีม (m3u8 / mpd)</h3>
+        <p><b>StreamDownloadService</b> → เอนจิน <b>yt-dlp + ffmpeg บนเครื่อง</b></p>
+        <p>· รวมชิ้นส่วน HLS/DASH เป็นไฟล์เดียวบนอุปกรณ์ (ไม่ต้องพึ่งเซิร์ฟเวอร์)</p>
+        <p>· ครอบทุกไซต์ที่ yt-dlp รองรับ — เพิ่มขอบเขตตาม upstream อัตโนมัติ</p>
+      </div>
+    </div>
+    <ul style="margin-top:16px">
+      <li>ตัวจัดเส้นทาง: <code>Downloader.isStream()</code> — สแกนนามสกุลจาก URL (pure function, JVM-tested)</li>
+      <li><b>ตั้งชื่อไฟล์ตาม title ของหน้าเว็บ</b> (sanitize ตัวอักษรต้องห้ามของ Windows/Android แล้ว) + กันชื่อซ้ำ <code>ชื่อ (2).mp4</code> — parity เดียวกับ desktop</li>
+      <li>เคส Android &lt;10: publish ต้องใส่ <code>MediaColumns.DATA</code> ด้วย ไม่งั้นไฟล์ไม่โผล่ (แก้แล้วใน v1.1.7)</li>
+    </ul>
+  </section>
+
+  <!-- 5 · ENGINE -->
+  <section class="slide">
+    <div class="kicker">เอนจินบนอุปกรณ์</div>
+    <h2>StreamDownloadService — yt-dlp วิ่งในเครื่องผู้ใช้</h2>
+    <ul>
+      <li><b>youtubedl-android (library + ffmpeg) v0.17.3</b> — พินเวอร์ชันเดียวกับที่ Seal ใช้ ตรวจ artifacts บน Maven Central แล้ว</li>
+      <li>ไบนารี python/ffmpeg ที่แพ็กมาถูก <code>exec()</code> จริง → <code>jniLibs.useLegacyPackaging = true</code> เพื่อ extract ลง nativeLibraryDir</li>
+      <li><b>Foreground service</b> (dataSync): notification แสดง % + ปุ่ม <b>ยกเลิก</b> ได้ทันที (<code>destroyProcessById</code>)</li>
+      <li>เสร็จแล้ว <b>publish เข้า MediaStore</b> (Downloads/VDOGrabber) — แจ้งเตือนมีปุ่ม <b>"เปิดไฟล์"</b> แตะดูได้เลยผ่าน content URI</li>
+      <li>ลบจากแจ้งเตือนได้ด้วย ผ่าน <b>DeleteFileActivity</b> (trampoline) + Toast ยืนยัน</li>
+      <li>ทุกขั้น emit event ชื่อเดียวกับ desktop: <code>download_start · download_done · download_deleted …</code> (snake_case)</li>
+    </ul>
+    <p style="margin-top:14px">เหมือนกด yt-dlp ในเทอร์มินัล แต่ผู้ใช้แค่กดปุ่มเขียว — แอปจัดการ args, cookie, ชื่อไฟล์ และคิวให้ครบ</p>
+  </section>
+
+  <!-- 6 · FILE MANAGEMENT -->
+  <section class="slide">
+    <div class="kicker">หลังดาวน์โหลด</div>
+    <h2>DownloadCleaner — ลบไฟล์ที่ดาวน์โหลดแล้วได้จากในแอป</h2>
+    <ul>
+      <li>ส่วน <b>"ไฟล์ที่ดาวน์โหลดแล้ว"</b> ในชีต 🎬 รวม 3 แหล่ง แล้ว dedupe ตามชื่อ + เรียงตามแก้ไขล่าสุด:
+        <ul>
+          <li>งาน <b>DownloadManager</b> ที่สำเร็จ (ไฟล์ตรง)</li>
+          <li>รายการ <b>MediaStore</b> ที่ publish แล้ว (Android 10+)</li>
+          <li>ไฟล์จริงในโฟลเดอร์ <b>Downloads/VDOGrabber</b> (เช่น ของเอนจิน yt-dlp)</li>
+        </ul>
+      </li>
+      <li>ไฟล์เดียวอาจมีหลาย <b>identity</b> (งาน DM + แถว MediaStore + ไฟล์ดิบ) — ลบทีละ identity จนสำเร็จ</li>
+      <li>ออกแบบให้ทดสอบได้: ตรรกะล้วนอยู่ใน object เดียว จุดแตะระบบมีแค่ <code>systemList</code> / <code>systemDelete</code></li>
+      <li>ปุ่ม "ลบไฟล์" มี dialog ยืนยัน · ลบแล้วแถวหายจากชีตทันที + event <code>download_deleted</code></li>
+    </ul>
+  </section>
+
+  <!-- 7 · LOGS -->
+  <section class="slide">
+    <div class="kicker">การมองเห็น</div>
+    <h2>FileLog — log สามไฟล์แบบเดียวกับแอป desktop</h2>
+    <div class="row">
+      <div class="card"><h3>app.log</h3><p>ข้อความทุกอย่าง หมุนเวียน 2 MB เก็บ 3 ไฟล์</p></div>
+      <div class="card"><h3>downloads.log</h3><p>การกระทำและผลของการดาวน์โหลดทุกงาน</p></div>
+      <div class="card"><h3>events.jsonl</h3><p>เหตุการณ์ structured 1 JSON/บรรทัด — วิเคราะห์ด้วย jq ได้</p></div>
+    </div>
+    <ul style="margin-top:16px">
+      <li>อยู่ที่ <code>/data/data/com.vdograbber.app/files/logs/</code> — เปิดดูในเครื่องได้จาก <b>LogsActivity</b> หรือ Device Explorer</li>
+      <li>ชื่อ event เป็น <b>snake_case ตรงกับ desktop ทุกตัว</b>: <code>app_start · page_loaded · media_found · download_start · download_done</code> …</li>
+      <li>เริ่ม log ตั้งแต่ <code>onCreate</code> — ทุกเซสชันมีร่องรอย ช่วยไล่เคส "ดาวน์โหลดไม่ได้" จากผู้ใช้ได้จริง</li>
+    </ul>
+  </section>
+
+  <!-- 8 · QUALITY -->
+  <section class="slide">
+    <div class="kicker">คุณภาพ</div>
+    <h2>ทดสอบสองชั้น: JVM ล้วน + E2E บน emulator จริง</h2>
+    <div class="row">
+      <div class="card"><h3>Unit (JVM, เร็ว)</h3><p>Downloader (ext/isStream/humanSize/ตั้งชื่อ+dedupe) · StreamArgs · MediaStore LRU · DownloadCleaner — รันทุก push</p></div>
+      <div class="card"><h3>E2E: StreamEngineTest</h3><p>ffmpeg ใน runner ปั่น HLS จริง → เสิร์ฟผ่าน loopback → อุปกรณ์ดาวน์โหลด + รวมไฟล์ด้วยเอนจินจริง</p></div>
+      <div class="card"><h3>E2E: DownloadCleanerE2E</h3><p>สร้างไฟล์ 3 เส้นทาง (MediaStore publish / ไฟล์ดิบ / งาน DownloadManager จริง) → ลบ → ยืนยันหายจากดิสก์</p></div>
+    </div>
+    <ul style="margin-top:16px">
+      <li>Emulator บน runner บางครั้ง ADB ไม่ตอบสนองตั้งแต่บูต → <b>รันใหม่อัตโนมัติ 1 ครั้งด้วย emulator ใหม่</b> แล้วค่อย fail จริง (เจอจริงบน tag v1.1.6)</li>
+      <li>Hardening: <code>-no-snapshot -camera-back none</code> ฯลฯ + ปิด animation — ลดความแปรปรวนของ software rendering</li>
+      <li>E2E เป็น <b>gate</b>: ไม่ผ่าน = ไม่ได้ release (CI ตัดสินแทนมนุษย์)</li>
+    </ul>
+  </section>
+
+  <!-- 9 · RELEASE PIPELINE -->
+  <section class="slide">
+    <div class="kicker">CI / Release</div>
+    <h2>ปั่น APK อัตโนมัติทั้งสาย: จาก tag ถึงหน้า release</h2>
+    <div class="flow">
+      <div class="step"><b>push tag v*</b><span>android.yml เริ่มทันที (ubuntu-24.04 ปักหมุดไว้ — ubuntu-latest จะย้ายไป Ubuntu 26)</span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>unit + E2E</b><span>testDebugUnitTest → HLS fixture จาก ffmpeg → emulator ×2 attempts</span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>ABI splits</b><span>arm64-v8a · armeabi-v7a · x86_64 · universal — ตั้งชื่อ + sha256</span></div>
+      <div class="arr">➜</div>
+      <div class="step"><b>attach release</b><span>อัปโหลด APK ทุกตัว + รวม checksums.txt + กัน release ค้าง draft</span></div>
+    </div>
+    <ul style="margin-top:16px">
+      <li><b>ABI splits ลดขนาด ~1/3</b> — เพราะ native lib ของ yt-dlp + ffmpeg ใหญ่ ผู้ใช้โหลดเฉพาะสถาปัตยกรรมเครื่องตัวเอง</li>
+      <li>checksums.txt รวมทุกไฟล์บน release (รวม exe ฝั่ง desktop) — ตรวจสิ้นเชิงหลังโหลด</li>
+      <li>ทุก branch ได้ artifact ก่อนขึ้น tag — ทดลองติดตั้งก่อน release ได้เสมอ</li>
+    </ul>
+  </section>
+
+  <!-- 10 · TIMELINE -->
+  <section class="slide">
+    <div class="kicker">ไทม์ไลน์</div>
+    <h2>เวอร์ชัน Android เดินมาไกลแค่ไหน</h2>
+    <table>
+      <tr><th>เวอร์ชัน</th><th>ไฮไลต์</th></tr>
+      <tr><td><b>1.1.0</b> (code 3)</td><td>เอนจิน yt-dlp บนอุปกรณ์ (library+ffmpeg 0.17.3) · StreamDownloadService + notification %/ยกเลิก · publish MediaStore</td></tr>
+      <tr><td><b>1.1.5</b> (code 5)</td><td>เจอ "Unsupported URL" → <b>เปิดหน้านั้นใน WebView ให้เอง</b> เล่นรอสักครู่แล้วแตะ 🎬 ดาวน์โหลด</td></tr>
+      <tr><td><b>1.1.6</b> (code 6)</td><td>ตั้งชื่อไฟล์ตามหน้าเว็บ + กันชื่อซ้ำ (parity desktop) · แจ้งเตือนเสร็จ <b>แตะเปิดไฟล์ได้เลย</b></td></tr>
+      <tr><td><b>1.1.7</b></td><td>ปุ่ม "ลบไฟล์" ในแจ้งเตือน (DeleteFileActivity trampoline) · แก้ Android &lt;10 ให้ไฟล์โผล่ใน MediaStore</td></tr>
+      <tr><td><b>1.1.9</b></td><td><b>DownloadCleaner</b> ลบจากชีตได้ · E2E ลบไฟล์จริงบน emulator · StreamEngineTest HLS · pin CI images</td></tr>
+      <tr><td><b>1.3.0</b> (code 13)</td><td>รีลีสรวมวันนี้ — bump versionName ตาม release หลัก (ฟีเจอร์ใหม่อยู่ฝั่ง desktop/extension)</td></tr>
+    </table>
+  </section>
+
+  <!-- 11 · SPECS -->
+  <section class="slide">
+    <div class="kicker">สเปก</div>
+    <h2>ข้อมูลเทคนิคฉบับย่อ</h2>
+    <div class="row">
+      <div class="card"><h3>แพลตฟอร์ม</h3><p>Kotlin 2.0.21 · JDK 17 · AGP (gradle wrapper ของ repo) · compileSdk/targetSdk <b>35</b> · minSdk <b>26</b> (Android 8.0+)</p></div>
+      <div class="card"><h3>เอนจิน</h3><p>youtubedl-android <b>0.17.3</b> (library + ffmpeg) — บรรทัดเดียวกับ Seal, exec ผ่าน nativeLibraryDir</p></div>
+      <div class="card"><h3>การกระจาย</h3><p>APK 4 ตัว/รีลีส (arm64 · armv7 · x86_64 · universal) debug-signed ติดตั้งได้ทันที + sha256</p></div>
+      <div class="card"><h3>สิทธิ์ที่จำเป็น</h3><p>INTERNET · FOREGROUND_SERVICE(dataSync) · POST_NOTIFICATIONS · เขียน Downloads ผ่าน MediaStore (ไม่ขอ storage เต็ม)</p></div>
+    </div>
+    <ul style="margin-top:16px">
+      <li>พาธสำคัญ: <code>android/app/src/main/java/com/vdograbber/app/</code> · workflow: <code>.github/workflows/android.yml</code></li>
+      <li>ดีบัก: Device Explorer → <code>/data/data/com.vdograbber.app/files/logs/</code> · events อ่านด้วย <code>jq</code></li>
+      <li>สั่งเอง: <code>cd android && ./gradlew assembleDebug</code></li>
+    </ul>
+  </section>
+
+  <!-- 12 · CLOSING -->
+  <section class="slide center">
+    <div class="big-ico">📱</div>
+    <h2>สรุป: ประสบการณ์เดียวกับ desktop บนมือถือ</h2>
+    <ul style="text-align:left; max-width: 780px; margin: 0 auto;">
+      <li>ตรวจจับ 4 ชั้นแบบเดียวกัน (ซอร์สคู่กันกับ desktop เสมอ) · log เดียวกัน · ชื่อ event เดียวกัน</li>
+      <li>ดาวน์โหลดทุกชนิด: ไฟล์ตรง, HLS, DASH และทุกไซต์ที่ yt-dlp รองรับ — ทำเสร็จบนเครื่อง ไม่มีเซิร์ฟเวอร์กลาง</li>
+      <li>จัดการไฟล์หลังโหลดครบวงจร: เปิดจากแจ้งเตือน · ลบจากชีต/แจ้งเตือน · โฟลเดอร์ Downloads/VDOGrabber</li>
+      <li>CI ปั่น+ทดสอบ+แนบ release อัตโนมัติทุก tag — คุณภาพไม่ขึ้นกับความจำของมนุษย์</li>
+    </ul>
+    <p style="margin-top:16px">ดาวน์โหลด APK ล่าสุดได้จากหน้า GitHub Pages ของโปรเจกต์ (docs/index.html ดึง release ให้เอง)</p>
+    <span class="verchip">VDO Grabber Android · v1.3.0 · versionCode 13</span>
+  </section>
+
+</div>
+
+<div class="footer">
+  <span>VDO Grabber — สไลด์แนะนำเวอร์ชัน Android (← / → หรือคลิกปุ่ม)</span>
+  <span class="btns">
+    <button onclick="go(-1)">◀ ก่อนหน้า</button>
+    <span id="counter"></span>
+    <button onclick="go(1)">ถัดไป ▶</button>
+  </span>
+</div>
+
+<script>
+  const slides = Array.from(document.querySelectorAll(".slide"));
+  let i = 0;
+  function show(n) {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => s.classList.toggle("active", k === i));
+    document.getElementById("counter").textContent = (i + 1) + " / " + slides.length;
+    document.getElementById("prog").style.width = ((i + 1) / slides.length * 100) + "%";
+  }
+  function go(d) { show(i + d); }
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowRight" || e.key === "PageDown" || e.key === " ") go(1);
+    if (e.key === "ArrowLeft" || e.key === "PageUp") go(-1);
+    if (e.key === "Home") show(0);
+    if (e.key === "End") show(slides.length - 1);
+  });
+  show(0);
+</script>
+</body>
+</html>
