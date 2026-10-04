@@ -5,6 +5,10 @@
     <string name="forward">ไปหน้าถัดไป</string>
     <string name="reload">รีโหลด</string>
     <string name="url_hint">ป้อน URL หรือค้นหา…</string>
+    <string name="open_clipboard">เปิด URL จากคลิปบอร์ด</string>
+    <string name="clipboard_opened">เปิดจากคลิปบอร์ดแล้ว</string>
+    <string name="clipboard_empty">คลิปบอร์ดว่าง — คัดลอกลิงก์ก่อนแล้วกดปุ่มนี้อีกครั้ง</string>
+    <string name="clipboard_no_url">ในคลิปบอร์ดไม่มีลิงก์ — คัดลอก URL แล้วลองอีกครั้ง</string>
     <string name="found_chip">🎬 พบวิดีโอ %1$d</string>
     <string name="found_title">วิดีโอที่ตรวจพบ (%1$d)</string>
     <string name="no_media">ยังไม่พบวิดีโอ — เล่นวิดีโอในหน้าเว็บสักครู่ แล้วแตะปุ่มอีกครั้ง</string>

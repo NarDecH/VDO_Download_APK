@@ -44,6 +44,68 @@ def public_settings() -> dict:
     return data
 
 
+def read_clipboard_text() -> str:
+    """Current Windows clipboard text (CF_UNICODETEXT) via ctypes - no extra
+    dependency and it works in the frozen exe. Returns '' when the clipboard
+    is empty, holds no text, or is owned by another process right now."""
+    if os.name != "nt":
+        return ""
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        CF_UNICODETEXT = 13
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        user32.IsClipboardFormatAvailable.argtypes = [wintypes.UINT]
+        user32.IsClipboardFormatAvailable.restype = wintypes.BOOL
+        user32.OpenClipboard.argtypes = [wintypes.HWND]
+        user32.OpenClipboard.restype = wintypes.BOOL
+        user32.GetClipboardData.argtypes = [wintypes.UINT]
+        user32.GetClipboardData.restype = wintypes.HANDLE
+        user32.CloseClipboard.restype = wintypes.BOOL
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalLock.restype = wintypes.LPVOID
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.restype = wintypes.BOOL
+        if not user32.IsClipboardFormatAvailable(CF_UNICODETEXT):
+            return ""
+        if not user32.OpenClipboard(None):
+            return ""
+        try:
+            handle = user32.GetClipboardData(CF_UNICODETEXT)
+            if not handle:
+                return ""
+            ptr = kernel32.GlobalLock(handle)
+            if not ptr:
+                return ""
+            try:
+                return ctypes.wstring_at(ptr)
+            finally:
+                kernel32.GlobalUnlock(handle)
+        finally:
+            user32.CloseClipboard()
+    except Exception:
+        return ""
+
+
+def clipboard_url(raw: str) -> str:
+    """Turn clipboard text into a loadable http(s) URL ('' when it does not
+    look like one) - same rules as the Android app's openFromClipboard():
+    scan lines and take the first URL-looking one (scheme kept as-is,
+    bare domains get https:// prefixed)."""
+    for raw_line in (raw or "").replace("\r\n", "\n").split("\n"):
+        line = raw_line.strip().strip("'\"")
+        if not line:
+            continue
+        if line.lower().startswith(("http://", "https://")):
+            return line
+        if "@" in line or " " in line or "." not in line:
+            continue
+        return "https://" + line
+    return ""
+
+
 class MediaStore:
     """Deduplicated list of videos detected across pages."""
 
@@ -103,6 +165,23 @@ class Api:
     def detect_now(self) -> None:
         _APP.logm.log("manual detection requested", event="detect_manual")
         _APP.browser.evaluate_js("window.__vgDetect && window.__vgDetect.scan('manual')")
+
+    def open_clipboard(self) -> dict:
+        """Read a URL from the Windows clipboard and load it in the browser
+        window. Clipboard is read on the Python side because WebView2 only
+        grants navigator.clipboard.readText() after a permission prompt that
+        does not reliably appear in the Control Center window."""
+        raw = read_clipboard_text()
+        url = clipboard_url(raw)
+        if not url:
+            reason = "empty" if not raw.strip() else "no url"
+            _APP.logm.log("open from clipboard: %s" % reason, level="debug",
+                          event="clipboard_open", ok=False, reason=reason)
+            return {"ok": False, "error": "คลิปบอร์ดว่าง" if reason == "empty" else "ในคลิปบอร์ดไม่มี URL"}
+        _APP.logm.log("open URL from clipboard: %s" % url[:120], event="clipboard_open", url=url)
+        # Deferred like navigate(): let the JS return-value callback win first.
+        threading.Timer(0.08, _APP.navigate, args=(url,)).start()
+        return {"ok": True, "url": url}
 
     # -------------------------------------------------------- media reporting
     def report_media(self, payload_json: str) -> None:

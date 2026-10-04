@@ -58,6 +58,15 @@
             android:textSize="13sp" />
 
         <ImageButton
+            android:id="@+id/btnPaste"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_clipboard"
+            android:src="@drawable/ic_paste"
+            app:tint="#E8ECF4" />
+
+        <ImageButton
             android:id="@+id/btnLogs"
             android:layout_width="40dp"
             android:layout_height="40dp"

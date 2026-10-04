@@ -80,6 +80,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <input type="text" id="quickUrl" placeholder="วาง URL วิดีโอแล้วกดดาวน์โหลด (รองรับ mp4 / m3u8 / หน้าเว็บ YouTube ฯลฯ)">
     <button class="act grn" onclick="quickDownload()">⬇ ดาวน์โหลด</button>
+    <button class="act" onclick="openFromClipboard()" title="อ่านลิงก์ที่คัดลอกไว้ในคลิปบอร์ด แล้วเปิดในหน้าต่างเบราว์เซอร์ของแอป">📋 เปิดจากคลิปบอร์ด</button>
     <button class="act" onclick="refresh()">⟳</button>
     <button class="act" onclick="clearDownloads()" title="ลบรายการที่เสร็จ/ผิดพลาด/ยกเลิกแล้วออกจากรายการ (ไม่ลบไฟล์)">🧹 ล้างรายการ</button>
   </div>
@@ -354,6 +355,19 @@ function quickDownload(url){
   document.getElementById('quickUrl').value = '';
 }
 function cancel(id){ py().download_cancel(id); }
+// Read a URL from the clipboard (Python side, WebView2 needs no permission
+// prompt this way) and open it in the app's browser window.
+async function openFromClipboard(){
+  try {
+    const r = await py().open_clipboard();
+    if (r && r.ok){
+      document.getElementById('quickUrl').value = r.url;
+      status('เปิดจากคลิปบอร์ดแล้ว: ' + r.url + ' — เล่นวิดีโอแล้วกดปุ่มดาวน์โหลดบนแถบเครื่องมือ');
+    } else {
+      status('เปิดจากคลิปบอร์ดไม่ได้: ' + ((r && r.error) || 'ไม่ทราบสาเหตุ'));
+    }
+  } catch(e){ status('เปิดจากคลิปบอร์ดไม่ได้: ' + e); }
+}
 function isLive(j){ return ['running','queued','merging'].includes(j.status); }
 // pywebview swallows window.confirm/alert, so use a small in-page dialog
 function confirmBox(msg, onYes){

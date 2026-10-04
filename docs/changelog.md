@@ -2,7 +2,25 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased]
+## [1.3.1] — 2026-10-04
+
+### Desktop v1.3.1
+- ปุ่มใหม่ **"📋 เปิดจากคลิปบอร์ด"** ใน Control Center (แท็บดาวน์โหลด) — คัดลอกลิงก์จากที่ไหนก็ได้แล้ว
+  กดปุ่มเดียว เปิดหน้านั้นในหน้าต่างเบราว์เซอร์ของแอปทันที · อ่านคลิปบอร์ดฝั่ง Python ด้วย ctypes
+  จึงไม่ติด permission prompt ของ WebView2 · เลือก "บรรทัดแรกที่หน้าตาเป็น URL" (รับทั้งลิงก์เต็ม,
+  โดเมนเปล่า ๆ ที่เติม https:// ให้, ข้อความที่มีลิงก์ปนอยู่ — แต่ไม่รับอีเมล/ข้อความธรรมดา) ·
+  ใส่ URL ที่เปิดกลับลงช่องวางลิงก์ด้วย · event log `clipboard_open`
+
+### Android v1.3.1 (versionCode 14)
+- ปุ่มคลิปบอร์ด (ไอคอน 📋) เพิ่มในแถบเครื่องมือด้านบน ข้างช่อง URL — แตะแล้วอ่านลิงก์จากคลิปบอร์ด
+  เปิดใน WebView ทันที ใช้กฎเดียวกับฝั่งเดสก์ท็อป · คลิปบอร์ดว่าง/ไม่มีลิงก์จะขึ้น toast บอกเหตุผล ·
+  event log `clipboard_open` / `clipboard_open_error`
+
+### Build (Android toolchain)
+- อัปเกรด AGP 8.7.3 → **8.13.2** พร้อมไฟล์ `gradlew.bat` ใหม่ — และเพราะ AGP 8.13 ไม่ build บน Gradle 9.6+
+  (internal Problems API ถูกถอดออก) wrapper จึงลดจาก 9.8.0 ลงเป็น **9.5.1** (เพดานที่รองรับ) · เพิ่ม
+  `gradle-daemon-jvm.properties` ล็อก JDK ของ daemon ที่ 25 พร้อมลิงก์ดาวน์โหลด foojay ทุก OS
+  (CI จะดาวน์โหลด JDK เองอัตโนมัติ) · ตรวจแล้วด้วย `:app:compileDebugKotlin` ผ่านในเครื่อง
 
 ## [1.3.0] — 2026-10-03
 

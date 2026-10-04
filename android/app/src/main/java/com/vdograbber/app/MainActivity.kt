@@ -64,7 +64,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.3.0 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.3.1 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -105,6 +105,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnFwd).setOnClickListener { if (web.canGoForward()) web.goForward() }
         findViewById<ImageButton>(R.id.btnReload).setOnClickListener { web.reload() }
         findViewById<ImageButton>(R.id.btnLogs).setOnClickListener { startActivity(Intent(this, LogsActivity::class.java)) }
+        findViewById<ImageButton>(R.id.btnPaste).setOnClickListener { openFromClipboard() }
         chipMedia.setOnClickListener { showMediaSheet() }
         urlBox.setOnEditorActionListener { _, _, event ->
             if (event == null || event.action == KeyEvent.ACTION_DOWN) {
@@ -178,6 +179,34 @@ class MainActivity : AppCompatActivity() {
         FileLog.app("INFO", "nav", "navigate -> $url")
         FileLog.event("navigate", mapOf("url" to url))
         web.loadUrl(url)
+    }
+
+    /** Open the URL currently in the clipboard (same rules as the desktop
+     * Api.open_clipboard: take the first URL-looking line, scheme kept,
+     * bare domains get https:// prefixed, the rest is rejected with a toast). */
+    private fun openFromClipboard() {
+        val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val text = cm.primaryClip?.getItemAt(0)?.coerceToText(this)?.toString()?.trim().orEmpty()
+        val url = text.lines()
+            .map { it.trim().trim('\'', '"') }
+            .firstOrNull { line ->
+                line.isNotEmpty() && (
+                    line.startsWith("http://") || line.startsWith("https://") ||
+                        (!line.contains('@') && !line.contains(' ') && line.contains('.'))
+                    )
+            }
+            ?.let { if (it.startsWith("http://") || it.startsWith("https://")) it else "https://$it" }
+        if (url == null) {
+            val reason = if (text.isEmpty()) "empty" else "no url"
+            FileLog.event("clipboard_open_error", mapOf("reason" to reason))
+            FileLog.app("INFO", "ui", "clipboard open skipped: $reason")
+            Toast.makeText(this, if (text.isEmpty()) R.string.clipboard_empty else R.string.clipboard_no_url, Toast.LENGTH_SHORT).show()
+            return
+        }
+        FileLog.event("clipboard_open", mapOf("url" to url.take(200)))
+        FileLog.app("INFO", "nav", "open URL from clipboard: $url")
+        Toast.makeText(this, R.string.clipboard_opened, Toast.LENGTH_SHORT).show()
+        navigate(url)
     }
 
     private fun updateChip() {
