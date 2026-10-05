@@ -137,10 +137,14 @@ def run_checks(skip_gradle: bool) -> None:
         die(f"desktop selftest failed:\n{out[-1200:]}")
     print("PASS  desktop selftest")
     if not skip_gradle:
-        # cwd is android/ - the wrapper name alone (gradlew.bat on Windows)
-        gradlew = "gradlew.bat" if os.name == "nt" else "gradlew"
-        rc, out = run([gradlew, "testDebugUnitTest", ":app:compileDebugKotlin", "--console=plain"],
-                      cwd=os.path.join(ROOT, "android"))
+        # cmd /c resolves gradlew.bat against the child cwd (android/);
+        # CreateProcess alone does not search the child's working directory
+        if os.name == "nt":
+            gradle_cmd = ["cmd.exe", "/c", "gradlew.bat", "testDebugUnitTest",
+                          ":app:compileDebugKotlin", "--console=plain"]
+        else:
+            gradle_cmd = ["./gradlew", "testDebugUnitTest", ":app:compileDebugKotlin", "--console=plain"]
+        rc, out = run(gradle_cmd, cwd=os.path.join(ROOT, "android"))
         if rc != 0:
             die(f"android gradle check failed:\n{out[-1200:]}")
         print("PASS  android gradle check")
