@@ -2,7 +2,7 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
-## [Unreleased]
+## [1.3.2] — 2026-10-05
 
 ### Android (แก้ crash + จัด UI ใหม่)
 - **แก้แอปปิดตัวเองเมื่อกดลิงก์/ปุ่มในหน้าเว็บ (เช่น ปุ่มโฆษณา overlay)** — สาเหตุ: หน้าเว็บที่มี

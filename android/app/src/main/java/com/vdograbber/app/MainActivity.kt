@@ -77,7 +77,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.3.1 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.3.2 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
