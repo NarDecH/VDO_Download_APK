@@ -2,6 +2,28 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.3.5] — 2026-10-05
+
+### Android (แก้ผลวิเคราะห์จาก log ผู้ใช้จริง)
+- **แก้ "ดาวน์โหลดสตรีมเสร็จ" แต่ไม่มีไฟล์เกิดขึ้น (log: `stream download done: null`)** — สาเหตุ:
+  เอนจิน yt-dlp เขียนไฟล์ลง Downloads/VDOGrabber โดยตรง ซึ่ง scoped storage ของ Android 10+
+  (targetSdk 30+) ไม่ให้ไลบรารีที่ไม่ใช่มีเดียสร้างไฟล์ จึง exit 0 แต่ไม่มีไฟล์ตกดิสก์ — ตอนนี้เอนจิน
+  เขียนลงโฟลเดอร์ app-private (`Android/data/<pkg>/files/engine-work`) แล้ว publishFile ย้ายเข้า
+  Downloads/VDOGrabber ผ่าน MediaStore API ตามเดิม · ถ้า exit 0 แต่ยังไม่มีไฟล์ จะรัน probe `-F`
+  แล้ว log สาเหตุจริง (DRM/geo/แผนผังไม่รู้จัก) เป็น event `download_no_file` แทนการรายงานสำเร็จลอย ๆ
+- **แก้ spam `[sniff] intercept failed: A WebView method was called on thread 'ThreadPoolForeg'`** —
+  shouldInterceptRequest เคยเรียก `web.title` จาก background thread ทำให้การดักจับ media ทาง native
+  พังทั้งเส้นทาง — ย้ายการอ่าน page/title ไปทำบน main thread แล้วบันทึกต่อที่นั่น (การดักจับกลับมาทำงาน)
+- **กรองลิงก์ `blob:` ไม่ให้เข้าเอนจิน** — yt-dlp เข้าถึง blob URL ไม่ได้ตามธรรมชาติ (มีอยู่แค่ในหน้า);
+  แจ้ง toast แนะนำให้ใช้ลิงก์อื่นในรายการ 🎬 แทน (event `download_skipped_blob`) · `routeOf()` คืน null
+  สำหรับ URL ที่ใช้ไม่ได้แล้ว · sync กับฝั่ง desktop (DETECT_JS ไม่เปลี่ยน — แต่ routing ทั้งสองฝั่งกรอง blob)
+- **notification เมื่อดาวน์โหลดล้มแสดงสาเหตุจริงของ yt-dlp** (เช่น "Unsupported URL: …") แทน stack trace
+  ของ exception (`ytDlpErrorLine` — ERROR ก่อน WARNING)
+- **E2E ใหม่ 2 เคส** (`HtmlSafetyNetE2E`): หน้า HTML ผ่าน DownloadManager ต้องโดนตรวจ + ลบ + ได้ URL
+  สำหรับ re-route (เคส .mp4 ปลอมจาก v1.3.4) และ MPD SegmentTemplate บน loopback ผ่านเอนจินจริงต้องได้
+  ไฟล์ fMP4 ที่ไบต์ตรง init+seg1+seg2 (fixtures สร้างตอนรันเทส ไม่แตะ workflow) · ย้าย fixture ของ
+  StreamEngineTest ไปใช้ work dir เดียวกับ service จริง
+
 ## [1.3.4] — 2026-10-05
 
 ### Android (แก้ไฟล์ .mp4 ที่ข้างในเป็น HTML)
