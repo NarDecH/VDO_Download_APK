@@ -2,6 +2,7 @@ package com.vdograbber.app
 
 import android.annotation.SuppressLint
 import android.app.AlertDialog
+import android.app.DownloadManager
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -77,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.3.3 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.3.4 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -91,6 +92,31 @@ class MainActivity : AppCompatActivity() {
                 navigate(u)
             }
         }, android.content.IntentFilter("com.vdograbber.app.OPEN_IN_BROWSER"),
+            Context.RECEIVER_NOT_EXPORTED)
+
+        // v1.3.4: a finished direct download whose payload is really an HTML
+        // page (the server answered with the player page) is deleted and the
+        // URL is re-routed to the yt-dlp engine automatically
+        registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: android.content.Intent?) {
+                val id = intent?.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1) ?: return
+                val pending = Downloader.pendingFor(id) ?: return
+                try {
+                    if (Downloader.verifyNotHtmlAndClean(this@MainActivity, id)) {
+                        FileLog.app("INFO", "dl", "re-routing page URL to the yt-dlp engine: $pending")
+                        Toast.makeText(
+                            this@MainActivity,
+                            R.string.not_media_rerouted,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                        Downloader.forget(id)
+                        StreamDownloadService.start(this@MainActivity, pending.first, pending.second)
+                    }
+                } catch (t: Throwable) {
+                    FileLog.app("ERROR", "dl", "download-complete check failed: $t")
+                }
+            }
+        }, android.content.IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE),
             Context.RECEIVER_NOT_EXPORTED)
 
         // yt-dlp + ffmpeg init for on-device stream downloads (async, engine
@@ -385,11 +411,13 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 42)
         }
         try {
-            if (Downloader.isStream(url)) {
-                // HLS/DASH or site pages: on-device yt-dlp engine (plan-android-hls.md)
-                StreamDownloadService.start(this, url, title)
-            } else {
-                Downloader.enqueue(this, url, title)
+            // v1.3.4: PAGE urls (player/embed pages, no media extension in the
+            // path) go to the yt-dlp engine too - DownloadManager would just
+            // save the HTML of the player page as "title.mp4" (the reported
+            // ".mp4 that is really HTML" bug).
+            when (Downloader.routeOf(url)) {
+                Downloader.Route.DIRECT_FILE -> Downloader.enqueue(this, url, title)
+                Downloader.Route.STREAM, Downloader.Route.PAGE -> StreamDownloadService.start(this, url, title)
             }
             Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {

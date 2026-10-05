@@ -18,6 +18,7 @@
     <string name="copied">คัดลอกลิงก์แล้ว</string>
     <string name="download_started">เริ่มดาวน์โหลดแล้ว — ดูความคืบหน้าในแถบแจ้งเตือน</string>
     <string name="download_failed">ดาวน์โหลดไม่สำเร็จ: %1$s</string>
+    <string name="not_media_rerouted">ลิงก์นี้ไม่ใช่ไฟล์วิดีโอตรง — สลับไปใช้เอนจิน yt-dlp ให้แล้ว รอสักครู่จนดาวน์โหลดเสร็จ</string>
     <string name="logs_title">Logs</string>
     <string name="engine_title">yt-dlp engine (Android)</string>
     <string name="engine_check">check engine version</string>
