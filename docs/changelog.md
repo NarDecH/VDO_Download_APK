@@ -2,6 +2,23 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.3.6] — 2026-10-06
+
+### ตามคำแนะนำที่ค้างจาก v1.3.5 (ทำครบทุกข้อ)
+- **เพิ่มแผนทดสอบบนเครื่องจริง** (`docs/real-device-test-plan.md`) — เช็คลิสต์ 6 เคสจากบทเรียน
+  field log (merrylion2/MPD, blob:, fake .mp4, no-file, ความเสถียร WebView) พร้อมวิธีดึง log
+  กลับมาวิเคราะห์ (adb pull / Device Explorer) และเกณฑ์ผ่าน
+- **เครื่องมือวิเคราะห์ events.jsonl** (`scripts/analyze_events.py`) — สรุป event ตามลำดับ funnel,
+  ชี้สัญญาณปัญหาที่รู้จัก (blob:/no-file/HTML ปลอม/engine_ready ไม่มีเวอร์ชัน) รองรับ `--event`
+  และ `--json` · มีเทสหน่วย 3 เคสใน scripts/test_units.py (รวมเป็น 27 เคส)
+- **Android CI ทน emulator flake มากขึ้น** — `emulator-boot-timeout: 600` ให้ทั้ง 3 attempt
+  (ตรงสาเหตุ "API level=1" ครึ่งบูตที่ timeout เดิม 300s) + cache gradle/AVD + warm AVD ล่วงหน้า
+- **ฝั่ง desktop ได้ protection เทียบเท่า Android v1.3.5** — กรอง blob: ทั้งชั้น UI/TOOLBAR_JS/API/engine
+  (event `download_skipped_blob`), exit 0 แต่ไม่มีไฟล์ → probe `-F` + event `download_no_file_probe`
+  (ไม่รายงานสำเร็จลอย ๆ), ไฟล์ที่ได้เป็นหน้า HTML → เก็บเป็นหลักฐาน `.html` + event
+  `download_not_media` + ลอง page-fallback อีกครั้งอัตโนมัติ · เอนจินจริงยืนยันว่า `output.mpd`
+  ของ merrylion2 มี formats ให้โหลด
+
 ## [1.3.5] — 2026-10-05
 
 ### Android (แก้ผลวิเคราะห์จาก log ผู้ใช้จริง)
