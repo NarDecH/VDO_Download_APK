@@ -23,6 +23,11 @@
   สำหรับ re-route (เคส .mp4 ปลอมจาก v1.3.4) และ MPD SegmentTemplate บน loopback ผ่านเอนจินจริงต้องได้
   ไฟล์ fMP4 ที่ไบต์ตรง init+seg1+seg2 (fixtures สร้างตอนรันเทส ไม่แตะ workflow) · ย้าย fixture ของ
   StreamEngineTest ไปใช้ work dir เดียวกับ service จริง
+- **แก้ HTML safety net ของ v1.3.4 ที่ไม่เคยทำงานจริงบนเครื่องผู้ใช้** (E2E บน CI จับได้):
+  ตัวตรวจ ".mp4 ที่ข้างในเป็น HTML" อ่านพาธไฟล์จาก `COLUMN_LOCAL_FILENAME` ซึ่ง Android ห้ามแอป
+  targetSdk ≥ 24 ใช้ (SecurityException ถูกกลืนเงียบ ๆ) — เปลี่ยนมาอ่าน payload ผ่าน
+  `dm.openDownloadedFile(id)` แล้วลบด้วย `dm.remove(id)` ทำให้ fake .mp4 โดนลบ + re-route
+  ไปเอนจินได้จริงทุกเครื่อง (event `download_not_media` เริ่มเห็นได้ใน log)
 
 ## [1.3.4] — 2026-10-05
 

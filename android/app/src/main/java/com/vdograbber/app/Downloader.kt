@@ -5,8 +5,6 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.webkit.CookieManager
-import java.io.File
-import java.io.FileInputStream
 
 /**
  * Queue direct-file downloads through the platform DownloadManager (writes
@@ -106,29 +104,43 @@ object Downloader {
 
     /**
      * v1.3.4: check a finished DownloadManager job - when the payload is
-     * really an HTML page (the server answered the player/embed page instead
+     * really an HTML page (the server answered the player page instead
      * of a video), delete the faked file + DM row and report true so the
      * caller can re-route the URL to the yt-dlp engine.
+     *
+     * v1.3.5: read through dm.openDownloadedFile(id) - COLUMN_LOCAL_FILENAME
+     * throws SecurityException for apps targeting N+, which silently disabled
+     * this whole safety net (the E2E caught it: assertion "HTML payload must
+     * be detected"). dm.remove(id) deletes both the row and the file, so the
+     * ParcelFileDescriptor is fully consumed before calling it.
      */
     fun verifyNotHtmlAndClean(ctx: Context, id: Long): Boolean {
         try {
             val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+            var statusOk = false
+            var url = ""
             dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
-                if (!c.moveToFirst()) return false
-                if (c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) != DownloadManager.STATUS_SUCCESSFUL) return false
-                val local = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_FILENAME)) ?: return false
-                val f = File(local)
-                if (!f.exists()) return false
-                val head = ByteArray(512)
-                val n = try { FileInputStream(f).use { it.read(head) } } catch (_: Exception) { return false }
-                if (n <= 0 || !looksLikeHtml(head.copyOf(n))) return false
-                val url = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_URI)).orEmpty()
-                FileLog.event("download_not_media", mapOf("url" to url.take(300), "file" to f.name.take(120)))
-                FileLog.app("WARN", "dl", "not a video (HTML page) - deleted: ${f.name}")
-                try { f.delete() } catch (_: Exception) {}
-                try { dm.remove(id) } catch (_: Exception) {}
-                return true
+                if (c.moveToFirst()) {
+                    statusOk = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) ==
+                        DownloadManager.STATUS_SUCCESSFUL
+                    url = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_URI)).orEmpty()
+                }
             }
+            if (!statusOk) return false
+            val head = ByteArray(512)
+            val n = try {
+                dm.openDownloadedFile(id).use { pfd ->
+                    android.os.ParcelFileDescriptor.AutoCloseInputStream(pfd).use { it.read(head) }
+                }
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "dl", "cannot open download #$id: $e")
+                return false
+            }
+            if (n <= 0 || !looksLikeHtml(head.copyOf(n))) return false
+            FileLog.event("download_not_media", mapOf("url" to url.take(300)))
+            FileLog.app("WARN", "dl", "not a video (HTML page) - deleted download #$id")
+            try { dm.remove(id) } catch (_: Exception) {} // removes the row + the file
+            return true
         } catch (e: Exception) {
             FileLog.app("ERROR", "dl", "html check failed: $e")
         }
