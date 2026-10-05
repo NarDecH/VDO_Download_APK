@@ -278,6 +278,12 @@ def verify_release(version: str, wait: bool) -> None:
 
 # --------------------------------------------------------------------- main
 def main() -> int:
+    # Thai notes/sections are normal output - a cp1252 Windows console would
+    # raise UnicodeEncodeError on print() without this (same as analyze_events)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except (AttributeError, ValueError):
+        pass
     ap = argparse.ArgumentParser(description="One-command VDO Grabber release")
     ap.add_argument("version", help="e.g. 1.4.0")
     ap.add_argument("--yes", action="store_true", help="do not ask for confirmation")
