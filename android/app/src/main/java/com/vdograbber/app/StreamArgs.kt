@@ -21,6 +21,36 @@ object StreamArgs {
         "-o", outputTemplate(dir, titleBase),
     )
 
+    /** Extra args for a cheap plan-probe run (-F prints the format table).
+     *  Used to log WHY a download produced no file (layout / geo / DRM). */
+    fun probeArgs(): List<String> = listOf("-F", "--no-playlist")
+
+    /**
+     * v1.3.5: app-private dir the engine writes into, under the app's
+     * external-files root (Android/data/<pkg>/files/engine-work).
+     * publishFile() then moves the finished file into Downloads/VDOGrabber
+     * via the MediaStore API. Writing straight into the public Downloads dir
+     * is denied on Q+ (scoped storage) - the "stream download done: null"
+     * bug from the field log. Pure JVM so tests can pin the layout.
+     */
+    fun engineWorkDir(externalFilesDir: File): File = File(externalFilesDir, "engine-work")
+
+    /**
+     * Pull the first real yt-dlp ERROR (falling back to WARNING) out of a
+     * stack-traced YoutubeDLException message, so toasts/logs show the actual
+     * cause ("Unsupported URL: ...", "[Blob] You've asked yt-dlp ...")
+     * instead of "com.yausername.youtubedl_android.YoutubeDLException: ...".
+     */
+    fun ytDlpErrorLine(raw: String?): String {
+        val s = raw.orEmpty()
+        if (s.isBlank()) return "unknown error"
+        Regex("ERROR:\\s*(.+)").find(s)?.let { return it.groupValues[1].trim().take(200) }
+        Regex("WARNING:\\s*(.+)").find(s)?.let { return it.groupValues[1].trim().take(200) }
+        return s.lineSequence().firstOrNull { it.isNotBlank() }?.trim()
+            ?.substringAfterLast(": ")?.take(200)
+            ?: "unknown error"
+    }
+
     /** Same output naming as the desktop app (app/core/downloader.py).
      *  Literal % is doubled so yt-dlp does not parse it as a template field. */
     fun outputTemplate(dir: File, titleBase: String = ""): String {

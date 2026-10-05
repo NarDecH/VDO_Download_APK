@@ -42,10 +42,14 @@ class StreamDownloadService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        outDir = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
-            "VDOGrabber",
-        ).apply { mkdirs() }
+        // v1.3.5: yt-dlp now WRITES into an app-private dir - the public
+        // Downloads dir is scope-protected on Q+ (targetSdk 30+), where a
+        // non-media library cannot create files; the engine "succeeded"
+        // (exit 0) but nothing landed on disk and the service reported a
+        // null download ("stream download done: null"). The finished file
+        // is published into Downloads/VDOGrabber via the MediaStore API
+        // (publishFile) exactly as before - that path is unaffected.
+        outDir = StreamArgs.engineWorkDir(getExternalFilesDir(null) ?: filesDir).apply { mkdirs() }
         createChannel()
     }
 
@@ -96,18 +100,29 @@ class StreamDownloadService : Service() {
 
             if (ok) {
                 val file = StreamArgs.newestFileIn(outDir)
+                if (file == null) {
+                    // v1.3.5: the engine exited 0 but produced no file (any
+                    // cause) - diagnose from machine facts instead of
+                    // reporting a phantom success
+                    onNoFile(url, title)
+                    finishNotification(false, title.ifEmpty { url })
+                    stopSelf()
+                    return@launch
+                }
                 val published = publishFile(file, title)
-                FileLog.event("download_done", mapOf("url" to url, "engine" to "ytdl-android"))
-                FileLog.app("INFO", "dl", "stream download done: ${published?.first ?: file?.name}")
+                FileLog.event("download_done", mapOf("url" to url, "engine" to "ytdl-android", "file" to (published?.first ?: file.name)))
+                FileLog.app("INFO", "dl", "stream download done: ${published?.first ?: file.name}")
                 finishNotification(
                     true,
-                    published?.first ?: file?.name ?: title.ifEmpty { url },
+                    published?.first ?: file.name,
                     published?.second,
                     published?.let { File(outDir, it.first).absolutePath },
                 )
             } else {
+                val cause = StreamArgs.ytDlpErrorLine(errorMsg)
                 FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
+                finishNotification(false, cause)
                 // Unsupported-URL player pages: hand the page to the WebView so
                 // the in-page detector can catch the real stream while it plays
                 // (desktop parity - plan-android-hls.md / v1.1.4 desktop flow)
@@ -118,10 +133,34 @@ class StreamDownloadService : Service() {
                     sendBroadcast(i)
                 }
             }
-            if (!ok) finishNotification(false, title.ifEmpty { url })
+            // failures already notified with the real yt-dlp cause (v1.3.5)
             stopSelf()
         }
         return START_NOT_STICKY
+    }
+
+    /**
+     * v1.3.5: engine exited 0 but wrote no file - run a cheap -F probe and
+     * log what yt-dlp really sees, so the user is not told a download
+     * "succeeded" into nothing. Typical causes: DRM-protected stream,
+     * geo-block, or an unknown page layout yt-dlp cannot parse.
+     */
+    private fun onNoFile(url: String, title: String) {
+        var probe = "-"
+        try {
+            val req = YoutubeDLRequest(url).apply {
+                StreamArgs.probeArgs().forEach { addOption(it) }
+            }
+            YoutubeDL.getInstance().execute(req, null) { _, _, line ->
+                if (!line.isNullOrBlank()) probe = (probe + " | " + line).take(400)
+            }
+            FileLog.app("INFO", "dl", "plan probe: ${probe.take(300)}")
+        } catch (e: Exception) {
+            probe = StreamArgs.ytDlpErrorLine(e.message ?: e.javaClass.simpleName)
+            FileLog.app("INFO", "dl", "plan probe failed: $probe")
+        }
+        FileLog.event("download_no_file", mapOf("url" to url.take(300), "probe" to probe.take(300)))
+        finishNotification(false, probe)
     }
 
     /**

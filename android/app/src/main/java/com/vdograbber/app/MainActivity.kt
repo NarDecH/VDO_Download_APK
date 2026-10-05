@@ -78,7 +78,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
-        FileLog.app("INFO", "app", "VDO Grabber 1.3.4 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.3.5 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
@@ -212,16 +212,26 @@ class MainActivity : AppCompatActivity() {
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
                 // never throw out of this callback - on ad-heavy pages an
                 // exception here takes the whole app down
-                try {
-                    val url = request.url.toString()
-                    val ext = Downloader.extOf(url)
-                    if (ext.isNotEmpty() && MediaStore.add(url, ext, "network request", url.substringBeforeLast('/'), web.title ?: "")) {
-                        FileLog.event("media_found", mapOf("url" to url, "kind" to ext, "via" to "shouldInterceptRequest"))
-                        runOnUiThread { updateChip() }
+                val url = request.url.toString()
+                val ext = try { Downloader.extOf(url) } catch (_: Throwable) { "" }
+                if (ext.isEmpty()) return null
+                // v1.3.5: WebView getters (web.url/web.title) must run on the
+                // main thread - this callback fires on a WebView thread-pool
+                // thread ("A WebView method was called on thread
+                // 'ThreadPoolForeg'" spam killed every sniff in the field).
+                // Read the page facts there, then record like the JS bridge.
+                runOnUiThread {
+                    try {
+                        val page = web.url ?: ""
+                        val title = web.title ?: ""
+                        if (MediaStore.add(url, ext, "network request", page.substringBeforeLast('/'), title)) {
+                            FileLog.event("media_found", mapOf("url" to url, "kind" to ext, "via" to "shouldInterceptRequest"))
+                            updateChip()
+                        }
+                    } catch (t: Throwable) {
+                        FileLog.app("ERROR", "sniff", "intercept (main) failed: $t")
+                        FileLog.event("intercept_error", mapOf("error" to t.toString().take(300)))
                     }
-                } catch (t: Throwable) {
-                    FileLog.app("ERROR", "sniff", "intercept failed: $t")
-                    FileLog.event("intercept_error", mapOf("error" to t.toString().take(300)))
                 }
                 return null
             }
@@ -406,6 +416,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun tryDownload(url: String, title: String) {
+        // v1.3.5: blob: URLs exist only inside the page (MSE players) - yt-dlp
+        // cannot reach them ("[Blob] A blob URL exists only locally in your
+        // browser"); the usable sources are the m3u8/mpd/direct URLs the
+        // detector also lists for the same page.
+        if (url.startsWith("blob:")) {
+            FileLog.event("download_skipped_blob", mapOf("url" to url.take(120)))
+            FileLog.app("INFO", "dl", "skip blob URL (browser-local only): $url")
+            Toast.makeText(this, R.string.blob_unsupported, Toast.LENGTH_SHORT).show()
+            return
+        }
         FileLog.event("download_click", mapOf("url" to url))
         if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
             requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 42)
@@ -418,6 +438,7 @@ class MainActivity : AppCompatActivity() {
             when (Downloader.routeOf(url)) {
                 Downloader.Route.DIRECT_FILE -> Downloader.enqueue(this, url, title)
                 Downloader.Route.STREAM, Downloader.Route.PAGE -> StreamDownloadService.start(this, url, title)
+                null -> FileLog.app("INFO", "dl", "unusable URL - not downloaded: $url")
             }
             Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {

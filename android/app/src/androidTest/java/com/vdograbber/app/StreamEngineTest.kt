@@ -20,6 +20,9 @@ import java.net.ServerSocket
  * bytes over loopback HTTP and runs the SAME yt-dlp options that
  * StreamArgs.optionsArgs() produces, asserting a merged mp4 comes back.
  * No network beyond 127.0.0.1, so it is deterministic.
+ *
+ * v1.3.5: the output directory is the service's real work dir
+ * (app-private external files/engine-work) - see StreamDownloadService.
  */
 @RunWith(AndroidJUnit4::class)
 class StreamEngineTest {
@@ -58,7 +61,12 @@ class StreamEngineTest {
         val server = RawHttpServer(port, root)
         server.start()
         try {
-            val outDir = File(instr.targetContext.filesDir, "e2e-out").apply { mkdirs() }
+            // v1.3.5: use the SAME app-private directory the service writes
+            // into (StreamDownloadService.onCreate -> getExternalFilesDir(null)
+            // "/engine-work") so the test proves files really land there -
+            // the old public Downloads dir silently denied all writes on Q+
+            // (scoped storage) and produced the field bug "done: null".
+            val outDir = File(instr.targetContext.getExternalFilesDir(null), "engine-work").apply { mkdirs() }
             val url = "http://127.0.0.1:$port/index.m3u8"
 
             val req = YoutubeDLRequest(url).apply {
@@ -75,6 +83,8 @@ class StreamEngineTest {
                 file.length() > 50_000,
             )
             file.delete()
+            File(instr.targetContext.getExternalFilesDir(null), "engine-work")
+                .listFiles()?.forEach { it.delete() } // leave the shared dir clean
         } finally {
             server.stop()
             root.deleteRecursively()

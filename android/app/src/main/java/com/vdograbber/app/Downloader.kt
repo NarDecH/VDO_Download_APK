@@ -39,6 +39,10 @@ object Downloader {
 
     fun isStream(url: String): Boolean = extOf(url) in STREAM_EXT
 
+    /** v1.3.5: blob: URLs exist only inside the browser page - neither
+     *  DownloadManager nor the yt-dlp engine can fetch them. */
+    fun isUsableDownloadUrl(url: String): Boolean = !url.startsWith("blob:")
+
     /** Where a URL must be downloaded from (v1.3.4). */
     enum class Route { DIRECT_FILE, STREAM, PAGE }
 
@@ -48,8 +52,12 @@ object Downloader {
      * other URL (player/embed/watch pages) to the engine as well - those are
      * web pages, not files, and DownloadManager would just save the HTML of
      * the player page as "title.mp4".
+     *
+     * v1.3.5: null for unusable URLs (blob: lives only inside the page) -
+     * callers must not download them at all.
      */
-    fun routeOf(url: String): Route = when {
+    fun routeOf(url: String): Route? = when {
+        !isUsableDownloadUrl(url) -> null
         isStream(url) -> Route.STREAM
         extOf(url).isNotEmpty() -> Route.DIRECT_FILE
         else -> Route.PAGE
@@ -92,6 +100,9 @@ object Downloader {
     fun pendingFor(id: Long): Pair<String, String>? = synchronized(pendingDm) { pendingDm[id] }
 
     fun forget(id: Long) { synchronized(pendingDm) { pendingDm.remove(id) } }
+
+    /** Test hook: seed the pending map like enqueue() does (E2E). */
+    fun putPending(id: Long, pair: Pair<String, String>) { synchronized(pendingDm) { pendingDm[id] = pair } }
 
     /**
      * v1.3.4: check a finished DownloadManager job - when the payload is
@@ -150,11 +161,15 @@ object Downloader {
     }
 
     fun enqueue(ctx: Context, url: String, title: String): Long {
-        // v1.3.4 guard: a page URL would come back as an HTML player saved as
-        // .mp4 - send it to the yt-dlp engine instead (defensive: tryDownload
-        // already routes by routeOf, this protects future call sites)
-        if (routeOf(url) != Route.DIRECT_FILE) {
-            FileLog.event("download_rerouted", mapOf("url" to url.take(300), "route" to routeOf(url).name))
+        // v1.3.5 + v1.3.4 guards: blob: URLs are unusable (lives only inside
+        // the page) and page URLs would come back as an HTML player saved as
+        // .mp4 - both are routed/skipped here so no call site can bypass them
+        val route = routeOf(url) ?: run {
+            FileLog.event("download_skipped_blob", mapOf("url" to url.take(120)))
+            return -1L
+        }
+        if (route != Route.DIRECT_FILE) {
+            FileLog.event("download_rerouted", mapOf("url" to url.take(300), "route" to route.name))
             StreamDownloadService.start(ctx, url, title)
             return -1L
         }
