@@ -54,5 +54,16 @@
             android:name=".StreamDownloadService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!-- v1.4.0: lets LogsActivity share the logs zip through a content:// URI -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logfiles"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
     </application>
 </manifest>

@@ -64,6 +64,8 @@ class StreamDownloadService : Service() {
             return START_NOT_STICKY
         }
         processId = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
+        lastPercent = -1
+        isRunning = true
 
         val url = intent?.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
@@ -89,6 +91,13 @@ class StreamDownloadService : Service() {
                 }
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
                     updateNotification(title.ifEmpty { url }, progress)
+                    // v1.4.0: throttle to whole percents so the event log stays
+                    // readable while the notification + main screen tick live
+                    val pct = progress.toInt().coerceIn(0, 99)
+                    if (pct != lastPercent) {
+                        lastPercent = pct
+                        FileLog.event("download_progress", mapOf("url" to url.take(200), "percent" to pct))
+                    }
                     if (!line.isNullOrBlank()) FileLog.download("[stream] $line")
                 }
                 ok = result.exitCode == 0
@@ -97,6 +106,7 @@ class StreamDownloadService : Service() {
                 errorMsg = e.message ?: e.javaClass.simpleName
                 FileLog.app("ERROR", "dl", "stream download error: $e")
             }
+            lastPercent = -1 // finished (any outcome) - the UI chip resets
 
             if (ok) {
                 val file = StreamArgs.newestFileIn(outDir)
@@ -230,7 +240,9 @@ class StreamDownloadService : Service() {
             .setSmallIcon(android.R.drawable.stat_sys_download)
             .setContentTitle(getString(R.string.stream_dl_title))
             .setContentText(title.take(60))
-            .setProgress(100, progress, progress == 0)
+            // v1.4.0: determinate as soon as yt-dlp reports a percent (only the
+            // very start - before the first report - stays indeterminate)
+            .setProgress(100, progress, progress <= 0)
             .setOngoing(true)
             .addAction(0, getString(R.string.cancel), cancelPendingIntent())
             .build()
@@ -285,6 +297,7 @@ class StreamDownloadService : Service() {
     )
 
     override fun onDestroy() {
+        isRunning = false
         scope.cancel()
         super.onDestroy()
     }
@@ -300,6 +313,16 @@ class StreamDownloadService : Service() {
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"
+
+        /** v1.4.0: true from onStartCommand until onDestroy (all stop paths). */
+        @Volatile var isRunning = false
+            private set
+
+        /** v1.4.0: current download percent 0..99, or -1 when idle. */
+        @Volatile var lastPercent = -1
+            private set
+
+        fun currentPercent(): Int = lastPercent
 
         /** Start a stream download (no-op when [url] is blank). */
         fun start(context: Context, url: String, title: String) {

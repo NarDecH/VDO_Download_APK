@@ -1,5 +1,6 @@
 package com.vdograbber.app
 
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
@@ -48,7 +49,40 @@ class LogsActivity : AppCompatActivity() {
         // ---- engine maintenance (docs/plan-android-hls.md step 6) ----------
         findViewById<Button>(R.id.btnEngine).setOnClickListener { showEngineDialog() }
 
+        // v1.4.0: hand the whole logs/ trio to any share target (mail, chat,
+        // file manager) as one zip - no adb / Device Explorer needed
+        findViewById<Button>(R.id.btnShare).setOnClickListener { shareLogsZip() }
+
         refresh("app.log")
+    }
+
+    /** Zip logs/ (app.log, downloads.log, events.jsonl, crash.log + rotations)
+     *  into the cache dir and open the system share sheet for it. */
+    private fun shareLogsZip() {
+        try {
+            val stamp = java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                .format(java.util.Date())
+            val zip = java.io.File(cacheDir, "vdograbber-logs-$stamp.zip")
+            java.util.zip.ZipOutputStream(zip.outputStream().buffered()).use { zos ->
+                FileLog.logsDir.listFiles()?.filter { it.isFile }?.sortedBy { it.name }?.forEach { f ->
+                    zos.putNextEntry(java.util.zip.ZipEntry(f.name))
+                    f.inputStream().use { it.copyTo(zos) }
+                    zos.closeEntry()
+                }
+            }
+            FileLog.event("logs_shared", mapOf("file" to zip.name, "bytes" to zip.length()))
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.logfiles", zip)
+            val send = Intent(Intent.ACTION_SEND).apply {
+                type = "application/zip"
+                putExtra(Intent.EXTRA_STREAM, uri)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            startActivity(Intent.createChooser(send, getString(R.string.share_logs)))
+        } catch (e: Exception) {
+            FileLog.app("ERROR", "ui", "share logs failed: $e")
+            Toast.makeText(this, getString(R.string.logs_shared_error, e.message ?: "unknown"), Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showEngineDialog() {

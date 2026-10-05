@@ -53,4 +53,44 @@ class MediaStoreTest {
         MediaStore.clear()
         assertEquals(0, MediaStore.list().size)
     }
+
+    // -------------------------------------- v1.4.0 origin reset (user request)
+
+    @Test
+    fun `originOf parses scheme host and port`() {
+        assertEquals("https://x.com", MediaStore.originOf("https://x.com/a/b?c#d"))
+        assertEquals("https://x.com:8443", MediaStore.originOf("HTTPS://X.com:8443/a"))
+        assertEquals("http://x.com", MediaStore.originOf("http://x.com:80/a"))
+        assertEquals("http://x.com:8080", MediaStore.originOf("http://x.com:8080"))
+        assertEquals("", MediaStore.originOf("blob:https://x.com/1"))
+        assertEquals("", MediaStore.originOf("about:blank"))
+    }
+
+    @Test
+    fun `main-frame navigation across origins clears the list`() {
+        MediaStore.clear()
+        MediaStore.onMainFrameNavigate("https://site-a.example/page1")
+        fill(3)
+        assertEquals(3, MediaStore.list().size)
+        // same-origin navigation keeps the detections (multi-page players)
+        assertEquals(0, MediaStore.onMainFrameNavigate("https://site-a.example/page2"))
+        assertEquals(3, MediaStore.list().size)
+        // crossing to another origin wipes them and returns the count
+        assertEquals(3, MediaStore.onMainFrameNavigate("https://site-b.example/"))
+        assertEquals(0, MediaStore.list().size)
+        // repeated loads of the same new page stay armed and keep it empty
+        assertEquals(0, MediaStore.onMainFrameNavigate("https://site-b.example/"))
+        MediaStore.clear()
+    }
+
+    @Test
+    fun `non-http main frame keeps the current list`() {
+        MediaStore.clear()
+        MediaStore.onMainFrameNavigate("https://site-a.example/")
+        fill(2)
+        // error pages / about:blank must not silently wipe detections
+        assertEquals(0, MediaStore.onMainFrameNavigate("about:blank"))
+        assertEquals(2, MediaStore.list().size)
+        MediaStore.clear()
+    }
 }

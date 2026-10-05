@@ -21,6 +21,9 @@
     <string name="not_media_rerouted">ลิงก์นี้ไม่ใช่ไฟล์วิดีโอตรง — สลับไปใช้เอนจิน yt-dlp ให้แล้ว รอสักครู่จนดาวน์โหลดเสร็จ</string>
     <string name="blob_unsupported">ลิงก์ blob: ใช้ได้เฉพาะภายในหน้าเว็บ — ใช้ลิงก์วิดีโออื่นในรายการ 🎬 แทน</string>
     <string name="logs_title">Logs</string>
+    <string name="share_logs">แชร์ log (zip)</string>
+    <string name="logs_shared_error">แชร์ log ไม่สำเร็จ: %1$s</string>
+    <string name="downloading_chip">⬇ กำลังดาวน์โหลด %1$d%%</string>
     <string name="engine_title">yt-dlp engine (Android)</string>
     <string name="engine_check">check engine version</string>
     <string name="engine_update">update engine</string>

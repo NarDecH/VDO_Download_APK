@@ -48,6 +48,10 @@ class MainActivity : AppCompatActivity() {
     /** renderer deaths since the last successful page load (crash-loop guard) */
     private var renderGoneCount = 0
 
+    /** v1.4.0: ticks the 🎬 chip with the live stream-download percent - the
+     *  notification alone was easy to miss (hidden by some launchers/DMI). */
+    private var progressTicker: java.util.Timer? = null
+
     inner class Bridge {
         @JavascriptInterface
         fun reportMedia(json: String) {
@@ -144,6 +148,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnFwd).setOnClickListener { if (web.canGoForward()) web.goForward() }
         findViewById<ImageButton>(R.id.btnReload).setOnClickListener { web.reload() }
         findViewById<ImageButton>(R.id.btnLogs).setOnClickListener { startActivity(Intent(this, LogsActivity::class.java)) }
+        startProgressTicker() // v1.4.0: live download percent on the chip
         findViewById<ImageButton>(R.id.btnPaste).setOnClickListener { openFromClipboard() }
         chipMedia.setOnClickListener { showMediaSheet() }
         urlBox.setOnEditorActionListener { _, _, event ->
@@ -242,6 +247,15 @@ class MainActivity : AppCompatActivity() {
                 FileLog.app("INFO", "nav", "page loaded: $url")
                 view.evaluateJavascript(Detector.INJECT_JS, null)
                 urlBox.setText(url)
+                // v1.4.0: the injected detector re-scans the NEW page here -
+                // clear the list first when the main frame changed origin so
+                // stale entries (and re-reports of the previous page) vanish
+                val removed = MediaStore.onMainFrameNavigate(url)
+                if (removed > 0) {
+                    FileLog.event("media_cleared", mapOf("reason" to "origin_change", "url" to url.take(300), "removed" to removed))
+                    FileLog.app("INFO", "detect", "media list reset on new origin ($removed items)")
+                }
+                updateChip()
             }
         }
         web.webChromeClient = object : WebChromeClient() {
@@ -282,6 +296,15 @@ class MainActivity : AppCompatActivity() {
         }
         FileLog.app("INFO", "nav", "navigate -> $url")
         FileLog.event("navigate", mapOf("url" to url))
+        // v1.4.0: reset the detected list when leaving the current origin -
+        // do it at navigate() time so the chip updates instantly (failures
+        // keep stale media visible instead of silently wiping it)
+        val removed = MediaStore.onMainFrameNavigate(url)
+        if (removed > 0) {
+            FileLog.event("media_cleared", mapOf("reason" to "origin_change_navigate", "url" to url.take(300), "removed" to removed))
+            FileLog.app("INFO", "nav", "media list reset on new origin ($removed items)")
+            updateChip()
+        }
         web.loadUrl(url)
     }
 
@@ -317,6 +340,27 @@ class MainActivity : AppCompatActivity() {
         val n = MediaStore.list().size
         chipMedia.text = getString(R.string.found_chip, n)
         chipMedia.visibility = if (n > 0) View.VISIBLE else View.GONE
+    }
+
+    /** v1.4.0: 500ms ticker - while the stream engine reports a percent the
+     *  chip shows "⬇ กำลังดาวน์โหลด 42%"; otherwise it falls back to updateChip. */
+    private fun startProgressTicker() {
+        progressTicker?.cancel()
+        progressTicker = java.util.Timer("dl-progress-ui").apply {
+            schedule(object : java.util.TimerTask() {
+                override fun run() {
+                    runOnUiThread {
+                        val p = StreamDownloadService.currentPercent()
+                        if (p in 0..99) {
+                            chipMedia.text = getString(R.string.downloading_chip, p)
+                            chipMedia.visibility = View.VISIBLE
+                        } else {
+                            updateChip()
+                        }
+                    }
+                }
+            }, 500, 500)
+        }
     }
 
     private fun showMediaSheet() {
@@ -452,6 +496,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        progressTicker?.cancel()
         FileLog.event("app_exit")
         web.destroy()
         super.onDestroy()
