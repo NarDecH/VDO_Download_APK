@@ -33,8 +33,38 @@ object StreamArgs {
     fun sanitizeFilename(name: String, maxLen: Int = 100): String {
         var s = name.replace(Regex("[<>:\"/\\\\|?*\\u0000-\\u001f]"), " ")
             .replace(Regex("\\s+"), " ").trim(' ', '.')
-        if (s.length > maxLen) s = s.take(maxLen).trimEnd(' ', '.')
-        return s
+        if (s.length > maxLen) s = s.take(maxLen)
+        // v1.3.3: ext4 allows 255 BYTES per filename component - Thai chars
+        // take 3 bytes and emoji 4, so the old 100-CHAR cap alone made
+        // DownloadManager.enqueue fail with "File name too long" on ad pages
+        // with huge Thai titles. Cap the stem at 180 bytes (extension + the
+        // " (2)" dedup suffix still fit under the limit).
+        s = truncateUtf8Bytes(s, 180)
+        return s.trimEnd(' ', '.')
+    }
+
+    /** Truncate to at most [maxBytes] UTF-8 bytes without cutting a character
+     *  (or an emoji surrogate pair) in half. */
+    fun truncateUtf8Bytes(s: String, maxBytes: Int): String {
+        if (s.toByteArray(Charsets.UTF_8).size <= maxBytes) return s
+        var bytes = 0
+        var end = 0
+        var i = 0
+        while (i < s.length) {
+            val c = s[i]
+            val w = when {
+                c.isHighSurrogate() && i + 1 < s.length && s[i + 1].isLowSurrogate() -> 4
+                c.isHighSurrogate() || c.isLowSurrogate() -> 1 // lone half encodes as '?'
+                c.code < 0x80 -> 1
+                c.code < 0x800 -> 2
+                else -> 3 // Thai, CJK, ...
+            }
+            if (bytes + w > maxBytes) break
+            bytes += w
+            i += if (w == 4) 2 else 1
+            end = i
+        }
+        return s.substring(0, end)
     }
 
     /** Free name `stem.ext`; on collision returns `stem (2).ext`, `(3)`, ... */

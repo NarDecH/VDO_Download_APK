@@ -63,6 +63,22 @@ class DownloaderTest {
     }
 
     @Test
+    fun `displayName caps byte length for huge Thai titles (file name too long fix)`() {
+        // v1.3.2 bug: a long Thai page title became a >255-byte filename and
+        // DownloadManager.enqueue failed with "File name too long"
+        val huge = "หนังเต็มเรื่องดูฟรี".repeat(40)
+        val name = Downloader.displayName("https://c/v/clip.mp4", huge)
+        assertTrue("ext4 caps a name at 255 bytes",
+            name.toByteArray(Charsets.UTF_8).size <= 200)
+        assertEquals(".mp4", name.takeLast(4))
+
+        // a long signed URL path segment (used as fallback) is capped too
+        val longUrl = "https://c/v/" + "s1-TH-hd-1080p-ก".repeat(30) + ".mp4?tok=1"
+        val name2 = Downloader.displayName(longUrl, "")
+        assertTrue(name2.toByteArray(Charsets.UTF_8).size <= 200)
+    }
+
+    @Test
     fun `displayName url-stem fallback and last resort`() {
         // page-style URL without a media extension: the URL's last segment is
         // used (same rule as the pre-1.1.6 DownloadManager naming)

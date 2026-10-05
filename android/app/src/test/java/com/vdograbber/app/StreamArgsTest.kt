@@ -62,6 +62,37 @@ class StreamArgsTest {
     }
 
     @Test
+    fun `sanitize filename caps UTF-8 bytes not chars (file name too long fix)`() {
+        // 100 Thai chars pass the old 100-char cap but are 300 UTF-8 bytes -
+        // beyond the 255-byte ext4 limit -> DownloadManager threw
+        // "java.io.IOException: File name too long"
+        val capped = StreamArgs.sanitizeFilename("ก".repeat(100))
+        assertTrue("Thai chars are 3 bytes each - the byte cap must bite",
+            capped.toByteArray(Charsets.UTF_8).size <= 180)
+        assertTrue(capped.length < 100)
+        // no partial characters: the result is stable under re-truncation
+        assertEquals(capped, StreamArgs.truncateUtf8Bytes(capped, 180))
+
+        // emoji = 4 bytes per surrogate pair - never cut in half
+        val cappedEmoji = StreamArgs.sanitizeFilename("👍".repeat(80))
+        assertTrue(cappedEmoji.toByteArray(Charsets.UTF_8).size <= 180)
+        assertTrue(cappedEmoji.length % 2 == 0) // whole pairs only
+        assertEquals("👍", cappedEmoji.takeLast(2)) // a full pair, not a split half
+
+        // short names are untouched
+        assertEquals("clip", StreamArgs.sanitizeFilename("clip"))
+    }
+
+    @Test
+    fun `truncateUtf8Bytes never splits characters`() {
+        assertEquals("aก", StreamArgs.truncateUtf8Bytes("aกา", 4)) // a=1 + ก=3; า does not fit
+        assertEquals("", StreamArgs.truncateUtf8Bytes("ก", 2))
+        assertEquals("ก", StreamArgs.truncateUtf8Bytes("กา", 3))
+        assertEquals("a👍", StreamArgs.truncateUtf8Bytes("a👍ก", 5)) // 1 + 4; ก does not fit
+        assertEquals("abcdef", StreamArgs.truncateUtf8Bytes("abcdef", 100))
+    }
+
+    @Test
     fun `unique file name dedupes like a browser`() {
         val dir = java.nio.file.Files.createTempDirectory("vg-dedupe").toFile()
         try {

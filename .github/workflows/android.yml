@@ -57,8 +57,9 @@ jobs:
 
       # The emulator sometimes boots into an unresponsive ADB shell on hosted
       # runners (software rendering / TCG) -> ShellCommandUnresponsiveException
-      # and connectedDebugAndroidTest finds no device (seen on the v1.1.6 tag).
-      # Run E2E twice with a FRESH emulator per attempt before giving up.
+      # and connectedDebugAndroidTest finds no device (seen on the v1.1.6 tag
+      # and again on the v1.3.2 tag, where both attempts hit it).
+      # Run E2E three times with a FRESH emulator per attempt before giving up.
       - name: E2E on emulator (attempt 1)
         id: e2e1
         continue-on-error: true
@@ -88,10 +89,23 @@ jobs:
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
             cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
 
-      - name: E2E gate (fail if both emulator attempts failed)
-        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome != 'success'
+      - name: E2E on emulator (attempt 3 - fresh emulator after infra flake)
+        id: e2e3
+        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome == 'failure'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          script: |
+            chmod +x "$GITHUB_WORKSPACE/android/gradlew"
+            cd "$GITHUB_WORKSPACE/android" && ./gradlew --no-daemon --stacktrace connectedDebugAndroidTest
+
+      - name: E2E gate (fail if all emulator attempts failed)
+        if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome != 'success' && steps.e2e3.outcome != 'success'
         run: |
-          echo "E2E failed on two fresh emulators - real failure"
+          echo "E2E failed on three fresh emulators - real failure"
           exit 1
 
       - name: Rename APKs (per-ABI + universal)
@@ -105,7 +119,9 @@ jobs:
           cp "$OUT/app-universal-debug.apk" "$APK_NAME"
           echo "APK_NAME=$APK_NAME" >> "$GITHUB_ENV"
           echo "ABI_APKS=VDOGrabber-${VERSION}-android-arm64.apk VDOGrabber-${VERSION}-android-armv7.apk VDOGrabber-${VERSION}-android-x86_64.apk" >> "$GITHUB_ENV"
-          sha256sum "$APK_NAME" VDOGrabber-"$VERSION"-android-*.apk | tee "${APK_NAME}.sha256"
+          # the glob already covers the universal APK - naming it twice made
+          # checksums.txt carry a duplicate universal line (v1.3.1/v1.3.2)
+          sha256sum VDOGrabber-"$VERSION"-android-*.apk | tee "${APK_NAME}.sha256"
 
       - name: Upload artifact (every branch)
         uses: actions/upload-artifact@v7
