@@ -2,6 +2,16 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.3.3] — 2026-10-05
+
+### Android (แก้ดาวน์โหลดไม่สำเร็จ)
+- **แก้ "ดาวน์โหลดไม่สำเร็จ: java.io.IOException: File name too long"** — แอปตั้งชื่อไฟล์ตามชื่อหน้าเว็บ
+  โดยเดิมจำกัดแค่ 100 *ตัวอักษร* ทั้งที่ ext4 จำกัด 255 *ไบต์* ต่อชื่อไฟล์ — ภาษาไทยใช้ 3 ไบต์/ตัว อิโมจิ 4 ไบต์/ตัว
+  หน้าโฆษณาที่ชื่อยาว ๆ เลยทำให้ DownloadManager ปฏิเสธทันที ตอนนี้จำกัดชื่อด้วยจำนวนไบต์ UTF-8 (stem ≤ 180 ไบต์)
+  ตัดที่ขอบตัวอักษร/อิโมจิเป๊ะ ไม่ตัดกลางคู่ · ครอบคลุมทั้ง DownloadManager, เทมเพลต yt-dlp และการ publish ลง MediaStore
+- CI: E2E บน emulator เพิ่ม attempt ที่ 3 รับมือ flake ที่โดนทั้ง 2 attempt บน tag v1.3.2 · แก้ checksums.txt
+  ไม่ให้มีบรรทัด APK universal ซ้ำ (เขียนชื่อ universal ซ้ำใน sha256sum ตอน rename APKs)
+
 ## [1.3.2] — 2026-10-05
 
 ### Android (แก้ crash + จัด UI ใหม่)
