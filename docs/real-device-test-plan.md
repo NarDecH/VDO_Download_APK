@@ -15,8 +15,9 @@
 
 ทำหลังทดสอบทุกเคส (หรือกลางทางถ้ามีข้อสงสัย):
 
-- **Android Studio → Device Explorer** → `/data/data/com.vdograbber.app/files/logs/`
-  ดึง 3 ไฟล์: `app.log`, `downloads.log`, `events.jsonl`
+- **ง่ายสุด (v1.4.0):** ในแอปกดปุ่ม Logs (⚙) → **แชร์ log (zip)** → ส่งไฟล์เข้าเมล/แชตตัวเอง
+  ได้ทั้ง app.log / downloads.log / events.jsonl / crash.log ในไฟล์เดียว ไม่ต้องต่อสาย
+- หรือ **Android Studio → Device Explorer** → `/data/data/com.vdograbber.app/files/logs/`
 - หรือผ่าน adb: `adb pull /data/data/com.vdograbber.app/files/logs/ ./logs/`
 - วิเคราะห์ events.jsonl ด้วยเครื่องมือใหม่ (ฝั่ง desktop):
   `python scripts/analyze_events.py path/to/events.jsonl`
