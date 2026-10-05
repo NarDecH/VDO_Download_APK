@@ -185,6 +185,7 @@ def push_with_retry(retries: int = 3, wait: int = 25) -> None:
             rc, out = run(["git", "push"] + args)
             if rc == 0:
                 print(f"push {' '.join(args)}: ok (attempt {attempt})")
+                break
             elif attempt == retries:
                 die("push failed - DNS flake? run: git push " + " ".join(args))
             else:
