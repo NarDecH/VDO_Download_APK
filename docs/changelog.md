@@ -2,6 +2,20 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.3.4] — 2026-10-05
+
+### Android (แก้ไฟล์ .mp4 ที่ข้างในเป็น HTML)
+- **แก้ "กดดาวน์โหลดแล้วได้ไฟล์ .mp4 แต่เปิดไม่ได้ — ข้างในเป็น HTML ของหน้า player ไม่ใช่วิดีโอ"** —
+  ลิงก์ที่ไม่มีนามสกุลไฟล์สื่อ (เช่น หน้า player/embed ที่เล่น DASH ผ่าน `output.mpd` ฝั่งใน) เคยถูกส่งเข้า
+  DownloadManager แล้วเซฟ HTML ของหน้านั้นเป็น `ชื่อหน้า.mp4` — ตอนนี้จัดเส้นทางด้วย `routeOf()` ใหม่:
+  ลิงก์ที่ไม่มีนามสกุลสื่อ = หน้าเว็บ → ส่งให้เอนจิน yt-dlp ในแอป (เปิดหน้า player แล้วดึงสตรีมจริงเอง)
+  เหมือนกับลิงก์ m3u8/mpd โดยตรง · event log `download_rerouted`
+- **เช็ก magic bytes หลังดาวน์โหลดตรงเสร็จ** (safety net): ถ้า payload เป็น HTML (มี BOM/ช่องว่าง/comment
+  นำหน้า `<!doctype html` / `<html` / `<?xml`) จะลบไฟล์ปลอม + ลบแถว DownloadManager ทิ้ง บันทึก event
+  `download_not_media` แล้ว**สลับไปดาวน์โหลดต่อด้วยเอนจิน yt-dlp ให้อัตโนมัติ** พร้อม toast แจ้งผู้ใช้
+- เพิ่ม JVM unit tests (`HtmlDetectorTest`): routing ของ URL ทั้ง 3 ชนิด + ตัวตรวจ HTML ครอบ BOM,
+  ช่องว่าง, comment นำหน้า, XML และไบต์จริงของ mp4/webm/ts/mp3
+
 ## [1.3.3] — 2026-10-05
 
 ### Android (แก้ดาวน์โหลดไม่สำเร็จ)
