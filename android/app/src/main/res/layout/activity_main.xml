@@ -6,7 +6,27 @@
     android:orientation="vertical"
     android:background="#0B1020">
 
-    <!-- top toolbar -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <WebView
+            android:id="@+id/web"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:visibility="gone"
+        android:progressTint="#FF5F6D" />
+
+    <!-- bottom toolbar (v1.3.2: moved from the top - the URL box now sits at
+         the bottom of the screen, thumb-friendly like mobile browsers) -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="52dp"
@@ -75,25 +95,6 @@
             android:src="@android:drawable/ic_menu_manage"
             app:tint="#E8ECF4" />
     </LinearLayout>
-
-    <ProgressBar
-        android:id="@+id/progress"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:layout_width="match_parent"
-        android:layout_height="3dp"
-        android:visibility="gone"
-        android:progressTint="#FF5F6D" />
-
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1">
-
-        <WebView
-            android:id="@+id/web"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </FrameLayout>
 
     <!-- bottom bar with the video chip -->
     <LinearLayout

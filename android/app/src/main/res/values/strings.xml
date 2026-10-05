@@ -41,4 +41,5 @@
     <string name="downloads_title">ไฟล์ที่ดาวน์โหลดแล้ว (%1$d)</string>
     <string name="cancel">ยกเลิก</string>
     <string name="refresh">รีเฟรช</string>
+    <string name="render_gone">หน้าเว็บนี้ทำให้ตัวแสดงผลล่ม — ป้อน URL อื่นในช่องด้านล่างได้เลย</string>
 </resources>

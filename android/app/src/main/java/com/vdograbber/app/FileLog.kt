@@ -12,6 +12,7 @@ import java.util.Locale
  *   app.log        rotating text log, everything
  *   downloads.log  download actions and results
  *   events.jsonl   structured one-JSON-per-line events
+ *   crash.log      uncaught exception stack traces (installed crash handler)
  * Files live in <filesDir>/logs and are viewable in LogsActivity.
  */
 object FileLog {
@@ -20,8 +21,36 @@ object FileLog {
     private lateinit var dir: File
     private val ts = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
 
+    private var crashHandlerInstalled = false
+
     fun init(ctx: Context) {
         dir = File(ctx.filesDir, "logs").apply { mkdirs() }
+        installCrashHandler()
+    }
+
+    /** v1.3.2: an uncaught exception used to close the app leaving no trace on
+     * disk (the desktop build already keeps crash.log). Persist the stack trace
+     * + an app_crash event, then hand over to the system handler as usual. */
+    private fun installCrashHandler() {
+        if (crashHandlerInstalled) return
+        crashHandlerInstalled = true
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            try {
+                val sw = java.io.StringWriter()
+                throwable.printStackTrace(java.io.PrintWriter(sw))
+                write(
+                    "crash.log",
+                    "${ts.format(Date())} CRASH on thread \"${thread.name}\"\n" +
+                        "device: ${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL} " +
+                        "(Android ${android.os.Build.VERSION.RELEASE}, API ${android.os.Build.VERSION.SDK_INT})\n" +
+                        sw.toString(),
+                )
+                event("app_crash", mapOf("thread" to thread.name, "error" to throwable.toString().take(300)))
+            } catch (_: Exception) {
+            }
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 
     val logsDir: File get() = dir

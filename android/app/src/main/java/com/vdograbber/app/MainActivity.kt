@@ -11,13 +11,17 @@ import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -40,22 +44,31 @@ class MainActivity : AppCompatActivity() {
 
     private val bridge = Bridge()
 
+    /** renderer deaths since the last successful page load (crash-loop guard) */
+    private var renderGoneCount = 0
+
     inner class Bridge {
         @JavascriptInterface
         fun reportMedia(json: String) {
-            val o = Detector.parse(json) ?: return
-            val url = o.optString("url")
-            val added = MediaStore.add(
-                url = url,
-                kind = o.optString("kind", "media"),
-                label = o.optString("label", ""),
-                page = o.optString("page", ""),
-                title = o.optString("title", ""),
-            )
-            if (added) {
-                FileLog.event("media_found", mapOf("url" to url, "kind" to o.optString("kind"), "via" to "js"))
-                FileLog.app("DEBUG", "detect", "media found: $url")
-                runOnUiThread { updateChip() }
+            // an uncaught exception on the WebView JS-bridge thread closes the app
+            try {
+                val o = Detector.parse(json) ?: return
+                val url = o.optString("url")
+                val added = MediaStore.add(
+                    url = url,
+                    kind = o.optString("kind", "media"),
+                    label = o.optString("label", ""),
+                    page = o.optString("page", ""),
+                    title = o.optString("title", ""),
+                )
+                if (added) {
+                    FileLog.event("media_found", mapOf("url" to url, "kind" to o.optString("kind"), "via" to "js"))
+                    FileLog.app("DEBUG", "detect", "media found: $url")
+                    runOnUiThread { updateChip() }
+                }
+            } catch (t: Throwable) {
+                FileLog.app("ERROR", "detect", "reportMedia failed: $t")
+                FileLog.event("bridge_error", mapOf("error" to t.toString().take(300)))
             }
         }
     }
@@ -133,29 +146,62 @@ class MainActivity : AppCompatActivity() {
         web.webViewClient = object : WebViewClient() {
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val url = request.url
-                return if (url.scheme in setOf("http", "https")) {
-                    false // keep navigation in-app
-                } else {
-                    try { startActivity(Intent(Intent.ACTION_VIEW, url)) } catch (_: Exception) {}
-                    true
+                return when (url.scheme) {
+                    "http", "https" -> false // keep navigation in-app
+                    // ad overlay buttons often link with javascript: - run in-page
+                    "javascript" -> false
+                    else -> {
+                        // intent://, market://, tel:, ... -> hand to an external app
+                        FileLog.event("external_link", mapOf("scheme" to (url.scheme ?: "?"), "url" to url.toString().take(300)))
+                        try { startActivity(Intent(Intent.ACTION_VIEW, url)) }
+                        catch (t: Throwable) { FileLog.app("INFO", "nav", "no external app for '${url.scheme}': $t") }
+                        true
+                    }
+                }
+            }
+
+            // v1.3.2: without this override a dead WebView render process (heavy
+            // ad pages are the classic trigger) terminates the whole app process -
+            // the user saw the app close itself when tapping an ad button.
+            // Rebuild the WebView instead and keep the app alive.
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                val why = if (detail.didCrash()) "crash" else "killed"
+                val lastUrl = web.url ?: ""
+                FileLog.event("render_gone", mapOf("reason" to why, "url" to lastUrl.take(300)))
+                FileLog.app("ERROR", "webview", "render process gone ($why): $lastUrl")
+                renderGoneCount++
+                rebuildWebView(lastUrl)
+                return true // we handled it - do not terminate the process
+            }
+
+            override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+                if (request.isForMainFrame) {
+                    FileLog.event("page_error", mapOf("url" to request.url.toString().take(300), "error" to error.description?.toString()))
+                    FileLog.app("WARN", "nav", "page error: ${error.description} (${request.url})")
                 }
             }
 
             // Native network sniffing (the extension's webRequest role):
             // every request that looks like media surfaces as a candidate.
             override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): android.webkit.WebResourceResponse? {
-                val url = request.url.toString()
-                if (Downloader.extOf(url).isNotEmpty()) {
+                // never throw out of this callback - on ad-heavy pages an
+                // exception here takes the whole app down
+                try {
+                    val url = request.url.toString()
                     val ext = Downloader.extOf(url)
-                    if (MediaStore.add(url, ext, "network request", url.substringBeforeLast('/'), web.title ?: "")) {
+                    if (ext.isNotEmpty() && MediaStore.add(url, ext, "network request", url.substringBeforeLast('/'), web.title ?: "")) {
                         FileLog.event("media_found", mapOf("url" to url, "kind" to ext, "via" to "shouldInterceptRequest"))
                         runOnUiThread { updateChip() }
                     }
+                } catch (t: Throwable) {
+                    FileLog.app("ERROR", "sniff", "intercept failed: $t")
+                    FileLog.event("intercept_error", mapOf("error" to t.toString().take(300)))
                 }
                 return null
             }
 
             override fun onPageFinished(view: WebView, url: String) {
+                renderGoneCount = 0 // successful load -> crash-loop guard reset
                 FileLog.event("page_loaded", mapOf("url" to url))
                 FileLog.app("INFO", "nav", "page loaded: $url")
                 view.evaluateJavascript(Detector.INJECT_JS, null)
@@ -166,6 +212,28 @@ class MainActivity : AppCompatActivity() {
             override fun onProgressChanged(view: WebView, newProgress: Int) {
                 progressBar.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
+        }
+    }
+
+    /** Replace the WebView whose renderer died with a fresh one (same
+     * settings/clients), then reload the page - or show a notice when the
+     * same page kills the renderer over and over (crash-loop guard). */
+    private fun rebuildWebView(lastUrl: String) {
+        val parent = web.parent as? ViewGroup
+        val stale = web
+        if (parent != null) parent.removeView(stale)
+        try { stale.stopLoading(); stale.destroy() } catch (_: Exception) {}
+        web = WebView(this).apply { id = R.id.web }
+        parent?.addView(
+            web,
+            FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT),
+        )
+        setupWebView()
+        if (renderGoneCount <= 1 && lastUrl.startsWith("http")) {
+            navigate(lastUrl) // usually a transient renderer OOM - just reload
+        } else {
+            web.loadDataWithBaseURL(null, ERROR_PAGE_HTML, "text/html", "utf-8", null)
+            Toast.makeText(this, R.string.render_gone, Toast.LENGTH_LONG).show()
         }
     }
 
@@ -338,5 +406,17 @@ class MainActivity : AppCompatActivity() {
         FileLog.event("app_exit")
         web.destroy()
         super.onDestroy()
+    }
+
+    companion object {
+        /** Shown after repeated renderer deaths on the same page. */
+        private const val ERROR_PAGE_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><style>
+body{background:#0B1020;color:#E8ECF4;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+div{text-align:center;max-width:32em;padding:24px;line-height:1.6}
+</style></head><body><div>
+<h2>⚠️ แสดงผลหน้านี้ไม่สำเร็จ</h2>
+<p>หน้าเว็บนี้ทำให้ตัวแสดงผลของแอปล่ม (มักเกิดกับหน้าที่มีโฆษณาหนัก ๆ)<br>ป้อน URL อื่นในช่องด้านล่างได้เลย</p>
+</div></body></html>"""
     }
 }

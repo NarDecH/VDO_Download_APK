@@ -2,6 +2,23 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [Unreleased]
+
+### Android (แก้ crash + จัด UI ใหม่)
+- **แก้แอปปิดตัวเองเมื่อกดลิงก์/ปุ่มในหน้าเว็บ (เช่น ปุ่มโฆษณา overlay)** — สาเหตุ: หน้าเว็บที่มี
+  สคริปต์โฆษณาหนัก ๆ ทำให้ renderer process ของ WebView ตาย และเมื่อไม่มี `onRenderProcessGone`
+  Android จะปิดแอปทั้ง process ทันที — ตอนนี้จับ event นี้แล้ว **สร้าง WebView ใหม่แทนที่ตัวเก่า
+  แล้วโหลดหน้าเดิมต่อ** (ถ้าหน้าเดิมทำล่มซ้ำจะขึ้นหน้าแจ้งเตือนแทน ไม่เข้าสู่ crash loop) ·
+  event log `render_gone`
+- กันชนเพิ่ม: try/catch รอบ `shouldInterceptRequest` (การดักจับ media บนหน้าโฆษณาแน่น ๆ) และ
+  รอบ bridge `reportMedia` (exception บน JS thread ปิดแอปได้) · ลิงก์ scheme อื่น (intent://,
+  market:// ฯลฯ) บันทึกเป็น event `external_link` และปล่อย `javascript:` ให้รันในหน้าเหมือน
+  เบราว์เซอร์ทั่วไป · จับ error ของหน้าเป็น event `page_error`
+- **UncaughtExceptionHandler เขียน `crash.log`** (เหมือนฝั่งเดสก์ท็อป) — ถ้ายังมี crash ที่ไหน
+  อีก จะเก็บ stack trace ไว้อ่านได้ใน Logs (แท็บ crash.log เพิ่มใหม่) · event `app_crash`
+- **ย้ายช่อง URL ลงด้านล่างของแอป** — แถบเครื่องมือทั้งแถว (ย้อนกลับ/ถัดไป/รีโหลด/ช่อง URL/
+  คลิปบอร์ด/Logs) อยู่ใต้หน้าเว็บ ส่วนแถบ 🎬 พบวิดีโอ ยังอยู่ขอบล่างสุดเหมือนเดิม
+
 ## [1.3.1] — 2026-10-04
 
 ### Desktop v1.3.1

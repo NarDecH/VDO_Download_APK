@@ -9,7 +9,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.yausername.youtubedl_android.YoutubeDL
 import kotlin.concurrent.thread
 
-/** In-app log viewer: app.log / downloads.log / events.jsonl tails + engine maintenance. */
+/** In-app log viewer: app.log / downloads.log / events.jsonl / crash.log tails + engine maintenance. */
 class LogsActivity : AppCompatActivity() {
 
     private lateinit var box: TextView
@@ -23,10 +23,12 @@ class LogsActivity : AppCompatActivity() {
         val tabApp: Button = findViewById(R.id.tabApp)
         val tabDl: Button = findViewById(R.id.tabDl)
         val tabEv: Button = findViewById(R.id.tabEv)
+        val tabCrash: Button = findViewById(R.id.tabCrash)
         val tabs = mapOf<Button, String>(
             tabApp to "app.log",
             tabDl to "downloads.log",
             tabEv to "events.jsonl",
+            tabCrash to "crash.log",
         )
         val refresh = { name: String ->
             box.text = FileLog.tail(name, 400)
