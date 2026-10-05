@@ -152,9 +152,12 @@ class HtmlSafetyNetE2E {
     // ---------------------------------------------------------------- helpers
 
     private fun dmEnqueue(url: String, name: String): Long {
+        // NOTE: VISIBILITY_HIDDEN (=2) needs the system ACCESS_DOWNLOAD_MANAGER
+        // permission - a third-party app gets SecurityException "Invalid value
+        // for visibility: 2"; use the same visibility the production code uses
         val req = DownloadManager.Request(Uri.parse(url))
             .setTitle(name)
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN)
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(
                 Environment.DIRECTORY_DOWNLOADS, "VDOGrabber/$name")
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
