@@ -137,7 +137,8 @@ def run_checks(skip_gradle: bool) -> None:
         die(f"desktop selftest failed:\n{out[-1200:]}")
     print("PASS  desktop selftest")
     if not skip_gradle:
-        gradlew = os.path.join("android", "gradlew.bat" if os.name == "nt" else "gradlew")
+        # cwd is android/ - the wrapper name alone (gradlew.bat on Windows)
+        gradlew = "gradlew.bat" if os.name == "nt" else "gradlew"
         rc, out = run([gradlew, "testDebugUnitTest", ":app:compileDebugKotlin", "--console=plain"],
                       cwd=os.path.join(ROOT, "android"))
         if rc != 0:
