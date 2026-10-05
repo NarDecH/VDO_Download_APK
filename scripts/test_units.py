@@ -574,6 +574,81 @@ def test_sieve_poll_backoff() -> bool:
     return True
 
 
+# --------------------------------------------------- events.jsonl analyzer
+def test_analyze_events_parsing_and_diagnosis() -> bool:
+    import analyze_events
+
+    sample = [
+        '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/v"}',
+        '{"ts":1759120328.0,"event":"media_found","url":"https://cdn.example.com/a.mp4"}',
+        'not json at all',
+        '{"ts":1759120330.0,"event":"download_skipped_blob","url":"blob:https://x/1"}',
+        '{"ts":1759120331.0,"event":"download_no_file","url":"https://x/v"}',
+        '[1,2,3]',
+    ]
+    records, bad = analyze_events.parse_events(sample)
+    assert len(records) == 4, "4 valid records expected"
+    assert bad == 2, "junk lines must be counted, got %d" % bad
+
+    s = analyze_events.summarize(records)
+    assert s["total"] == 4 and s["counts"]["media_found"] == 1
+    assert s["blob_urls"] == ["blob:https://x/1"], "blob URLs collected"
+    assert s["first_ts"] == 1759120327.1 and s["last_ts"] == 1759120331.0
+    assert s["engine_ready_seen"] is False
+
+    findings = analyze_events.diagnose(s, records)
+    text = "\n".join(findings)
+    assert "blob" in text and "exit 0" in text, "blob + no-file findings present"
+    return True
+
+
+def test_analyze_events_clean_log_has_no_known_problem() -> bool:
+    import analyze_events
+
+    records, bad = analyze_events.parse_events(
+        ['{"ts":1,"event":"app_start"}', '{"ts":2,"event":"download_done","url":"https://x/a.mp4"}'])
+    assert bad == 0
+    s = analyze_events.summarize(records)
+    findings = analyze_events.diagnose(s, records)
+    assert len(findings) == 1 and "ไม่พบสัญญาณปัญหา" in findings[0]
+    out = analyze_events.render_text(s, records, findings, records)
+    assert "download_done" in out and "app_start" in out, "funnel table lists both"
+    return True
+
+
+def test_analyze_events_cli_missing_file_and_filter() -> bool:
+    import contextlib
+    import io
+    import os
+    import tempfile
+
+    import analyze_events
+
+    # stdout must be captured: findings are Thai and a cp1252 console would
+    # raise UnicodeEncodeError inside the CLI print (Windows runner lesson)
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        rc = analyze_events.main(["Z:/definitely/missing/events.jsonl"])
+    assert rc == 2, "missing log exits 2"
+
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write('{"ts":1,"event":"download_queued","url":"https://x/a.mp4"}\n')
+        fh.write('{"ts":2,"event":"download_done","url":"https://x/a.mp4"}\n')
+        fh.write('{"ts":3,"event":"download_no_file","url":"https://x/b.mpd"}\n')
+    try:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = analyze_events.main([path, "--event", "download_no_file", "--json"])
+        assert rc == 0
+        out = buf.getvalue()
+        assert "download_no_file" in out and "download_queued" not in out, \
+            "--event filter keeps only matching events"
+    finally:
+        os.remove(path)
+    return True
+
+
 def main() -> int:
     tests = {
         "sieve_request_building": test_sieve_request_building,
@@ -600,6 +675,9 @@ def main() -> int:
         "exclusion_matcher": test_exclusion_matcher,
         "exclusion_transfer": test_exclusion_transfer,
         "pair_sync_guard": test_pair_sync_guard,
+        "analyze_events_parse_and_diagnose": test_analyze_events_parsing_and_diagnosis,
+        "analyze_events_clean_log": test_analyze_events_clean_log_has_no_known_problem,
+        "analyze_events_cli": test_analyze_events_cli_missing_file_and_filter,
     }
     failed = []
     for name, fn in tests.items():

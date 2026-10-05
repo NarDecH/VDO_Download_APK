@@ -55,11 +55,44 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon --stacktrace assembleDebug
 
+      # AVD + gradle caches: a pre-built AVD makes later E2E attempts boot
+      # faster and less flaky (the boot flake is ShellCommandUnresponsive /
+      # "API level=1" on the hosted software-rendering emulator)
+      - name: Cache gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-android-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
+          restore-keys: gradle-android-${{ runner.os }}-
+      - name: Cache AVD
+        uses: actions/cache@v4
+        id: avd-cache
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/avd/*.lock
+          key: avd-29-x86_64
+
+      - name: Create AVD ahead of time (warm cache)
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 29
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
+          disable-animations: true
+          script: echo "AVD warmed"
+
       # The emulator sometimes boots into an unresponsive ADB shell on hosted
       # runners (software rendering / TCG) -> ShellCommandUnresponsiveException
       # and connectedDebugAndroidTest finds no device (seen on the v1.1.6 tag
       # and again on the v1.3.2 tag, where both attempts hit it).
       # Run E2E three times with a FRESH emulator per attempt before giving up.
+      # emulator-boot-timeout 600: the runner default (300s) was exactly the
+      # "Device emulator-5554 API level=1" half-boot seen on the v1.3.5 tag.
       - name: E2E on emulator (attempt 1)
         id: e2e1
         continue-on-error: true
@@ -68,6 +101,7 @@ jobs:
           api-level: 29
           arch: x86_64
           disable-animations: true
+          emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: |
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
@@ -84,6 +118,7 @@ jobs:
           api-level: 29
           arch: x86_64
           disable-animations: true
+          emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: |
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"
@@ -97,6 +132,7 @@ jobs:
           api-level: 29
           arch: x86_64
           disable-animations: true
+          emulator-boot-timeout: 600
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -camera-back none -camera-front none
           script: |
             chmod +x "$GITHUB_WORKSPACE/android/gradlew"

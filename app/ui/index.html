@@ -350,6 +350,8 @@ async function tailLogs(){
 function quickDownload(url){
   const u = url || document.getElementById('quickUrl').value.trim();
   if (!u) return;
+  // v1.3.6 (Android parity): blob: URLs live only inside the page - the engine cannot reach them
+  if (/^blob:/i.test(u)) { status('blob: URL มีอยู่แค่ในหน้าเว็บ — คัดลอกลิงก์ไฟล์/ลิงก์สตรีม (.m3u8/.mpd) มาแทน'); return; }
   const kind = /\.(m3u8|mpd)(\?|#|$)/i.test(u) ? (u.endsWith('m3u8')||u.includes('.m3u8') ? 'hls' : 'dash') : 'media';
   py().download_start({ url: u, kind, page_url:'', referrer:'' });
   document.getElementById('quickUrl').value = '';

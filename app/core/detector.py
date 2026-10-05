@@ -273,8 +273,16 @@ TOOLBAR_JS = r"""
       return;
     }
     if (b.classList.contains('dlbtn')) {
-      pyapi() && pyapi().download_start({ url: decodeURIComponent(b.getAttribute('data-url')),
-        kind: classifyKind(b.getAttribute('data-url')), page_url: decodeURIComponent(b.getAttribute('data-ref') || ''), referrer: '',
+      var dlurl = decodeURIComponent(b.getAttribute('data-url'));
+      // v1.3.6 (Android parity): blob: URLs live only inside the page - the
+      // engine cannot fetch them; tell the user to pick a real link instead
+      if (dlurl.toLowerCase().indexOf('blob:') === 0) {
+        badge.textContent = 'blob: ใช้ไม่ได้';
+        window.setTimeout(function () { badge.textContent = ''; }, 2500);
+        panel.style.display = 'none'; return;
+      }
+      pyapi() && pyapi().download_start({ url: dlurl,
+        kind: classifyKind(dlurl), page_url: decodeURIComponent(b.getAttribute('data-ref') || ''), referrer: '',
         title: document.title || '', page_title: document.title || '' });
       panel.style.display = 'none'; return;
     }

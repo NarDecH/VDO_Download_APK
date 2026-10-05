@@ -33,6 +33,12 @@ PROGRESS_TEMPLATE = (
 
 MEDIA_EXT_RE = re.compile(r"\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?$", re.I)
 
+# v1.3.6 (Android parity): a blob: URL exists only inside the browser page -
+# neither yt-dlp nor a direct fetch can ever reach it (field log: the engine
+# answered "ERROR: [Blob] ... only locally in your browser").
+def is_usable_download_url(url: str) -> bool:
+    return not str(url or "").lower().startswith("blob:")
+
 # Windows-invalid filename characters (plus control chars) -> replaced by spaces
 _INVALID_FS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -327,6 +333,15 @@ class DownloadManager:
             job.status, job.error = "error", "yt-dlp not available"
             return
 
+        # v1.3.6 (Android parity): never hand a blob: URL to the engine
+        if not is_usable_download_url(job.url):
+            job.status = "error"
+            job.error = ("blob: URL มีอยู่แค่ในหน้าเว็บ — เอนจินเข้าถึงไม่ได้ "
+                         "ให้เลือกลิงก์ไฟล์/ลิงก์สตรีมจากรายการ 🎬 แทน")
+            self.log.log("download rejected (blob URL) #%s: %s" % (job.id, job.url[:120]),
+                         level="warning", event="download_skipped_blob", id=job.id, url=job.url)
+            return
+
         # HLS/DASH or split A/V formats need ffmpeg for demux/merge -> get it once.
         if job.kind in ("hls", "dash") or ".m3u8" in job.url or ".mpd" in job.url or job.format_id in ("bv*", "bv+ba"):
             ff = self.engines.ensure_ffmpeg(push=lambda stage, pct, msg: self.push_ui(
@@ -392,12 +407,29 @@ class DownloadManager:
             job.percent = 100.0
             # fragment/manifest downloads often never report totals - fill
             # them from the finished file so the UI shows real size + 100%
-            if job.filepath and os.path.exists(job.filepath):
-                try:
-                    size = os.path.getsize(job.filepath)
-                    job.total = job.downloaded = size
-                except OSError:
-                    pass
+            if not job.filepath or not os.path.exists(job.filepath):
+                # v1.3.6 (field-log parity with Android): exit 0 without a file
+                # must not be reported as a floating success - probe -F and log
+                # the real reason (DRM / geo / unknown structure)
+                job.status = "error"
+                job.error = ("yt-dlp finished (exit 0) but no file appeared in the "
+                             "download folder - see the no-file probe in the log")
+                self.log.log("download done but no file #%s" % job.id,
+                             level="error", event="download_no_file", id=job.id, url=job.url)
+                self._probe_no_file(job, ytdlp)
+                self.push_ui("download_update", job.public())
+                return
+            try:
+                size = os.path.getsize(job.filepath)
+                job.total = job.downloaded = size
+            except OSError:
+                pass
+            # v1.3.6 (Android parity safety net): a "video" that is really an
+            # HTML player page gets flagged + kept as .html evidence, and the
+            # page fallback gets one retry (it often finds the real manifest)
+            if self._looks_like_html(job.filepath):
+                self._handle_html_payload(job, allow_fallback)
+                return
             self.log.log("download done #%s -> %s" % (job.id, job.filepath or "(file name unknown)"),
                          event="download_done", id=job.id, url=job.url, filepath=job.filepath,
                          seconds=round(job.finished - job.created, 1), bytes=job.total)
@@ -424,6 +456,79 @@ class DownloadManager:
                         job.title_base = job.title
                     job.status = "queued"
                     return self._execute(job, allow_fallback=False)
+        self.push_ui("download_update", job.public())
+
+    # ------------------------------------------------- v1.3.6 payload checks
+    def _looks_like_html(self, path: str) -> bool:
+        """True when the first bytes of `path` look like an HTML/XML page
+        rather than media data (desktop twin of the Android
+        Downloader.looksLikeHtml sniff, unit-tested): optional UTF-8 BOM,
+        leading whitespace and HTML comments, then <!doctype html / <html /
+        <?xml. Media files start with binary boxes/sizes, never a tag."""
+        try:
+            with open(path, "rb") as fh:
+                head = fh.read(512)
+        except OSError:
+            return False
+        if head[:3] == b"\xef\xbb\xbf":
+            head = head[3:]
+        low = head.decode("ascii", "replace").lstrip().lower()
+        while True:
+            if low.startswith("<!--"):  # some pages ship a comment before the doctype
+                end = low.find("-->", 4)
+                if end < 0:
+                    return False  # comment fills the sniffed window - undecided
+                low = low[end + 3:].lstrip()
+                continue
+            break
+        return low.startswith("<!doctype html") or low.startswith("<html") or low.startswith("<?xml")
+
+    def _probe_no_file(self, job: Job, ytdlp: str) -> None:
+        """Exit 0 without a produced file: ask yt-dlp what it actually sees
+        (-F) and mirror the answer into the logs - the same diagnosis the
+        Android service runs (event download_no_file_probe)."""
+        try:
+            probe = subprocess.run(
+                [ytdlp, "--no-playlist", "--no-warnings", "-F", job.url],
+                capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace",
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            tail = [ln for ln in (probe.stdout or "").strip().splitlines() if ln][-12:]
+            for ln in tail:
+                self.log.dl("[%s][probe] %s" % (job.id, ln))
+            self.log.log("no-file probe #%s tail: %s" % (job.id, " | ".join(tail)[-400:]),
+                         event="download_no_file_probe", id=job.id, url=job.url)
+        except Exception as e:  # noqa: BLE001
+            self.log.log("no-file probe failed #%s: %r" % (job.id, e),
+                         level="warning", event="download_no_file_probe_error",
+                         id=job.id, error=repr(e))
+
+    def _handle_html_payload(self, job: Job, allow_fallback: bool) -> None:
+        """The finished job wrote an HTML player page instead of media: flag
+        it (event download_not_media), keep the page as *.html evidence, and
+        retry once through the page-fallback scanner."""
+        self.log.log("saved file is HTML, not media #%s: %s" % (job.id, job.filepath),
+                     level="error", event="download_not_media", id=job.id, url=job.url,
+                     filepath=job.filepath)
+        try:
+            evidence = job.filepath + ".html"
+            os.replace(job.filepath, evidence)
+            job.filepath = evidence
+        except OSError:
+            pass
+        if allow_fallback:
+            cand = self._page_fallback(job)
+            if cand and cand != job.url:
+                self.log.log("not-media payload #%s -> retrying with %s" % (job.id, cand[:120]),
+                             event="download_fallback", id=job.id, from_url=job.url, to_url=cand)
+                job.url = cand
+                job.error = ""
+                job.status = "queued"
+                if not job.title_base:
+                    job.title_base = job.title
+                return self._execute(job, allow_fallback=False)
+        job.status = "error"
+        job.error = ("the saved file is an HTML page, not a video (the site served the "
+                     "player page) - try a stream link (.m3u8/.mpd) from the list")
         self.push_ui("download_update", job.public())
 
     def _parse_line(self, job: Job, line: str) -> None:

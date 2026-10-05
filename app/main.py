@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import webview  # noqa: E402
 
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
-from core.downloader import DownloadManager  # noqa: E402
+from core.downloader import DownloadManager, is_usable_download_url  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
 from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
 from core.sieve import DEVICE_CLIENT_NAME, SieveError, SieveManager, device_login  # noqa: E402
@@ -213,6 +213,12 @@ class Api:
         url = str(spec.get("url") or "").strip()
         if not url:
             return {"ok": False, "error": "empty url"}
+        # v1.3.6 (Android parity): blob: URLs live only inside the page - the
+        # engine would just answer "ERROR: [Blob] ... only locally in your browser"
+        if not is_usable_download_url(url):
+            _APP.logm.log("download rejected (blob URL): %s" % url[:120],
+                          level="warning", event="download_skipped_blob", url=url)
+            return {"ok": False, "error": "blob: URL มีอยู่แค่ในหน้าเว็บ — เลือกลิงก์ไฟล์/ลิงก์สตรีมจากรายการ 🎬 แทน"}
         job = _APP.downloads.start(
             url,
             kind=str(spec.get("kind") or "media"),
