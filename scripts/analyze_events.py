@@ -165,7 +165,19 @@ def render_text(summary: dict, records: list[dict], findings: list[str],
     return "\n".join(lines)
 
 
+def _force_utf8_stdout() -> None:
+    """Findings are Thai; a cp1252 Windows console would raise
+    UnicodeEncodeError on print. Python 3.7+ lets us reconfigure the
+    stream - a StringIO (unit tests) has no reconfigure and never needs it.
+    """
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except (AttributeError, ValueError):
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
+    _force_utf8_stdout()
     ap = argparse.ArgumentParser(description="Analyze VDO Grabber events.jsonl")
     ap.add_argument("path", nargs="?", default=None, help="events.jsonl path (default: desktop log)")
     ap.add_argument("--event", action="append", default=[], help="show only this event (repeatable)")
