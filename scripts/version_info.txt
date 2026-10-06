@@ -17,12 +17,12 @@ VSVersionInfo(
       StringTable('040904B0', [
         StringStruct('CompanyName', 'VDO Grabber Project'),
         StringStruct('FileDescription', 'VDO Grabber - open any website and download the playing video'),
-        StringStruct('FileVersion', '1.4.0.0'),
+        StringStruct('FileVersion', '1.5.0.0'),
         StringStruct('InternalName', 'VDOGrabber'),
         StringStruct('LegalCopyright', 'MIT License (c) 2026 VDO Grabber Project'),
         StringStruct('OriginalFilename', 'VDOGrabber.exe'),
         StringStruct('ProductName', 'VDO Grabber'),
-        StringStruct('ProductVersion', '1.4.0.0')])
+        StringStruct('ProductVersion', '1.5.0.0')])
     ]),
     VarFileInfo([VarStruct('Translation', [1033, 1200])])
   ]
