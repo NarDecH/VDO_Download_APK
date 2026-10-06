@@ -47,4 +47,48 @@ class DownloadCleanerTest {
         )
         assertFalse("deleting a non-existent file must not report success", again)
     }
+
+    // ---------------------------------- v1.6.0 deleteAll (clear-all button)
+
+    @Test
+    fun `deleteAll removes every raw file and reports honest counts`() {
+        val a = File.createTempFile("vclean-a", ".mp4")
+        val b = File.createTempFile("vclean-b", ".mp4")
+        a.writeText("a"); b.writeText("b")
+
+        val (deleted, total) = DownloadCleaner.deleteAll(
+            null,
+            listOf(
+                DownloadCleaner.Candidate(-1, null, a, a.name, 1),
+                DownloadCleaner.Candidate(-1, null, b, b.name, 1),
+            ),
+        )
+        assertEquals(2, total)
+        assertEquals(2, deleted)
+        assertFalse(a.exists()); assertFalse(b.exists())
+    }
+
+    @Test
+    fun `deleteAll keeps going after failures and counts identity-less as gone`() {
+        val gone = File.createTempFile("vclean-ok", ".mp4")
+        gone.writeText("a")
+        // NOTE: no injected "delete fails" case here - making File.delete()
+        // fail is OS-dependent (a read-only FILE blocks deletion on Windows
+        // but not on Linux, where only a read-only DIRECTORY does), so the
+        // deterministic non-deleted cases are a missing file (systemDelete
+        // reports false) and a candidate with no identity at all
+        val missing = File(gone.parentFile, "vclean-never.mp4")
+        val (deleted, total) = DownloadCleaner.deleteAll(
+            null,
+            listOf(
+                DownloadCleaner.Candidate(-1, null, gone, gone.name, 1),
+                DownloadCleaner.Candidate(-1, null, missing, missing.name, 0),
+                // no identity at all: nothing to remove -> counted as gone
+                DownloadCleaner.Candidate(-1, null, null, "ghost", 0),
+            ),
+        )
+        assertEquals(3, total)
+        assertEquals("1 file deleted + 1 identity-less candidate", 2, deleted)
+        assertFalse(gone.exists())
+    }
 }

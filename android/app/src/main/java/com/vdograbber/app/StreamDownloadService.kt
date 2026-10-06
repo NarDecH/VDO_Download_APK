@@ -139,6 +139,7 @@ class StreamDownloadService : Service() {
                     // reporting a phantom success
                     onNoFile(url, title)
                     finishNotification(false, title.ifEmpty { url })
+                    notifyMainActivity(false, "")
                     stopSelfResult(startId)
                     return@launch
                 }
@@ -151,11 +152,14 @@ class StreamDownloadService : Service() {
                     published?.second,
                     published?.let { File(outDir, it.first).absolutePath },
                 )
+                // v1.6.0: surface the outcome inside the app too (Snackbar + chip)
+                notifyMainActivity(true, published?.first ?: file.name)
             } else {
                 val cause = StreamArgs.ytDlpErrorLine(errorMsg)
                 FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
                 finishNotification(false, cause)
+                notifyMainActivity(false, "")
                 // Unsupported-URL player pages: hand the page to the WebView so
                 // the in-page detector can catch the real stream while it plays
                 // (desktop parity - plan-android-hls.md / v1.1.4 desktop flow)
@@ -251,6 +255,25 @@ class StreamDownloadService : Service() {
         return stem
     }
 
+    /**
+     * v1.6.0: tell the (possibly dead) MainActivity a download finished or
+     * failed - a broadcast it registers with RECEIVER_NOT_EXPORTED, so only
+     * this app receives it. Never throws: a dead/missing receiver must not
+     * take the download worker down.
+     */
+    private fun notifyMainActivity(ok: Boolean, file: String) {
+        try {
+            sendBroadcast(
+                Intent(ACTION_DL_STATE)
+                    .setPackage(packageName)
+                    .putExtra(EXTRA_DL_OK, ok)
+                    .putExtra(EXTRA_DL_FILE, file.take(120)),
+            )
+        } catch (e: Exception) {
+            FileLog.app("WARNING", "dl", "notify main activity failed: $e")
+        }
+    }
+
     // ------------------------------------------------------------ notification
     private fun createChannel() {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -340,6 +363,12 @@ class StreamDownloadService : Service() {
         /** v1.5.0: per-job cancel - absent means "cancel every running job". */
         const val EXTRA_PID = "pid"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"
+
+        /** v1.6.0: in-app download outcome notice (MainActivity shows a
+         *  Snackbar + a temporary status chip). */
+        const val ACTION_DL_STATE = "com.vdograbber.app.DL_STATE"
+        const val EXTRA_DL_OK = "ok"
+        const val EXTRA_DL_FILE = "file"
 
         /** v1.4.0: true from onStartCommand until onDestroy (all stop paths). */
         @Volatile var isRunning = false

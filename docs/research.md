@@ -74,6 +74,43 @@ resource types `xmlhttprequest|media|main_frame|sub_frame|other` บน `<all_ur
 ข้อจำกัดที่ทราบและยอมรับไว้: ไม่มีการทำงานกับ DRM (Widevine), เนื้อหาหลังล็อกอินบางประเภท
 (ไม่มี cookie profile ของเบราว์เซอร์ผู้ใช้), และ YouTube บางช่วงอาจต้องรอ yt-dlp อัปเดต
 
+## 7. สถาปัตยกรรมการดาวน์โหลดและหน้าสื่อบน Android (v1.5.0–v1.6.0)
+
+### ท่อดาวน์โหลด
+
+- **การ route URL** — `Downloader.routeOf()` แบ่ง 3 ทาง: `DIRECT_FILE` (นามสกุลสื่อ →
+  DownloadManager, ตรวจไฟล์ HTML ปลอมหลังเสร็จแล้ว re-route อัตโนมัติ), `STREAM`
+  (m3u8/mpd) และ `PAGE` (หน้าเล่น/หน้า embed) → ทั้งสองทางหลังเข้า `StreamDownloadService`
+  ที่รัน yt-dlp บนเครื่อง
+- **StreamDownloadService** — foreground service ที่รับงานได้ซ้อนกัน: แต่ละ `onStartCommand`
+  สร้าง coroutine + pid ของตัวเอง, เขียนลงโฟลเดอร์ engine-work (app-private, กัน scoped storage)
+  แล้ว `publishFile()` ย้ายไฟล์เสร็จเข้า `Downloads/VDOGrabber` ผ่าน MediaStore API
+- **DownloadJobs (registry)** — ฐานสถานะกลางของงานที่กำลังวิ่ง: `(pid, url, title, percent)`
+  ต่องาน ใช้ร่วมกันระหว่าง chip ticker (แสดง percent สูงสุด) และแท็บ "กำลังดาวน์โหลด"
+  (รายการเรียงเก่า→ใหม่) · คู่ `markCancelled`/`consumeCancelled` แยก "ผู้ใช้ยกเลิก"
+  ออกจาก "งานล้มเหลว" ใน log และการแจ้งเตือน
+- **การยกเลิก** — `ACTION_CANCEL` พร้อม `EXTRA_PID` ยกเลิกเฉพาะงานนั้น
+  (`destroyProcessById`); แถบแจ้งเตือนไม่ส่ง pid = ยกเลิกทั้งหมด · `stopSelfResult(startId)`
+  ทำให้ service จบเมื่องานสุดท้ายเท่านั้น (งานใหม่ที่เข้ามาระหว่างวิ่งไม่ถูกฆ่าตาม)
+
+### หน้าสื่อ (media sheet) 3 แท็บ
+
+| แท็บ | แหล่งข้อมูล | ปุ่ม |
+|---|---|---|
+| พบวิดีโอ | `MediaStore` (LRU, รีเซ็ตเมื่อ origin เปลี่ยน) | ดาวน์โหลด / คัดลอกลิงก์ / เปิด embed |
+| กำลังดาวน์โหลด | `DownloadJobs.active()` | ยกเลิกรายงาน |
+| ดาวน์โหลดเสร็จแล้ว | `DownloadCleaner.systemList()` | ลบรายไฟล์ / ล้างทั้งหมด (v1.6.0) |
+
+- แท็บที่เปิดเมื่อมีงานวิ่งคือ "กำลังดาวน์โหลด" โดยอัตโนมัติ · แถว percent/แถบคืบหน้า
+  **วาด in-place** จาก ticker หลักทุก 500 ms (สร้าง view ใหม่เมื่อชุด pid เปลี่ยนเท่านั้น —
+  กดปุ่มไม่หลุด)
+- **แจ้งเตือนในแอป (v1.6.0)** — service broadcast `DL_STATE` (ok/percent) ตอนงานจบ,
+  MainActivity ฟังแล้วโชว์ Snackbar + ชิปสถานะชั่วคราว (~8 วิ) ข้อความเดียวกัน และ
+  ฟื้นแท็บพบวิดีโอ/ชิปตามสถานะ
+- **ล้างทั้งหมด (v1.6.0)** — `DownloadCleaner.deleteAll()` ลบทุก Candidate ต่อ identity
+  (MediaStore → DM → ไฟล์จริง) นับสำเร็จรายไฟล์, log event `download_cleared_all`,
+  มี dialog ยืนยัน — logic บริสุทธิ์และเทส JVM ได้ (DownloadCleanerTest)
+
 ---
 
 *วิเคราะห์เชิงโครงสร้างจากซอร์สที่ถูก minify โดยค้นหาสตริง/ชื่อฟังก์ชันอ้างอิง เช่น `$f()`, `RS()`, `zf()`,

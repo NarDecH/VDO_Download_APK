@@ -119,6 +119,24 @@ object DownloadCleaner {
     }
 
     /**
+     * v1.6.0: delete EVERY candidate in [list], one delete attempt per
+     * candidate (single confirm dialog in the UI covers the whole tab).
+     * Returns (deleted, total) so the caller can report an honest "ลบแล้ว 5/7
+     * ไฟล์" toast when a ghost row refuses to die - candidates that carry no
+     * identity left (already gone) count as deleted, matching systemDelete's
+     * fall-through semantics. Pure logic over systemDelete (logging is the
+     * caller's job, like every other cleaner entry point) -> JVM-testable.
+     */
+    fun deleteAll(ctx: Context?, list: List<Candidate>): Pair<Int, Int> {
+        var deleted = 0
+        for (c in list) {
+            // nothing left to remove (no id, no uri, no file) - treat as gone
+            if (c.identities == 0 || systemDelete(ctx, c)) deleted++
+        }
+        return deleted to list.size
+    }
+
+    /**
      * Delete a candidate: try the MediaStore row first (points at the real
      * file), then the DM row (its remove() is documented to delete the file,
      * but fresh emulators can keep ghost rows that delete nothing), then the

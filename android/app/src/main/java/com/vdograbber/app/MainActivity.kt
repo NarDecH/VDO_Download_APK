@@ -31,6 +31,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.snackbar.Snackbar
 import kotlin.concurrent.thread
 
 /**
@@ -66,6 +67,12 @@ class MainActivity : AppCompatActivity() {
     private var sheetLastActive = 0
     private var sheetShown: MutableMap<String, View> = mutableMapOf()
     private var sheetShownPids: List<String> = emptyList()
+
+    // v1.6.0: last in-app download notice (debounce) - the sheet tab refresh
+    // is only re-armed after this window so a fast burst of events does not
+    // fight the user's taps (renderSheet rebuilds views)
+    private var lastDlNoticeMs = 0L
+    private var lastDlNoticeOk = false
 
     inner class Bridge {
         @JavascriptInterface
@@ -111,6 +118,19 @@ class MainActivity : AppCompatActivity() {
                 navigate(u)
             }
         }, android.content.IntentFilter("com.vdograbber.app.OPEN_IN_BROWSER"),
+            Context.RECEIVER_NOT_EXPORTED)
+
+        // v1.6.0: the stream service announces finished/failed downloads so
+        // the user sees the outcome in the app (Snackbar + temporary chip),
+        // not only in the notification drawer
+        registerReceiver(object : android.content.BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: android.content.Intent?) {
+                if (intent?.action != StreamDownloadService.ACTION_DL_STATE) return
+                val ok = intent.getBooleanExtra(StreamDownloadService.EXTRA_DL_OK, false)
+                val file = intent.getStringExtra(StreamDownloadService.EXTRA_DL_FILE).orEmpty()
+                onDlState(ok, file)
+            }
+        }, android.content.IntentFilter(StreamDownloadService.ACTION_DL_STATE),
             Context.RECEIVER_NOT_EXPORTED)
 
         // v1.3.4: a finished direct download whose payload is really an HTML
@@ -476,6 +496,20 @@ class MainActivity : AppCompatActivity() {
             b.setTextColor(if (selected) 0xFF111629.toInt() else 0xFF93A4C3.toInt())
             b.setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
         }
+        // v1.6.0: one-shot ล้างทั้งหมด chip on the finished tab (kept out of
+        // item rows so it cannot scroll away with the list)
+        container.findViewWithTag<View>(TAG_CLEAR_ALL)?.let { container.removeView(it) }
+        if (sheetTab == TAB_DONE && dls.isNotEmpty()) {
+            container.addView(TextView(this).apply {
+                tag = TAG_CLEAR_ALL
+                text = getString(R.string.clear_all)
+                background = ContextCompat.getDrawable(this@MainActivity, R.drawable.chip_bg)
+                setTextColor(0xFF111629.toInt())
+                textSize = 13f
+                setPadding(26, 12, 26, 12)
+                setOnClickListener { clearAllDownloads() }
+            })
+        }
         when (sheetTab) {
             TAB_FOUND -> {
                 if (items.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_found)))
@@ -566,6 +600,56 @@ class MainActivity : AppCompatActivity() {
         del.visibility = View.VISIBLE
         del.setOnClickListener { deleteDownload(d) { renderSheet() } }
         return row
+    }
+
+    /** v1.6.0: confirm, then delete EVERY finished download (single dialog
+     *  covers the whole tab; honest ลบแล้ว N/M toast for ghost rows). */
+    private fun clearAllDownloads() {
+        val dls = DownloadCleaner.systemList(this)
+        if (dls.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setMessage(getString(R.string.clear_all_confirm, dls.size))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                val (deleted, total) = DownloadCleaner.deleteAll(this@MainActivity, dls)
+                Toast.makeText(
+                    this,
+                    getString(R.string.clear_all_done, deleted, total),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                renderSheet()
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    /** v1.6.0: a stream download finished (or failed) - surface it in-app:
+     *  Snackbar with a เปิด action that opens the media sheet, plus a
+     *  temporary status chip for when the toolbar chip is hidden. The open
+     *  sheet refreshes too (debounced so taps are not stolen mid-burst). */
+    private fun onDlState(ok: Boolean, file: String) {
+        val now = System.currentTimeMillis()
+        val repeated = now - lastDlNoticeMs < 800 && ok == lastDlNoticeOk
+        lastDlNoticeMs = now
+        lastDlNoticeOk = ok
+        val text = if (ok) getString(R.string.dl_done_inapp, file.ifEmpty { "-" })
+                   else getString(R.string.dl_failed_inapp)
+        val root = window.decorView as? ViewGroup
+        if (root != null) {
+            Snackbar.make(root, text, Snackbar.LENGTH_LONG)
+                .setAction(R.string.notif_open) { showMediaSheet() }
+                .show()
+        }
+        chipMedia.text = if (ok) text else getString(R.string.dl_failed_inapp)
+        chipMedia.visibility = View.VISIBLE
+        if (sheetDialog?.isShowing == true && !repeated) renderSheet()
+        if (ok) {
+            // restore the normal chip (count or live percent) after a beat
+            java.util.Timer("dl-notice-reset").schedule(object : java.util.TimerTask() {
+                override fun run() {
+                    runOnUiThread { updateChip() }
+                }
+            }, 8000)
+        }
     }
 
     private fun sheetEmptyBox(msg: String): View = TextView(this).apply {
@@ -670,6 +754,9 @@ class MainActivity : AppCompatActivity() {
         private const val TAB_FOUND = 0
         private const val TAB_DL = 1
         private const val TAB_DONE = 2
+
+        /** v1.6.0: tag of the ล้างทั้งหมด chip inside the sheet container. */
+        private const val TAG_CLEAR_ALL = "clear_all_chip"
 
         /** Shown after repeated renderer deaths on the same page. */
         private const val ERROR_PAGE_HTML = """<!doctype html>

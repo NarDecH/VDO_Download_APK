@@ -53,6 +53,12 @@
     <string name="empty_downloading">ยังไม่มีการดาวน์โหลดที่กำลังทำงาน</string>
     <string name="empty_done">ยังไม่มีไฟล์ใน Downloads/VDOGrabber</string>
     <string name="download_cancelled">ยกเลิกการดาวน์โหลดแล้ว</string>
+    <!-- v1.6.0: clear-all on the finished tab + in-app download notices -->
+    <string name="clear_all">🧹 ล้างทั้งหมด</string>
+    <string name="clear_all_confirm">ลบไฟล์ที่ดาวน์โหลดแล้วทั้งหมด %1$d ไฟล์ออกจากดิสก์ถาวร?</string>
+    <string name="clear_all_done">ลบแล้ว %1$d/%2$d ไฟล์</string>
+    <string name="dl_done_inapp">✅ ดาวน์โหลดเสร็จ: %1$s</string>
+    <string name="dl_failed_inapp">⚠️ ดาวน์โหลดไม่สำเร็จ — แตะเพื่อดูรายละเอียด</string>
     <string name="cancel">ยกเลิก</string>
     <string name="refresh">รีเฟรช</string>
     <string name="render_gone">หน้าเว็บนี้ทำให้ตัวแสดงผลล่ม — ป้อน URL อื่นในช่องด้านล่างได้เลย</string>
