@@ -3,10 +3,10 @@ name: Desktop selftest + exe
 on:
   push:
     branches: [main]
-    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "requirements.txt", ".github/workflows/desktop.yml"]
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "requirements.txt", ".github/workflows/desktop.yml"]
     tags: ["v*"]
   pull_request:
-    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "requirements.txt", ".github/workflows/desktop.yml"]
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "requirements.txt", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
 permissions:
@@ -32,6 +32,12 @@ jobs:
 
       - name: Run unit tests (stores / prune / pair-sync)
         run: python scripts/test_units.py
+
+      # v1.5.0: smoke-test the release script itself - parses args, bumps 5
+      # files in memory (dry-run never writes), checks the repo guards work.
+      # A broken release.py now fails CI before it can break a real release.
+      - name: Smoke test release script (dry-run)
+        run: python scripts/release.py 9.9.9 --dry-run --notes "ci smoke"
 
       - name: Prepare yt-dlp engine (bundled into exe)
         run: python -c "import sys; sys.path.insert(0, 'scripts'); import build_exe; build_exe.ensure_ytdlp()"

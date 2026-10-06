@@ -32,11 +32,15 @@ import com.yausername.youtubedl_android.YoutubeDLRequest
  *
  * Publishing the finished file into the media store (MediaStore API) lives in
  * publishFile(); FileLog events mirror the desktop event names.
+ *
+ * v1.5.0: per-job tracking via [DownloadJobs] - a new onStartCommand while a
+ * download is running now starts a SECOND concurrent job, each with its own
+ * pid/percent (the old single lastPercent static mixed their progress), and
+ * a cancel targets one job instead of stopping the whole service.
  */
 class StreamDownloadService : Service() {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private var processId: String? = null
 
     private lateinit var outDir: File
 
@@ -55,26 +59,36 @@ class StreamDownloadService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_CANCEL) {
-            processId?.let {
-                try { YoutubeDL.getInstance().destroyProcessById(it) } catch (e: Exception) {
+            // v1.5.0: a pid extra cancels exactly that job (the sheet's row
+            // ยกเลิก button); without one (the notification action) every
+            // running job is cancelled as before.
+            val single = intent.getStringExtra(EXTRA_PID)
+            val pids = if (single.isNullOrEmpty()) DownloadJobs.active().map { it.pid }
+                       else listOf(single)
+            for (p in pids) {
+                if (!DownloadJobs.markCancelled(p)) continue // already finished
+                try { YoutubeDL.getInstance().destroyProcessById(p) } catch (e: Exception) {
                     FileLog.app("ERROR", "dl", "cancel failed: $e")
                 }
             }
-            stopSelf()
+            if (DownloadJobs.count() == 0) stopSelfResult(startId)
             return START_NOT_STICKY
         }
-        processId = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
-        lastPercent = -1
         isRunning = true
 
         val url = intent?.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
-        if (url.isEmpty()) { stopSelf(); return START_NOT_STICKY }
+        if (url.isEmpty()) { stopSelfResult(startId); return START_NOT_STICKY }
         // v1.1.6: name the file after the page title (deduped on disk),
         // falling back to yt-dlp's metadata title + id when there is none.
         // v1.1.7: precompute a FREE stem, otherwise yt-dlp skips a re-download
         // with "has already been downloaded" and nothing gets saved.
         val titleBase = freeTitleBase(outDir, StreamArgs.sanitizeFilename(title))
+
+        // v1.5.0: process id is per-job (a second download may already be
+        // running) and stays alive in DownloadJobs for the UI + cancel
+        val pid = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
+        DownloadJobs.register(pid, url, title)
 
         startForeground(NOTIF_ID, buildNotification(title.ifEmpty { url }, 0))
         FileLog.event("download_start", mapOf("url" to url, "kind" to "stream", "engine" to "ytdl-android"))
@@ -83,7 +97,7 @@ class StreamDownloadService : Service() {
         scope.launch {
             var ok = false
             var errorMsg = ""
-            val pid = processId ?: ""
+            var loggedPct = -1
             try {
                 val req = YoutubeDLRequest(url).apply {
                     StreamArgs.optionsArgs(outDir, titleBase).forEach { addOption(it) }
@@ -92,11 +106,14 @@ class StreamDownloadService : Service() {
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
                     updateNotification(title.ifEmpty { url }, progress)
                     // v1.4.0: throttle to whole percents so the event log stays
-                    // readable while the notification + main screen tick live
+                    // readable while the notification + main screen tick live.
+                    // v1.5.0: percent is per-JOB (DownloadJobs) - overlapping
+                    // downloads no longer overwrite each other's progress
                     val pct = progress.toInt().coerceIn(0, 99)
-                    if (pct != lastPercent) {
-                        lastPercent = pct
-                        FileLog.event("download_progress", mapOf("url" to url.take(200), "percent" to pct))
+                    DownloadJobs.update(pid, pct)
+                    if (pct != loggedPct) {
+                        loggedPct = pct
+                        FileLog.event("download_progress", mapOf("url" to url.take(200), "percent" to pct, "pid" to pid))
                     }
                     if (!line.isNullOrBlank()) FileLog.download("[stream] $line")
                 }
@@ -106,9 +123,15 @@ class StreamDownloadService : Service() {
                 errorMsg = e.message ?: e.javaClass.simpleName
                 FileLog.app("ERROR", "dl", "stream download error: $e")
             }
-            lastPercent = -1 // finished (any outcome) - the UI chip resets
+            DownloadJobs.remove(pid) // gone from the sheet/chip whatever the outcome
 
-            if (ok) {
+            if (DownloadJobs.consumeCancelled(pid)) {
+                // user pressed ยกเลิก: the process died on purpose - report it
+                // as cancelled, not as a failure (no error notification and no
+                // Unsupported-URL re-route broadcast for a killed process)
+                FileLog.event("download_cancel", mapOf("url" to url.take(200), "pid" to pid))
+                FileLog.app("INFO", "dl", "stream download cancelled: $url")
+            } else if (ok) {
                 val file = StreamArgs.newestFileIn(outDir)
                 if (file == null) {
                     // v1.3.5: the engine exited 0 but produced no file (any
@@ -116,7 +139,7 @@ class StreamDownloadService : Service() {
                     // reporting a phantom success
                     onNoFile(url, title)
                     finishNotification(false, title.ifEmpty { url })
-                    stopSelf()
+                    stopSelfResult(startId)
                     return@launch
                 }
                 val published = publishFile(file, title)
@@ -143,8 +166,9 @@ class StreamDownloadService : Service() {
                     sendBroadcast(i)
                 }
             }
-            // failures already notified with the real yt-dlp cause (v1.3.5)
-            stopSelf()
+            // stop only once every delivered start request was handled - with
+            // a concurrent download still running the service must stay alive
+            stopSelfResult(startId)
         }
         return START_NOT_STICKY
     }
@@ -298,6 +322,7 @@ class StreamDownloadService : Service() {
 
     override fun onDestroy() {
         isRunning = false
+        DownloadJobs.clear() // service dead -> nothing is running anymore
         scope.cancel()
         super.onDestroy()
     }
@@ -312,17 +337,33 @@ class StreamDownloadService : Service() {
         private const val RC_MAIN = 44
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
+        /** v1.5.0: per-job cancel - absent means "cancel every running job". */
+        const val EXTRA_PID = "pid"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"
 
         /** v1.4.0: true from onStartCommand until onDestroy (all stop paths). */
         @Volatile var isRunning = false
             private set
 
-        /** v1.4.0: current download percent 0..99, or -1 when idle. */
-        @Volatile var lastPercent = -1
-            private set
+        /** v1.4.0: current download percent 0..99, or -1 when idle. Backed by
+         *  the per-job registry since v1.5.0. */
+        fun currentPercent(): Int = DownloadJobs.currentPercent()
 
-        fun currentPercent(): Int = lastPercent
+        /** v1.5.0: jobs currently downloading (media sheet "กำลังดาวน์โหลด" tab). */
+        fun activeJobs(): List<DownloadJobs.Job> = DownloadJobs.active()
+
+        /** v1.5.0: cancel ONE job by pid (no-op when it already finished). */
+        fun cancel(context: Context, pid: String) {
+            if (pid.isBlank()) return
+            val i = Intent(context, StreamDownloadService::class.java)
+                .setAction(ACTION_CANCEL)
+                .putExtra(EXTRA_PID, pid)
+            try {
+                context.startService(i)
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "dl", "cancel service start failed: $e")
+            }
+        }
 
         /** Start a stream download (no-op when [url] is blank). */
         fun start(context: Context, url: String, title: String) {

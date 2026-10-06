@@ -7,6 +7,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -25,9 +26,11 @@ import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import kotlin.concurrent.thread
 
 /**
@@ -51,6 +54,18 @@ class MainActivity : AppCompatActivity() {
     /** v1.4.0: ticks the 🎬 chip with the live stream-download percent - the
      *  notification alone was easy to miss (hidden by some launchers/DMI). */
     private var progressTicker: java.util.Timer? = null
+
+    // v1.5.0: the open media sheet's state - the same 500ms ticker re-renders
+    // its active tab so downloading rows show live progress without any extra
+    // timer (views are dropped on dismiss to avoid leaks)
+    private var sheetDialog: AlertDialog? = null
+    private var sheetContainer: LinearLayout? = null
+    private var sheetButtons: Map<Int, TextView> = emptyMap()
+    private var sheetTab = TAB_FOUND
+    private var sheetFoundCount = 0
+    private var sheetLastActive = 0
+    private var sheetShown: MutableMap<String, View> = mutableMapOf()
+    private var sheetShownPids: List<String> = emptyList()
 
     inner class Bridge {
         @JavascriptInterface
@@ -357,16 +372,21 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             updateChip()
                         }
+                        updateOpenSheet() // v1.5.0: live rows inside the open sheet
                     }
                 }
             }, 500, 500)
         }
     }
 
+    // ------------------------------------------------------------------ media sheet
+    // v1.5.0: tabbed sheet (user request) - the detected media, the ACTIVE
+    // stream jobs and the finished files no longer share one mixed list.
     private fun showMediaSheet() {
         val items = MediaStore.list()
         val dls = DownloadCleaner.systemList(this)
-        if (items.isEmpty() && dls.isEmpty()) {
+        val active = StreamDownloadService.activeJobs()
+        if (items.isEmpty() && dls.isEmpty() && active.isEmpty()) {
             Toast.makeText(this, R.string.no_media, Toast.LENGTH_SHORT).show()
             return
         }
@@ -374,11 +394,26 @@ class MainActivity : AppCompatActivity() {
             orientation = LinearLayout.VERTICAL
             setPadding(48, 32, 48, 32)
         }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(
-                if (items.isNotEmpty()) getString(R.string.found_title, items.size)
-                else getString(R.string.downloads_title, dls.size)
-            )
+        val tabsRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER
+        }
+        val tabButtons = linkedMapOf<Int, TextView>()
+        for (tab in intArrayOf(TAB_FOUND, TAB_DL, TAB_DONE)) {
+            val b = TextView(this).apply {
+                textSize = 13f
+                setPadding(26, 12, 26, 12)
+                setOnClickListener {
+                    sheetTab = tab
+                    renderSheet()
+                }
+            }
+            tabsRow.addView(b)
+            tabButtons[tab] = b
+        }
+        container.addView(tabsRow)
+        val sheet = AlertDialog.Builder(this)
+            .setTitle(R.string.sheet_title)
             .setView(container)
             .setNegativeButton(android.R.string.cancel, null)
             .setNeutralButton(R.string.clear_list) { _, _ ->
@@ -389,56 +424,184 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.cleared, Toast.LENGTH_SHORT).show()
             }
             .show()
-        for (m in items.take(15)) {
-            val row = layoutInflater.inflate(R.layout.item_media, container, false)
-            row.findViewById<TextView>(R.id.mLabel).text =
-                "${m.label.ifEmpty { m.kind }}  ·  ${m.kind}"
-            row.findViewById<TextView>(R.id.mUrl).text = m.url
-            row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
-            row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
-                val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                cm.setPrimaryClip(ClipData.newPlainText("url", m.url))
-                Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
-            }
-            // embed players: opening the embed page as the top page lets the
-            // detector find the real video URLs inside it (same idea as the
-            // desktop toolbar's "เปิดหน้า embed" button)
-            row.findViewById<TextView>(R.id.mOpen).visibility =
-                if (m.kind == "embed") View.VISIBLE else View.GONE
-            row.findViewById<TextView>(R.id.mOpen).setOnClickListener {
-                FileLog.event("embed_open", mapOf("url" to m.url))
-                FileLog.app("INFO", "nav", "open embed page: ${m.url}")
-                navigate(m.url)
-                dialog.dismiss()
-            }
-            container.addView(row)
+        sheetDialog = sheet
+        sheetContainer = container
+        sheetButtons = tabButtons
+        // land on the downloading tab while a job runs (the usual "where is my
+        // download?" case), else on พบวิดีโอ, else on เสร็จแล้ว
+        sheetTab = when {
+            active.isNotEmpty() -> TAB_DL
+            items.isNotEmpty() -> TAB_FOUND
+            else -> TAB_DONE
         }
+        renderSheet()
+        // the main 500ms ticker keeps the open sheet live; drop the views on dismiss
+        sheet.setOnDismissListener {
+            sheetDialog = null
+            sheetContainer = null
+            sheetButtons = emptyMap()
+            sheetShown.clear()
+            sheetShownPids = emptyList()
+        }
+    }
 
-        // v1.1.8: finished downloads from Downloads/VDOGrabber, each with a
-        // ลบไฟล์ button (file + list entry disappear)
-        if (dls.isNotEmpty()) {
-            val head = TextView(this).apply {
-                text = getString(R.string.downloads_section)
-                setTextColor(0xFF93A4C3.toInt())
-                textSize = 13f
-                setPadding(0, 24, 0, 4)
+    /** Rebuild the open sheet's current tab (also refreshes the tab counts). */
+    private fun renderSheet() {
+        val container = sheetContainer ?: return
+        while (container.childCount > 1) container.removeViewAt(1) // keep the tab strip
+        val items = MediaStore.list()
+        val dls = DownloadCleaner.systemList(this)
+        val active = StreamDownloadService.activeJobs()
+        sheetFoundCount = items.size
+        sheetLastActive = active.size
+        sheetShown.clear()
+        sheetShownPids = emptyList()
+        fun tabLabel(tab: Int, n: Int): String = getString(
+            when (tab) {
+                TAB_FOUND -> R.string.tab_found
+                TAB_DL -> R.string.tab_downloading
+                else -> R.string.tab_done
+            },
+            n,
+        )
+        sheetButtons.forEach { (tab, b) ->
+            val n = when (tab) {
+                TAB_FOUND -> items.size
+                TAB_DL -> active.size
+                else -> dls.size
             }
-            container.addView(head)
-            for (d in dls.take(15)) {
-                val row = layoutInflater.inflate(R.layout.item_media, container, false)
-                row.findViewById<TextView>(R.id.mLabel).text = d.name
-                val info = row.findViewById<TextView>(R.id.mUrl)
-                info.text = Downloader.humanSize(d.size)
-                info.visibility = if (d.size > 0) View.VISIBLE else View.GONE
-                row.findViewById<TextView>(R.id.mDl).visibility = View.GONE
-                row.findViewById<TextView>(R.id.mCopy).visibility = View.GONE
-                row.findViewById<TextView>(R.id.mOpen).visibility = View.GONE
-                val del = row.findViewById<TextView>(R.id.mDel)
-                del.visibility = View.VISIBLE
-                del.setOnClickListener { deleteDownload(d) { row.visibility = View.GONE } }
-                container.addView(row)
+            b.text = tabLabel(tab, n)
+            val selected = tab == sheetTab
+            b.background = if (selected) ContextCompat.getDrawable(this@MainActivity, R.drawable.chip_bg) else null
+            b.setTextColor(if (selected) 0xFF111629.toInt() else 0xFF93A4C3.toInt())
+            b.setTypeface(null, if (selected) Typeface.BOLD else Typeface.NORMAL)
+        }
+        when (sheetTab) {
+            TAB_FOUND -> {
+                if (items.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_found)))
+                for (m in items.take(15)) container.addView(bindMediaRow(m))
+            }
+            TAB_DL -> {
+                sheetShownPids = active.take(15).map { it.pid }
+                if (active.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_downloading)))
+                for (j in active.take(15)) {
+                    val row = bindDownloadingRow(j)
+                    sheetShown[j.pid] = row
+                    container.addView(row)
+                }
+            }
+            else -> {
+                if (dls.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_done)))
+                for (d in dls.take(15)) container.addView(bindDoneRow(d))
             }
         }
+    }
+
+    /** v1.5.0: one row of the กำลังดาวน์โหลด tab - live percent, determinate
+     *  bar and a per-download ยกเลิก button (EXTRA_PID -> engine process kill). */
+    private fun bindDownloadingRow(j: DownloadJobs.Job): View {
+        val row = layoutInflater.inflate(R.layout.item_download, sheetContainer, false)
+        val label = row.findViewById<TextView>(R.id.dLabel)
+        val pct = row.findViewById<TextView>(R.id.dPct)
+        val bar = row.findViewById<ProgressBar>(R.id.dBar)
+        fun paint() {
+            label.text = j.title.ifEmpty { Downloader.urlStem(j.url) }
+            if (j.percent >= 0) {
+                pct.text = "$j.percent%"
+                bar.isIndeterminate = false
+                bar.progress = j.percent
+            } else {
+                pct.text = "…"
+                bar.isIndeterminate = true
+            }
+        }
+        paint()
+        row.findViewById<TextView>(R.id.dCancel).setOnClickListener {
+            FileLog.event("download_cancel_click", mapOf("url" to j.url.take(200), "pid" to j.pid))
+            FileLog.app("INFO", "dl", "cancel requested: ${j.url}")
+            StreamDownloadService.cancel(this@MainActivity, j.pid)
+            Toast.makeText(this, R.string.download_cancelled, Toast.LENGTH_SHORT).show()
+            renderSheet()
+        }
+        return row
+    }
+
+    /** One row of the พบวิดีโอ tab (same behaviour as pre-v1.5.0). */
+    private fun bindMediaRow(m: MediaStore.Item): View {
+        val row = layoutInflater.inflate(R.layout.item_media, sheetContainer, false)
+        row.findViewById<TextView>(R.id.mLabel).text =
+            "${m.label.ifEmpty { m.kind }}  ·  ${m.kind}"
+        row.findViewById<TextView>(R.id.mUrl).text = m.url
+        row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
+        row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("url", m.url))
+            Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
+        }
+        // embed players: opening the embed page as the top page lets the
+        // detector find the real video URLs inside it (same idea as the
+        // desktop toolbar's "เปิดหน้า embed" button)
+        row.findViewById<TextView>(R.id.mOpen).visibility =
+            if (m.kind == "embed") View.VISIBLE else View.GONE
+        row.findViewById<TextView>(R.id.mOpen).setOnClickListener {
+            FileLog.event("embed_open", mapOf("url" to m.url))
+            FileLog.app("INFO", "nav", "open embed page: ${m.url}")
+            navigate(m.url)
+            sheetDialog?.dismiss()
+        }
+        return row
+    }
+
+    /** One row of the ดาวน์โหลดเสร็จแล้ว tab: file + ลบไฟล์ (v1.1.8 behaviour). */
+    private fun bindDoneRow(d: DownloadCleaner.Candidate): View {
+        val row = layoutInflater.inflate(R.layout.item_media, sheetContainer, false)
+        row.findViewById<TextView>(R.id.mLabel).text = d.name
+        val info = row.findViewById<TextView>(R.id.mUrl)
+        info.text = Downloader.humanSize(d.size)
+        info.visibility = if (d.size > 0) View.VISIBLE else View.GONE
+        row.findViewById<TextView>(R.id.mDl).visibility = View.GONE
+        row.findViewById<TextView>(R.id.mCopy).visibility = View.GONE
+        row.findViewById<TextView>(R.id.mOpen).visibility = View.GONE
+        val del = row.findViewById<TextView>(R.id.mDel)
+        del.visibility = View.VISIBLE
+        del.setOnClickListener { deleteDownload(d) { renderSheet() } }
+        return row
+    }
+
+    private fun sheetEmptyBox(msg: String): View = TextView(this).apply {
+        text = msg
+        setTextColor(0xFF93A4C3.toInt())
+        textSize = 13f
+        setPadding(0, 24, 0, 8)
+    }
+
+    /** Refresh the open sheet only when something visible changed. On the
+     *  downloading tab the percents update IN PLACE while the job set is
+     *  unchanged - re-rendering every tick would steal button presses. */
+    private fun updateOpenSheet() {
+        val d = sheetDialog ?: return
+        if (!d.isShowing) return
+        if (sheetTab == TAB_DL) {
+            val active = StreamDownloadService.activeJobs()
+            if (active.map { it.pid } == sheetShownPids) {
+                if (active.isEmpty()) return
+                for (j in active) {
+                    val row = sheetShown[j.pid] ?: continue
+                    if (j.percent >= 0) {
+                        row.findViewById<TextView>(R.id.dPct).text = "$j.percent%"
+                        val bar = row.findViewById<ProgressBar>(R.id.dBar)
+                        bar.isIndeterminate = false
+                        bar.progress = j.percent
+                    }
+                }
+                return
+            }
+            renderSheet() // a job started/finished - rebuild the tab once
+            return
+        }
+        if (StreamDownloadService.activeJobs().size != sheetLastActive ||
+            MediaStore.list().size != sheetFoundCount
+        ) renderSheet()
     }
 
     /** Confirm, then delete one finished download (file + list entry). */
@@ -503,6 +666,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
+        // v1.5.0: media sheet tabs
+        private const val TAB_FOUND = 0
+        private const val TAB_DL = 1
+        private const val TAB_DONE = 2
+
         /** Shown after repeated renderer deaths on the same page. */
         private const val ERROR_PAGE_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><style>
