@@ -59,7 +59,7 @@ jobs:
       # faster and less flaky (the boot flake is ShellCommandUnresponsive /
       # "API level=1" on the hosted software-rendering emulator)
       - name: Cache gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
@@ -67,7 +67,7 @@ jobs:
           key: gradle-android-${{ runner.os }}-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/**/*.gradle.kts') }}
           restore-keys: gradle-android-${{ runner.os }}-
       - name: Cache AVD
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         id: avd-cache
         with:
           path: |
