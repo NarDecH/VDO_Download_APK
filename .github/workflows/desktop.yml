@@ -36,7 +36,11 @@ jobs:
       # v1.5.0: smoke-test the release script itself - parses args, bumps 5
       # files in memory (dry-run never writes), checks the repo guards work.
       # A broken release.py now fails CI before it can break a real release.
+      # Skipped on tag builds: the checkout is a detached HEAD there and
+      # release.py requires a branch (this exact mismatch failed v1.5.0's
+      # first tag build), while on main it needs a clean tree anyway.
       - name: Smoke test release script (dry-run)
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         run: python scripts/release.py 9.9.9 --dry-run --notes "ci smoke"
 
       - name: Prepare yt-dlp engine (bundled into exe)
