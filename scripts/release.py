@@ -259,7 +259,7 @@ def verify_release(version: str, wait: bool) -> None:
     os.makedirs(tmp, exist_ok=True)
     rc, out = gh(["release", "download", tag, "--pattern", "checksums.txt",
                   "--pattern", f"VDOGrabber-{version}-android-universal.apk",
-                  "--clobber", "--output-dir", tmp])
+                  "--clobber", "--dir", tmp])
     if rc != 0:
         die(f"download failed: {out[-300:]}")
     sums = read(os.path.join(tmp, "checksums.txt"))
