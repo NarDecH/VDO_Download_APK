@@ -201,11 +201,14 @@ def gh(args: list[str]) -> tuple[int, str]:
 def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
     sha = run(["git", "rev-parse", tag])[1].strip()[:7]
     deadline = time.time() + timeout_min * 60
-    workflows = ["Android APK", "Desktop selftest + exe"]
+    # gh only matches the workflow FILE name here - the human name
+    # ("Desktop selftest + exe") needs URL-encoding that gh does not
+    # decode back, and the wait loop then spins forever (v1.5.0 incident)
+    workflows = ["android.yml", "desktop.yml"]
     while time.time() < deadline:
         pending = []
         for wf in workflows:
-            rc, out = gh(["run", "list", "--workflow=" + wf.replace(" ", "%20"),
+            rc, out = gh(["run", "list", "--workflow=" + wf,
                           "--limit", "5",
                           "--json", "headSha,status,conclusion"])
             rows = []
@@ -222,7 +225,7 @@ def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
         if done:
             conclusions = []
             for wf in workflows:
-                rc, out = gh(["run", "list", "--workflow=" + wf.replace(" ", "%20"),
+                rc, out = gh(["run", "list", "--workflow=" + wf,
                               "--limit", "5", "--json", "headSha,conclusion"])
                 rows = json.loads(out) if rc == 0 and out.strip() else []
                 c = next((r.get("conclusion") for r in rows
@@ -231,7 +234,7 @@ def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
             for wf, c in conclusions:
                 print(f"CI   {wf}: {c}")
             return all(c == "success" for _, c in conclusions)
-        print(f"CI   waiting: {statuses}")
+        print(f"CI   waiting: {statuses}", flush=True)
         time.sleep(60)
     print("CI   timeout waiting for runs")
     return False
