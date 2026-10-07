@@ -120,6 +120,21 @@ resource types `xmlhttprequest|media|main_frame|sub_frame|other` บน `<all_ur
   `download_resumed`, `paused_deleted` · แยก flag กับยกเลิก (`markPaused`/
   `consumePaused` ใน DownloadJobs) งานที่พักไม่ถูกรายงานเป็นความล้มเหลว
 
+### บทเรียนจาก field log ดาวน์โหลดพร้อมกัน (v1.7.0, 2026-10-07 22:11 — แก้ใน v1.8.0)
+
+เวลางาน A เสร็จ ระหว่างที่งาน B ยังวิ่ง: A เรียก `newestFileIn(engine-work)` ซึ่งหยิบ
+**ไฟล์ `.part` ของ B ที่กำลังเขียนสด ๆ** (มัน “แก้ไขล่าสุด” กว่าไฟล์ของ A) → คัดลอกเข้า
+Downloads แล้ว `file.delete()` ไฟล์ต้นทางของ B ขณะ B กำลังเขียน → B ชน
+`Errno 2 ... .part-Frag25.part -> .part-Frag25` แล้วพังทั้งงาน · แก้ด้วย
+**per-job work dir** (`engine-work/<pid>`): ทุกงานมีโฟลเดอร์ของตัวเอง (`.part`, state,
+ไฟล์เสร็จ) publish จากโฟลเดอร์ตัวเองเท่านั้น (`publishableFile` = ไฟล์ที่ใหญ่สุด
+ใน dir — merged mp4 ใหญ่กว่า state file เสมอ) และ `freeTitleBase` dedupe ใน dir
+ตัวเอง ทำให้งานพร้อมกันหลายไฟล์แยกกันสมบูรณ์ · จุดที่สอง: ตอนกดพัก worker โดน
+`CanceledException` แล้ว log “download_error” ลอย ๆ (การแข่งกับ flag) → ปิดเสียง
+exception นี้เพราะ `consumePaused/consumeCancelled` เป็นตัวชี้ผลจริง · ฝั่ง desktop
+ได้ pause/resume เทียบเท่า (`DownloadManager.pause/resume`, status `paused`,
+ปุ่มใน Control Center, API `download_pause`/`download_resume`)
+
 ### บทเรียนจาก field log เครื่องจริง (v1.6.0, Xiaomi 23113RKC6G / Android 16 — 2026-10-07)
 
 ผลวิเคราะห์ `vdograbber-logs-20261007-184730.zip` (3 sessions, 4 ดาวน์โหลด MPD):

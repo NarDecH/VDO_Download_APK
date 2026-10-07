@@ -234,6 +234,15 @@ class Api:
     def download_cancel(self, job_id: str) -> dict:
         return _APP.downloads.cancel(job_id)
 
+    def download_pause(self, job_id: str) -> dict:
+        """v1.8.0: หยุดพัก - keep yt-dlp's .part files, resume later."""
+        return _APP.downloads.pause(job_id)
+
+    def download_resume(self, job_id: str) -> dict:
+        """v1.8.0: ดาวน์โหลดต่อ - re-run the stored template over the kept
+        .part fragments."""
+        return _APP.downloads.resume(job_id)
+
     def downloads_list(self) -> list[dict]:
         return _APP.downloads.list()
 

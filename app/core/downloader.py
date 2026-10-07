@@ -87,7 +87,7 @@ class Job:
         self.ext = ext or ""              # source extension sniffed from the URL
         self.title_base = title_base or ""  # filename stem decided up-front
         self.page_title = page_title or ""
-        self.status = "queued"        # queued running merging done error canceled
+        self.status = "queued"        # queued running merging done error canceled paused
         self.percent = 0.0
         self.speed = ""
         self.eta = ""
@@ -164,6 +164,50 @@ class DownloadManager:
                 pass
             self.log.log("download canceled: %s" % job_id, event="download_canceled", id=job_id, url=job.url)
         self.push_ui("download_update", job.public())
+        return {"ok": True, "job": job.public()}
+
+    # -------------------------------------------------- v1.8.0 pause/resume
+    def pause(self, job_id: str) -> dict:
+        """หยุดพัก: stop the engine but KEEP its .part/.part-FragN files in
+        out_dir (yt-dlp always resumes them when the same output template is
+        re-run) and remember the job for ดาวน์โหลดต่อ. The worker thread
+        observes status "paused" exactly like "canceled" and finishes
+        quietly - no error event, no no-file probe."""
+        job = self.jobs.get(job_id)
+        if not job:
+            return {"ok": False, "error": "no such job"}
+        if job.status == "paused":
+            return {"ok": False, "error": "already paused"}
+        if job.status in ("queued", "running", "merging"):
+            job.status = "paused"
+            try:
+                if job.proc and job.proc.poll() is None:
+                    job.proc.terminate()
+            except OSError:
+                pass
+            self.log.log("download paused: %s" % job_id,
+                         event="download_paused", id=job_id, url=job.url,
+                         title_base=job.title_base)
+            self.push_ui("download_update", job.public())
+            return {"ok": True, "job": job.public()}
+        # done/error/canceled jobs have nothing left to pause
+        return {"ok": False, "error": "job is %s" % job.status}
+
+    def resume(self, job_id: str) -> dict:
+        """ดาวน์โหลดต่อ: re-queue a paused job with the SAME title_base (its
+        stored stem) so the new yt-dlp run picks up the kept .part fragments
+        and continues instead of starting over under `stem (2)`."""
+        job = self.jobs.get(job_id)
+        if not job:
+            return {"ok": False, "error": "no such job"}
+        if job.status != "paused":
+            return {"ok": False, "error": "job is not paused"}
+        job.status = "queued"
+        job.error = ""
+        self.log.log("download resumed: %s" % job_id,
+                     event="download_resumed", id=job_id, url=job.url)
+        self.push_ui("download_update", job.public())
+        threading.Thread(target=self._run, args=(job,), name=f"dl-{job.id}", daemon=True).start()
         return {"ok": True, "job": job.public()}
 
     def clear_list(self) -> dict:
@@ -400,6 +444,11 @@ class DownloadManager:
 
         if job.status == "canceled":
             self.log.log("download canceled #%s" % job.id, event="download_canceled", id=job.id, url=job.url)
+        elif job.status == "paused":
+            # v1.8.0: the user pressed หยุดพัก - .part fragments stay in
+            # out_dir and resume() re-runs the same template. Keep the job in
+            # the list (no error event, no no-file probe, no fallback retry).
+            self.log.log("download paused #%s" % job.id, event="download_paused", id=job.id, url=job.url)
         elif rc == 0:
             job.status = "done"
             job.finished = time.time()

@@ -109,6 +109,34 @@ def test_prune_frees_finished_jobs() -> bool:
     return True
 
 
+# ------------------------------------------- v1.8.0 pause / resume (desktop)
+def test_pause_resume_lifecycle() -> bool:
+    """หยุดพัก keeps the job in the list with status 'paused' and its
+    title_base untouched (resume re-runs the SAME template over the kept
+    .part fragments); ดาวน์โหลดต่อ flips it back to queued and re-spawns the
+    worker. Cancel and paused never leak into each other."""
+    mgr = _manager_with_history(2, ["running"])
+    jobs = list(mgr.jobs.values())
+    a, b = jobs[0], jobs[1]
+
+    pa = mgr.pause(a.id)
+    assert pa["ok"] and pa["job"]["status"] == "paused", pa
+    assert a.status == "paused"
+    # paused jobs stay in the list/history (UI must keep showing them)
+    assert a.id in mgr.jobs and a.id in mgr.history
+
+    # pausing again / resuming a running job is a clean no
+    assert not mgr.pause(a.id)["ok"], "already paused"
+    assert not mgr.resume(b.id)["ok"], "running job is not resumable"
+
+    # cancel and paused are distinct states - cancel must not revive it
+    r = mgr.resume(a.id)
+    assert r["ok"] and a.status == "queued" and not a.error, r
+    # unknown ids fail cleanly
+    assert not mgr.pause("nope")["ok"] and not mgr.resume("nope")["ok"]
+    return True
+
+
 # ------------------------------------------------- page fallback scanner
 def test_page_fallback_scanner() -> bool:
     """Regexes that power the 'Unsupported URL' auto-fallback (v1.1.2).
@@ -666,6 +694,7 @@ def main() -> int:
         "prune_keeps_running": test_prune_keeps_running_jobs,
         "prune_noop_under_limit": test_prune_noop_under_limit,
         "prune_frees_finished": test_prune_frees_finished_jobs,
+        "pause_resume_lifecycle": test_pause_resume_lifecycle,
         "page_fallback_scanner": test_page_fallback_scanner,
         "page_fallback_obfuscated": test_page_fallback_obfuscated,
         "sanitize_filename": test_sanitize_filename,

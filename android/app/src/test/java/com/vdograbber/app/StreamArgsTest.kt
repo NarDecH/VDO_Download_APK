@@ -200,4 +200,45 @@ class StreamArgsTest {
             dir.deleteRecursively()
         }
     }
+
+    // ---- v1.8.0: per-job work dirs (parallel downloads must not collide) ----
+
+    @Test
+    fun `jobWorkDir sanitizes the pid and nests under engine-work`() {
+        val root = java.nio.file.Files.createTempDirectory("vg-work").toFile()
+        try {
+            assertEquals(File(root, "abc123"), StreamArgs.jobWorkDir(root, "abc123"))
+            // hostile/malformed pid chars are stripped, not trusted
+            assertEquals(File(root, "ab12"), StreamArgs.jobWorkDir(root, "ab/../12"))
+            assertEquals(File(root, "job"), StreamArgs.jobWorkDir(root, ""))
+            assertEquals(File(root, "job"), StreamArgs.jobWorkDir(root, "///"))
+            // long pids are capped (never a path bomb)
+            assertTrue(StreamArgs.jobWorkDir(root, "x".repeat(64)).name.length <= 16)
+        } finally {
+            root.deleteRecursively()
+        }
+    }
+
+    @Test
+    fun `publishableFile takes the biggest file - never a sibling job's part`() {
+        val jobA = java.nio.file.Files.createTempDirectory("vg-jobA").toFile()
+        val jobB = java.nio.file.Files.createTempDirectory("vg-jobB").toFile()
+        try {
+            // job A finished: merged mp4 (big) + tiny ytdl state
+            val merged = File(jobA, "clip.mp4").apply { writeText("x".repeat(1000)) }
+            File(jobA, "clip.f0.mp4.ytdl").writeText("state")
+            // job B still running: actively growing .part
+            File(jobB, "other.f0.mp4.part").apply { writeText("y".repeat(500)) }
+
+            assertEquals(merged, StreamArgs.publishableFile(jobA))
+            // each dir is isolated: B's in-flight data is invisible to A
+            assertEquals("other.f0.mp4.part", StreamArgs.publishableFile(jobB)?.name)
+            // empty dir -> null (drives the no-file probe path)
+            val jobC = java.nio.file.Files.createTempDirectory("vg-jobC").toFile()
+            assertEquals(null, StreamArgs.publishableFile(jobC))
+            jobC.delete()
+        } finally {
+            jobA.deleteRecursively(); jobB.deleteRecursively()
+        }
+    }
 }

@@ -54,6 +54,20 @@ object StreamArgs {
     fun engineWorkDir(externalFilesDir: File): File = File(externalFilesDir, "engine-work")
 
     /**
+     * v1.8.0: per-job work dir (engine-work/<pid>). Everything a download
+     * writes - .part fragments, ytdl state, the merged mp4 - stays inside
+     * its own folder, so concurrent jobs can never collide. Field log
+     * 2026-10-07 22:11: A's publishFile() picked newestFileIn(engine-work),
+     * which was B's actively-written .part file, copied it and DELETED the
+     * original under B -> Errno 2 rename crash that killed a healthy job.
+     * Also narrows freeTitleBase dedup to the sibling-free per-job dir.
+     */
+    fun jobWorkDir(engineWork: File, pid: String): File {
+        val safe = pid.filter { it.isLetterOrDigit() }.take(16).ifEmpty { "job" }
+        return File(engineWork, safe)
+    }
+
+    /**
      * Pull the first real yt-dlp ERROR (falling back to WARNING) out of a
      * stack-traced YoutubeDLException message, so toasts/logs show the actual
      * cause ("Unsupported URL: ...", "[Blob] You've asked yt-dlp ...")
@@ -138,11 +152,18 @@ object StreamArgs {
         "m4a" -> "audio/mp4"
         "aac" -> "audio/aac"
         else -> "application/octet-stream"
-    }
-
-    /** Most recently written file in [dir] (the just-finished download). */
+    }    /** Most recently written file in [dir] (the just-finished download).
+     *  v1.8.0: called on a PER-JOB dir now, so it can never see another
+     *  job's partially written .part file (field-log fix below). */
     fun newestFileIn(dir: File): File? =
         dir.listFiles()?.filter { it.isFile }?.maxByOrNull { it.lastModified() }
+
+    /** v1.8.0: the biggest real file inside a per-job dir - yt-dlp leaves
+     *  merged output plus leftover .part state; the biggest file is the
+     *  deliverable, the small ones are engine bookkeeping. Falls back to
+     *  newest [newestFileIn] when sizes are equal/empty. */
+    fun publishableFile(dir: File): File? =
+        dir.listFiles()?.filter { it.isFile }?.maxByOrNull { it.length() }
 
     /** v1.7.0: leftover partial artifacts of a paused download - yt-dlp keeps
      *  `stem.f0.mp4.part`, `.part-Frag12`, `.ytdl` state files in the work

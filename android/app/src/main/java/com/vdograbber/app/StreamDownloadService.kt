@@ -109,6 +109,17 @@ class StreamDownloadService : Service() {
         val url = intent?.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
         if (url.isEmpty()) { stopSelfResult(startId); return START_NOT_STICKY }
+
+        // v1.5.0: process id is per-job (a second download may already be
+        // running) and stays alive in DownloadJobs for the UI + cancel
+        val pid = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
+
+        // v1.8.0: EVERYTHING this job writes (.part fragments, ytdl state,
+        // the merged mp4) goes into its own engine-work/<pid> dir - during
+        // parallel downloads A's publish must never see (or delete) B's
+        // partially written data (field log 2026-10-07 22:11 crash).
+        val jobDir = StreamArgs.jobWorkDir(outDir, pid).apply { mkdirs() }
+
         // v1.1.6: name the file after the page title (deduped on disk),
         // falling back to yt-dlp's metadata title + id when there is none.
         // v1.1.7: precompute a FREE stem, otherwise yt-dlp skips a re-download
@@ -116,18 +127,18 @@ class StreamDownloadService : Service() {
         // v1.7.0: a resumed job carries its EXACT paused titleBase - recomputing
         // freeTitleBase here would dedupe against the kept .part files and the
         // resume would silently start from zero under a different name.
+        // v1.8.0: the paused stem now lives inside THIS job's dir, so the
+        // dedupe check reads the per-job dir too (and a resumed titleBase is
+        // never "taken" by any other concurrent job).
         val titleBase = intent?.getStringExtra(EXTRA_TITLE_BASE)
             ?.takeIf { it.isNotBlank() }
-            ?: freeTitleBase(outDir, StreamArgs.sanitizeFilename(title))
+            ?: freeTitleBase(jobDir, StreamArgs.sanitizeFilename(title))
 
-        // v1.5.0: process id is per-job (a second download may already be
-        // running) and stays alive in DownloadJobs for the UI + cancel
-        val pid = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
         DownloadJobs.register(pid, url, title, titleBase)
 
         startForeground(NOTIF_ID, buildNotification(title.ifEmpty { url }, 0))
         FileLog.event("download_start", mapOf("url" to url, "kind" to "stream", "engine" to "ytdl-android"))
-        FileLog.app("INFO", "dl", "stream download start: $url")
+        FileLog.app("INFO", "dl", "stream download start: $url (work ${jobDir.name})")
 
         scope.launch {
             var ok = false
@@ -141,7 +152,7 @@ class StreamDownloadService : Service() {
             var lastLineLogMs = 0L
             try {
                 val req = YoutubeDLRequest(url).apply {
-                    StreamArgs.optionsArgs(outDir, titleBase).forEach { addOption(it) }
+                    StreamArgs.optionsArgs(jobDir, titleBase).forEach { addOption(it) }
                     addOption("-f", "bv*+ba/b")
                 }
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
@@ -172,7 +183,14 @@ class StreamDownloadService : Service() {
                 if (!ok) errorMsg = "yt-dlp exit ${result.exitCode}"
             } catch (e: Exception) {
                 errorMsg = e.message ?: e.javaClass.simpleName
-                FileLog.app("ERROR", "dl", "stream download error: $e")
+                // v1.8.0: a CanceledException here is normal when THIS pid was
+                // just paused/cancelled (destroyProcessById); do not scream to
+                // app.log - the consumePaused/consumeCancelled branch below
+                // turns it into the right outcome (field log 2026-10-07:
+                // "download_error CanceledException" noise)
+                if (e !is com.yausername.youtubedl_android.YoutubeDL.CanceledException) {
+                    FileLog.app("ERROR", "dl", "stream download error: $e")
+                }
             }
             DownloadJobs.remove(pid) // gone from the sheet/chip whatever the outcome
 
@@ -188,7 +206,13 @@ class StreamDownloadService : Service() {
                 // here we only avoid reporting a fake "yt-dlp exit" failure
                 FileLog.app("INFO", "dl", "stream download paused (worker exit): $url")
             } else if (ok) {
-                val file = StreamArgs.newestFileIn(outDir)
+                // v1.8.0: publish from THIS job's own dir only - the old shared
+                // newestFileIn(engine-work) could pick ANOTHER running job's
+                // actively written .part file, copy it into Downloads and
+                // delete it under the running job (field log Errno 2).
+                // publishableFile takes the biggest real file: a merged mp4
+                // always dwarfs yt-dlp's state bookkeeping.
+                val file = StreamArgs.publishableFile(jobDir)
                 if (file == null) {
                     // v1.3.5: the engine exited 0 but produced no file (any
                     // cause) - diagnose from machine facts instead of
@@ -206,7 +230,7 @@ class StreamDownloadService : Service() {
                     true,
                     published?.first ?: file.name,
                     published?.second,
-                    published?.let { File(outDir, it.first).absolutePath },
+                    published?.let { File(file.parent, it.first).absolutePath },
                 )
                 // v1.6.0: surface the outcome inside the app too (Snackbar + chip)
                 notifyMainActivity(true, published?.first ?: file.name)
@@ -268,10 +292,12 @@ class StreamDownloadService : Service() {
         val ext = file.extension.ifEmpty { "mp4" }
         val stem = StreamArgs.sanitizeFilename(title)
         // when yt-dlp already named/deduped it after the title, keep that name
+        // (dedupe target must be the DOWNLOADS name space, not the per-job dir;
+        // the MediaStore insert below is what makes the name visible there)
         val displayName = when {
             stem.isEmpty() -> file.name
             file.name.startsWith(stem) -> file.name
-            else -> StreamArgs.uniqueFileName(outDir, stem, ext)
+            else -> file.name
         }
         try {
             val values = android.content.ContentValues().apply {
