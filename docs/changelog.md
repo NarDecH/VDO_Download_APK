@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.6.1] — 2026-10-07
+
+### การเปลี่ยนแปลง
+- จับเวอร์ชัน yt-dlp จริงตอนเปิดแอป (แก้ engine_ready version=null บนเครื่องจริง)
+- throttle log ความคืบหน้า 1 บรรทัด/วินาที ลด downloads.log จาก 1.2MB/4 งาน เหลือโครงสร้างสำคัญครบ
+- เอกสารบทเรียน field log ใน docs/research.md หัวข้อ 7
+
+
 ## [1.6.0] — 2026-10-06
 
 ### การเปลี่ยนแปลง
