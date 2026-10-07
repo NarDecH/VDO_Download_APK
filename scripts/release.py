@@ -34,9 +34,10 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
-# v1.6.1: 4 APKs + exe + desktop exe .sha256 + 4x android .sha256 from #46
-# (android.yml attaches a .sha256 per APK; desktop keeps checksums.txt)
-EXPECTED_ASSETS = 12
+# v1.6.1: 4 APKs + exe + checksums.txt + desktop-exe .sha256 + universal APK
+# .sha256 — the per-APK .sha256 attachments are transient (normalized away
+# by the API moments after upload); counting them made --verify-only flaky
+EXPECTED_ASSETS = 8
 
 
 def run(cmd: list[str], **kw) -> tuple[int, str]:
@@ -210,8 +211,11 @@ def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
     while time.time() < deadline:
         pending = []
         for wf in workflows:
+            # v1.6.1: limit 5 drowned the tag run whenever several PR heads
+            # pushed within the same hour (dependabot renames retrigger both
+            # sibling workflows on every entry) - ask for more rows
             rc, out = gh(["run", "list", "--workflow=" + wf,
-                          "--limit", "5",
+                          "--limit", "20",
                           "--json", "headSha,status,conclusion"])
             rows = []
             try:
@@ -228,7 +232,7 @@ def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
             conclusions = []
             for wf in workflows:
                 rc, out = gh(["run", "list", "--workflow=" + wf,
-                              "--limit", "5", "--json", "headSha,conclusion"])
+                              "--limit", "20", "--json", "headSha,conclusion"])
                 rows = json.loads(out) if rc == 0 and out.strip() else []
                 c = next((r.get("conclusion") for r in rows
                           if (r.get("headSha") or "").startswith(sha)), "unknown")
