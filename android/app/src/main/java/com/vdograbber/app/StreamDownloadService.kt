@@ -98,6 +98,12 @@ class StreamDownloadService : Service() {
             var ok = false
             var errorMsg = ""
             var loggedPct = -1
+            // v1.6.1: rate-limit the two progress log sinks. The field log
+            // (2026-10-07) showed ~11k downloads.log lines and ~330
+            // download_progress events for ONE job - every line hit the log
+            // while the UI already had its own 500 ms ticker.
+            var lastProgressLogMs = 0L
+            var lastLineLogMs = 0L
             try {
                 val req = YoutubeDLRequest(url).apply {
                     StreamArgs.optionsArgs(outDir, titleBase).forEach { addOption(it) }
@@ -111,11 +117,21 @@ class StreamDownloadService : Service() {
                     // downloads no longer overwrite each other's progress
                     val pct = progress.toInt().coerceIn(0, 99)
                     DownloadJobs.update(pid, pct)
-                    if (pct != loggedPct) {
+                    // v1.6.1: at most one download_progress per second per job
+                    if (pct != loggedPct && StreamArgs.progressLogDue(lastProgressLogMs, System.currentTimeMillis())) {
                         loggedPct = pct
+                        lastProgressLogMs = System.currentTimeMillis()
                         FileLog.event("download_progress", mapOf("url" to url.take(200), "percent" to pct, "pid" to pid))
                     }
-                    if (!line.isNullOrBlank()) FileLog.download("[stream] $line")
+                    // v1.6.1: keep the verbatim mirror for everything except
+                    // per-fragment progress chatter (rate-limited to 1/s);
+                    // Destination/Merger/Deleting and the 100% summary pass as-is
+                    if (!line.isNullOrBlank()) {
+                        if (!StreamArgs.isProgressLine(line) || StreamArgs.progressLogDue(lastLineLogMs, System.currentTimeMillis())) {
+                            lastLineLogMs = System.currentTimeMillis()
+                            FileLog.download("[stream] $line")
+                        }
+                    }
                 }
                 ok = result.exitCode == 0
                 if (!ok) errorMsg = "yt-dlp exit ${result.exitCode}"

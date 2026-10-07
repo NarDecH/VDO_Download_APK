@@ -164,7 +164,12 @@ class MainActivity : AppCompatActivity() {
             try {
                 com.yausername.youtubedl_android.YoutubeDL.getInstance().init(applicationContext)
                 com.yausername.ffmpeg.FFmpeg.getInstance().init(applicationContext)
-                val v = com.yausername.youtubedl_android.YoutubeDL.getInstance().version(applicationContext)
+                // v1.6.1: YoutubeDL.version() reads a SharedPreferences value
+                // that only updateYoutubeDL() writes - bundled installs report
+                // null forever (field log 2026-10-07). Ask the engine itself;
+                // the stored value is kept only as the fallback.
+                val v = com.yausername.youtubedl_android.YoutubeDL.getInstance()
+                    .version(applicationContext) ?: runEngineVersionProbe()
                 FileLog.event("engine_ready", mapOf("engine" to "yt-dlp", "version" to v))
                 FileLog.app("INFO", "engine", "yt-dlp ready (v$v)")
             } catch (e: Exception) {
@@ -195,6 +200,19 @@ class MainActivity : AppCompatActivity() {
         val start = intent?.dataString
             ?: "https://duckduckgo.com/?q=sample+video+mp4"
         navigate(start)
+    }
+
+    /** v1.6.1: run `yt-dlp --version` through the same env execute() uses and
+     *  return the printed version, or null when anything goes wrong. Called
+     *  once on the engine-init thread only - never while a download runs. */
+    private fun runEngineVersionProbe(): String? = try {
+        val req = com.yausername.youtubedl_android.YoutubeDLRequest(emptyList<String>())
+            .apply { addCommands(StreamArgs.versionProbeArgs()) }
+        val res = com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(req)
+        StreamArgs.parseVersionLine(res.out.lineSequence().firstOrNull { it.isNotBlank() })
+    } catch (t: Throwable) {
+        android.util.Log.w("engine", "version probe failed", t)
+        null
     }
 
     @SuppressLint("SetJavaScriptEnabled")

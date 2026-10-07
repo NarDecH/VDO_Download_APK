@@ -117,4 +117,58 @@ class StreamArgsTest {
         assertEquals(new, StreamArgs.newestFileIn(dir))
         old.delete(); new.delete(); dir.delete()
     }
+
+    // ---- v1.6.1: engine version probe (field log: engine_ready v=null) ----
+
+    @Test
+    fun `parseVersionLine reads bare and wrapper forms`() {
+        assertEquals("2026.10.22", StreamArgs.parseVersionLine("2026.10.22"))
+        assertEquals("2026.10.22", StreamArgs.parseVersionLine("yt-dlp/2026.10.22"))
+        assertEquals("2026.09.14", StreamArgs.parseVersionLine("yt-dlp 2026.09.14"))
+        assertEquals("1.2.3", StreamArgs.parseVersionLine("1.2.3"))
+        assertEquals("2026.10.22.1", StreamArgs.parseVersionLine("yt-dlp/2026.10.22.1"))
+        assertEquals(null, StreamArgs.parseVersionLine(""))
+        assertEquals(null, StreamArgs.parseVersionLine("no digits here"))
+        assertEquals(null, StreamArgs.parseVersionLine(null))
+    }
+
+    @Test
+    fun `version probe args ask the engine itself`() {
+        assertEquals(listOf("--version"), StreamArgs.versionProbeArgs())
+    }
+
+    // ---- v1.6.1: progress log throttle (field log: 11k lines / 1.2 MB per day) ----
+
+    @Test
+    fun `only per-fragment chatter is a progress line`() {
+        assertTrue(StreamArgs.isProgressLine(
+            "[download]   12.3% of ~  17.81MiB at  376.70KiB/s ETA 00:03 (frag 45/283)"))
+        // retry notices are NOT chatter - they pass verbatim for diagnosis,
+        // even when glued to a carriage-returned progress line
+        assertTrue(!StreamArgs.isProgressLine(
+            "[download] Got error: HTTP Error 500: Internal Server Error. Retrying (1/10)..."))
+        assertTrue(!StreamArgs.isProgressLine(
+            "[download]  73.9% of ~  17.81MiB at  376.70KiB/s ETA 00:03 (frag 210/283)  [download] Got error: HTTP Error 500: Internal Server Error. Retrying (1/10)..."))
+        // terminal summary is NEVER rate-limited
+        assertTrue(!StreamArgs.isProgressLine(
+            "[download] 100% of  239.80MiB in 00:02:44 at 1.46MiB/s"))
+        // structural lines are never rate-limited
+        assertTrue(!StreamArgs.isProgressLine(
+            "[download] Destination: /data/engine-work/clip.f0.mp4"))
+        assertTrue(!StreamArgs.isProgressLine(
+            "[Merger] Merging formats into \"/data/engine-work/clip.mp4\""))
+        assertTrue(!StreamArgs.isProgressLine(
+            "Deleting original file /data/engine-work/clip.f0.mp4 (pass -k to keep)"))
+    }
+
+    @Test
+    fun `progress log limiter keeps a 1s gap and never blocks the first write`() {
+        val gap = StreamArgs.PROGRESS_LOG_GAP_MS
+        assertTrue("first write always passes", StreamArgs.progressLogDue(0L, 10_000L))
+        assertTrue("within the gap is blocked", !StreamArgs.progressLogDue(10_000L, 10_000L + gap - 1))
+        assertTrue("after the gap passes", StreamArgs.progressLogDue(10_000L, 10_000L + gap))
+        // custom gap also starts open
+        assertTrue(StreamArgs.progressLogDue(0L, 5L, gapMs = 3L))
+        assertTrue(!StreamArgs.progressLogDue(5L, 6L, gapMs = 3L))
+    }
 }

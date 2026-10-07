@@ -25,6 +25,24 @@ object StreamArgs {
      *  Used to log WHY a download produced no file (layout / geo / DRM). */
     fun probeArgs(): List<String> = listOf("-F", "--no-playlist")
 
+    /** v1.6.1: args for a --version probe - the engine reports its real
+     *  version in one fast line. Needed because YoutubeDL.version() only
+     *  returns what updateYoutubeDL() stored in SharedPreferences, i.e. null
+     *  for as long as the user never used ตรวจสอบเอนจิน/อัปเดตเอนจิน (field
+     *  log 2026-10-07: three sessions of "engine_ready version=null" while
+     *  every download worked). Never called while a download is running.
+     */
+    fun versionProbeArgs(): List<String> = listOf("--version")
+
+    /** v1.6.1: extract "X.Y.Z" from a yt-dlp --version stdout line.
+     *  Accepts a bare version, a "2026.10.22" calver and the python wrapper's
+     *  "yt-dlp/2026.10.22" prefix form; ignores everything else. */
+    fun parseVersionLine(line: String?): String? {
+        val m = Regex("(?i)yt-dlp[/ ]?(\\d{4}\\.\\d{2}\\.\\d{2}(?:\\.\\d+)?)").find(line.orEmpty())
+        if (m != null) return m.groupValues[1]
+        return Regex("(?<!\\d)(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)(?!\\d)").find(line.orEmpty())?.groupValues?.get(1)
+    }
+
     /**
      * v1.3.5: app-private dir the engine writes into, under the app's
      * external-files root (Android/data/<pkg>/files/engine-work).
@@ -125,4 +143,25 @@ object StreamArgs {
     /** Most recently written file in [dir] (the just-finished download). */
     fun newestFileIn(dir: File): File? =
         dir.listFiles()?.filter { it.isFile }?.maxByOrNull { it.lastModified() }
+
+    /** v1.6.1: minimum gap between two rate-limited log writes. */
+    const val PROGRESS_LOG_GAP_MS = 1000L
+
+    /** v1.6.1: true for yt-dlp's per-fragment progress chatter ("[download]
+     *  12.3% of ~ 17.81MiB ... ETA 00:03 (frag 45/283)") - the only lines
+     *  allowed to be rate-limited. Destination/Merger/Deleting lines, the
+     *  terminal "100% of" summary and retry notices ("Got error: HTTP 500...")
+     *  always pass untouched; the last also survives being appended to a
+     *  carriage-returned progress line, as seen in the 2026-10-07 field log. */
+    fun isProgressLine(line: String): Boolean =
+        Regex("""\[\w+]\s*\d""").containsMatchIn(line) &&
+            !line.contains("100% of") && !line.contains("Got error")
+
+    /** v1.6.1: shared rate limiter for noisy progress writes. [lastFireMs]
+     *  is the caller's own last-fire timestamp (0 = never); first call always
+     *  passes. Desktop keeps verbatim mirrors (rotating 5 MB x 5) but the
+     *  Android trio rotates at 2 MB x 3, where one 4-job day flushed all
+     *  history - field log 2026-10-07 showed 11k lines / 1.2 MB per session. */
+    fun progressLogDue(lastFireMs: Long, nowMs: Long, gapMs: Long = PROGRESS_LOG_GAP_MS): Boolean =
+        nowMs - lastFireMs >= gapMs
 }

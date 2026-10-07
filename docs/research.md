@@ -111,6 +111,23 @@ resource types `xmlhttprequest|media|main_frame|sub_frame|other` บน `<all_ur
   (MediaStore → DM → ไฟล์จริง) นับสำเร็จรายไฟล์, log event `download_cleared_all`,
   มี dialog ยืนยัน — logic บริสุทธิ์และเทส JVM ได้ (DownloadCleanerTest)
 
+### บทเรียนจาก field log เครื่องจริง (v1.6.0, Xiaomi 23113RKC6G / Android 16 — 2026-10-07)
+
+ผลวิเคราะห์ `vdograbber-logs-20261007-184730.zip` (3 sessions, 4 ดาวน์โหลด MPD):
+**สำเร็จ 4/4** — video+audio merge ครบ, HTTP 500 ระหว่างทางถูก retry ของ yt-dlp กลืนหมด,
+`download_published` มีทุกงาน (MediaStore URI ครบ) · จุดที่แก้ใน v1.6.1:
+
+1. **`engine_ready` รายงาน `version: null`** ทั้ง 3 session — `YoutubeDL.version()` ของ
+   library อ่านค่าจาก SharedPreferences ที่เขียนเฉพาะตอน `updateYoutubeDL()` เท่านั้น
+   การติดตั้งจาก binary ที่ bundle มาจึงได้ null ตลอดกาล ทั้งที่เอนจินทำงานปกติ →
+   v1.6.1 probe `yt-dlp --version` จริงผ่าน `execute()` ตอน init (`StreamArgs.versionProbeArgs`
+   + `parseVersionLine`), เก็บค่า library ไว้เป็น fallback
+2. **downloads.log โต 1.2 MB / 11k บรรทัด จาก 4 งาน** — callback ได้ทุกบรรทัด stdout
+   (~4 บรรทัด/วิ ตอนกำลังโหลด fragment) และถูก mirror ลง log หมด; rotation 2 MB × 3
+   ทำให้ประวัติเก่าถูกลบทิ้งภายในวันเดียว → v1.6.1 rate-limit บรรทัด progress ที่ 1 วินาที/ครั้ง
+   (`StreamArgs.isProgressLine` + `progressLogDue`) เหลือ Destination/Merger/Deleting/100%
+   /Got-error ผ่าน verbatim · event `download_progress` ก็จำกัด 1 ครั้ง/วิ/งาน เช่นกัน
+
 ---
 
 *วิเคราะห์เชิงโครงสร้างจากซอร์สที่ถูก minify โดยค้นหาสตริง/ชื่อฟังก์ชันอ้างอิง เช่น `$f()`, `RS()`, `zf()`,
