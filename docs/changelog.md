@@ -2,6 +2,15 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.8.0] — 2026-10-07
+
+### การเปลี่ยนแปลง
+- แก้บั๊กดาวน์โหลดพร้อมกัน: แยกโฟลเดอร์ทำงานรายงาน (engine-work/<pid>) งานที่เสร็จก่อนไม่ไปแตะ/ลบไฟล์ชั่วคราวของงานที่ยังวิ่ง (สาเหตุ Errno 2 จาก field log)
+- ปิดเสียง CanceledException ตอนกดพักไม่ให้เป็น error ลอยๆ
+- ฝั่ง desktop เพิ่มพัก/ดาวน์โหลดต่อเทียบเท่า Android (ปุ่มใน Control Center)
+- +3 เทส (desktop 28, Android JVM 64)
+
+
 ## [1.7.0] — 2026-10-07
 
 ### การเปลี่ยนแปลง
