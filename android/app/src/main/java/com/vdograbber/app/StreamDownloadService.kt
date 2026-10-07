@@ -54,6 +54,7 @@ class StreamDownloadService : Service() {
         // is published into Downloads/VDOGrabber via the MediaStore API
         // (publishFile) exactly as before - that path is unaffected.
         outDir = StreamArgs.engineWorkDir(getExternalFilesDir(null) ?: filesDir).apply { mkdirs() }
+        PausedJobs.init(filesDir) // v1.7.0: pause may arrive with no Activity alive
         createChannel()
     }
 
@@ -71,7 +72,36 @@ class StreamDownloadService : Service() {
                     FileLog.app("ERROR", "dl", "cancel failed: $e")
                 }
             }
-            if (DownloadJobs.count() == 0) stopSelfResult(startId)
+            if (DownloadJobs.count() == 0) {
+                cancelProgressNotification()
+                stopSelfResult(startId)
+            }
+            return START_NOT_STICKY
+        }
+        if (intent?.action == ACTION_PAUSE) {
+            // v1.7.0: หยุดพัก - kill the engine but KEEP its .part/.part-FragN
+            // files in engine-work and file the job in PausedJobs, so a later
+            // ดาวน์โหลดต่อ restarts the same output template and yt-dlp
+            // resumes from the last fragment. Same pid semantics as cancel.
+            val single = intent.getStringExtra(EXTRA_PID)
+            val pids = if (single.isNullOrEmpty()) DownloadJobs.active().map { it.pid }
+                       else listOf(single)
+            for (p in pids) {
+                val j = DownloadJobs.get(p) ?: continue
+                if (!DownloadJobs.markPaused(p)) continue // already finished
+                try { PausedJobs.add(j.url, j.title, j.titleBase) } catch (e: Exception) {
+                    FileLog.app("ERROR", "dl", "pause persist failed: $e")
+                }
+                try { YoutubeDL.getInstance().destroyProcessById(p) } catch (e: Exception) {
+                    FileLog.app("ERROR", "dl", "pause kill failed: $e")
+                }
+                FileLog.event("download_paused", mapOf("url" to j.url.take(200), "pid" to p))
+                FileLog.app("INFO", "dl", "stream download paused: ${j.url}")
+            }
+            if (DownloadJobs.count() == 0) {
+                cancelProgressNotification()
+                stopSelfResult(startId)
+            }
             return START_NOT_STICKY
         }
         isRunning = true
@@ -83,12 +113,17 @@ class StreamDownloadService : Service() {
         // falling back to yt-dlp's metadata title + id when there is none.
         // v1.1.7: precompute a FREE stem, otherwise yt-dlp skips a re-download
         // with "has already been downloaded" and nothing gets saved.
-        val titleBase = freeTitleBase(outDir, StreamArgs.sanitizeFilename(title))
+        // v1.7.0: a resumed job carries its EXACT paused titleBase - recomputing
+        // freeTitleBase here would dedupe against the kept .part files and the
+        // resume would silently start from zero under a different name.
+        val titleBase = intent?.getStringExtra(EXTRA_TITLE_BASE)
+            ?.takeIf { it.isNotBlank() }
+            ?: freeTitleBase(outDir, StreamArgs.sanitizeFilename(title))
 
         // v1.5.0: process id is per-job (a second download may already be
         // running) and stays alive in DownloadJobs for the UI + cancel
         val pid = java.util.UUID.randomUUID().toString().substringBefore("-").take(8)
-        DownloadJobs.register(pid, url, title)
+        DownloadJobs.register(pid, url, title, titleBase)
 
         startForeground(NOTIF_ID, buildNotification(title.ifEmpty { url }, 0))
         FileLog.event("download_start", mapOf("url" to url, "kind" to "stream", "engine" to "ytdl-android"))
@@ -147,6 +182,11 @@ class StreamDownloadService : Service() {
                 // Unsupported-URL re-route broadcast for a killed process)
                 FileLog.event("download_cancel", mapOf("url" to url.take(200), "pid" to pid))
                 FileLog.app("INFO", "dl", "stream download cancelled: $url")
+            } else if (DownloadJobs.consumePaused(pid)) {
+                // v1.7.0: user pressed พัก - the job is already in PausedJobs
+                // with its .part files kept; the pause action logged the event,
+                // here we only avoid reporting a fake "yt-dlp exit" failure
+                FileLog.app("INFO", "dl", "stream download paused (worker exit): $url")
             } else if (ok) {
                 val file = StreamArgs.newestFileIn(outDir)
                 if (file == null) {
@@ -307,6 +347,7 @@ class StreamDownloadService : Service() {
             // very start - before the first report - stays indeterminate)
             .setProgress(100, progress, progress <= 0)
             .setOngoing(true)
+            .addAction(0, getString(R.string.pause), pausePendingIntent())
             .addAction(0, getString(R.string.cancel), cancelPendingIntent())
             .build()
 
@@ -359,6 +400,24 @@ class StreamDownloadService : Service() {
         PendingIntent.FLAG_IMMUTABLE,
     )
 
+    private fun pausePendingIntent(): PendingIntent = PendingIntent.getService(
+        this, 1,
+        Intent(this, StreamDownloadService::class.java).setAction(ACTION_PAUSE),
+        PendingIntent.FLAG_IMMUTABLE,
+    )
+
+    /** The progress notification is shared by every running job - remove it
+     *  only when the LAST job goes away (cancel/pause of a single job among
+     *  several leaves it up for the survivor). */
+    private fun cancelProgressNotification() {
+        try {
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                .cancel(NOTIF_ID)
+        } catch (e: Exception) {
+            FileLog.app("WARNING", "dl", "progress notification cancel failed: $e")
+        }
+    }
+
     override fun onDestroy() {
         isRunning = false
         DownloadJobs.clear() // service dead -> nothing is running anymore
@@ -379,6 +438,12 @@ class StreamDownloadService : Service() {
         /** v1.5.0: per-job cancel - absent means "cancel every running job". */
         const val EXTRA_PID = "pid"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"
+
+        /** v1.7.0: หยุดพัก - same pid semantics as [ACTION_CANCEL] but keeps
+         *  the partial files; [EXTRA_TITLE_BASE] feeds a resumed job back its
+         *  exact paused stem so yt-dlp resumes instead of restarting. */
+        const val ACTION_PAUSE = "com.vdograbber.app.PAUSE"
+        const val EXTRA_TITLE_BASE = "titleBase"
 
         /** v1.6.0: in-app download outcome notice (MainActivity shows a
          *  Snackbar + a temporary status chip). */
@@ -410,12 +475,39 @@ class StreamDownloadService : Service() {
             }
         }
 
+        /** v1.7.0: pause ONE job by pid (no pid = pause every running job,
+         *  same shape as [cancel]) - partial files are kept for a resume. */
+        fun pause(context: Context, pid: String) {
+            val i = Intent(context, StreamDownloadService::class.java)
+                .setAction(ACTION_PAUSE)
+            if (pid.isNotBlank()) i.putExtra(EXTRA_PID, pid)
+            try {
+                context.startService(i)
+            } catch (e: Exception) {
+                FileLog.app("ERROR", "dl", "pause service start failed: $e")
+            }
+        }
+
+        /** v1.7.0: ดาวน์โหลดต่อ a paused job - drop it from the paused
+         *  registry and restart the engine with the SAME titleBase so yt-dlp
+         *  finds its .part files and resumes instead of starting over. */
+        fun resume(context: Context, entry: PausedJobs.Entry) {
+            if (entry.url.isBlank()) return
+            try { PausedJobs.remove(entry.titleBase) } catch (e: Exception) {
+                FileLog.app("ERROR", "dl", "resume unbook failed: $e")
+            }
+            FileLog.event("download_resumed", mapOf("url" to entry.url.take(200)))
+            FileLog.app("INFO", "dl", "stream download resumed: ${entry.url}")
+            start(context, entry.url, entry.title, entry.titleBase)
+        }
+
         /** Start a stream download (no-op when [url] is blank). */
-        fun start(context: Context, url: String, title: String) {
+        fun start(context: Context, url: String, title: String, titleBase: String = "") {
             if (url.isBlank()) return
             val i = Intent(context, StreamDownloadService::class.java)
                 .putExtra(EXTRA_URL, url)
                 .putExtra(EXTRA_TITLE, title)
+            if (titleBase.isNotBlank()) i.putExtra(EXTRA_TITLE_BASE, titleBase)
             context.startForegroundService(i)
         }
     }

@@ -110,6 +110,15 @@ resource types `xmlhttprequest|media|main_frame|sub_frame|other` บน `<all_ur
 - **ล้างทั้งหมด (v1.6.0)** — `DownloadCleaner.deleteAll()` ลบทุก Candidate ต่อ identity
   (MediaStore → DM → ไฟล์จริง) นับสำเร็จรายไฟล์, log event `download_cleared_all`,
   มี dialog ยืนยัน — logic บริสุทธิ์และเทส JVM ได้ (DownloadCleanerTest)
+- **หยุดพัก / ดาวน์โหลดต่อ (v1.7.0)** — ปุ่ม “พัก” (แถว + notification) ฆ่า process
+  แต่**เก็บไฟล์ `.part`/`.part-FragN` ของ yt-dlp ไว้** แล้วบันทึกงาน (titleBase ที่แท้จริง,
+  url, title) ลง `paused_jobs.tsv` (`PausedJobs` — pure JVM, tab-separated + URLEncoder)
+  กด “ดาวน์โหลดต่อ” = รันคำสั่งเดิมด้วย titleBase เดิม (`EXTRA_TITLE_BASE` ข้าม
+  `freeTitleBase` เพราะไม่งั้นมันเห็น `.part` เป็นไฟล์ที่ “taken” แล้วเริ่มใหม่ชื่อ
+  `stem (2)`) → yt-dlp ต่อจาก fragment เดิมเอง · “ลบ” ใช้ `StreamArgs.partialFilesFor`
+  ลบเฉพาะ partial (`.part`/`.ytdl`) ไม่แตะไฟล์เสร็จ · event `download_paused`,
+  `download_resumed`, `paused_deleted` · แยก flag กับยกเลิก (`markPaused`/
+  `consumePaused` ใน DownloadJobs) งานที่พักไม่ถูกรายงานเป็นความล้มเหลว
 
 ### บทเรียนจาก field log เครื่องจริง (v1.6.0, Xiaomi 23113RKC6G / Android 16 — 2026-10-07)
 

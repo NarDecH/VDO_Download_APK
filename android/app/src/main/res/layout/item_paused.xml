@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- v1.7.0: one row of the หยุดพักไว้ section (media sheet, กำลังดาวน์โหลด
+     tab) - a paused stream job whose .part files are kept in engine-work.
+     ดาวน์โหลดต่อ re-runs the SAME output template so yt-dlp resumes;
+     ลบ removes the entry and the partial artifacts.
+     (ids: pLabel / pMeta / pResume / pDelete) -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingVertical="10dp">
+
+    <TextView
+        android:id="@+id/pLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#FFC371"
+        android:textStyle="bold"
+        android:textSize="14sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
+
+    <TextView
+        android:id="@+id/pMeta"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:textColor="#93A4C3"
+        android:textSize="12sp"
+        android:maxLines="1"
+        android:ellipsize="end" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/pResume"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="#1d3b1d"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="@string/resume_dl"
+            android:textColor="#86efac" />
+
+        <TextView
+            android:id="@+id/pDelete"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#7f1d1d"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="@string/delete"
+            android:textColor="#FCA5A5" />
+    </LinearLayout>
+</LinearLayout>

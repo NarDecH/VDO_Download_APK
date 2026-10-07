@@ -20,6 +20,11 @@ object DownloadJobs {
 
         /** Wall clock at start - drives the stable oldest-first tab order. */
         @Volatile var startedAt: Long = 0
+
+        /** v1.7.0: the exact free stem this run writes to - หยุดพัก stores it
+         *  in [PausedJobs] so ดาวน์โหลดต่อ can reuse the same output template
+         *  and yt-dlp finds its own .part files to resume. */
+        @Volatile var titleBase: String = ""
     }
 
     private val jobs = ConcurrentHashMap<String, Job>()
@@ -29,9 +34,17 @@ object DownloadJobs {
      *  a fake failure ("yt-dlp exit ...") when the process dies on purpose. */
     private val cancelledPids: MutableSet<String> = ConcurrentHashMap.newKeySet()
 
+    /** v1.7.0: same one-shot flag as [cancelledPids] but for หยุดพัก - the
+     *  worker must report "paused", not a failure, when the process dies
+     *  because the user pressed พัก. */
+    private val pausedPids: MutableSet<String> = ConcurrentHashMap.newKeySet()
+
     /** Register a job (done by the service right before the engine starts). */
-    fun register(pid: String, url: String, title: String): Job {
-        val j = Job(pid, url, title).apply { startedAt = System.currentTimeMillis() }
+    fun register(pid: String, url: String, title: String, titleBase: String = ""): Job {
+        val j = Job(pid, url, title).apply {
+            startedAt = System.currentTimeMillis()
+            this.titleBase = titleBase
+        }
         jobs[pid] = j
         return j
     }
@@ -48,6 +61,7 @@ object DownloadJobs {
     fun clear() {
         jobs.clear()
         cancelledPids.clear()
+        pausedPids.clear()
     }
 
     /** Active jobs, oldest first (stable order in the downloading tab). */
@@ -70,4 +84,15 @@ object DownloadJobs {
 
     /** Consume the cancelled flag for [pid] (one-shot, for the worker). */
     fun consumeCancelled(pid: String): Boolean = cancelledPids.remove(pid)
+
+    /** v1.7.0: mark [pid] as user-paused (หยุดพัก) and drop it from the
+     *  active list at once; the worker later consumes the flag. */
+    fun markPaused(pid: String): Boolean {
+        if (jobs.remove(pid) == null) return false
+        pausedPids.add(pid)
+        return true
+    }
+
+    /** Consume the paused flag for [pid] (one-shot, for the worker). */
+    fun consumePaused(pid: String): Boolean = pausedPids.remove(pid)
 }

@@ -144,6 +144,19 @@ object StreamArgs {
     fun newestFileIn(dir: File): File? =
         dir.listFiles()?.filter { it.isFile }?.maxByOrNull { it.lastModified() }
 
+    /** v1.7.0: leftover partial artifacts of a paused download - yt-dlp keeps
+     *  `stem.f0.mp4.part`, `.part-Frag12`, `.ytdl` state files in the work
+     *  dir and resumes them when the same output template is re-run. Only
+     *  partials match: the finished `stem.mp4` has neither, so ลบ on a paused
+     *  row can never delete a completed download. */
+    fun partialFilesFor(dir: File, stem: String): List<File> {
+        if (stem.isEmpty()) return emptyList()
+        return dir.listFiles()?.filter {
+            it.isFile && it.name.startsWith("$stem.") &&
+                (it.name.contains(".part") || it.name.endsWith(".ytdl"))
+        } ?: emptyList()
+    }
+
     /** v1.6.1: minimum gap between two rate-limited log writes. */
     const val PROGRESS_LOG_GAP_MS = 1000L
 

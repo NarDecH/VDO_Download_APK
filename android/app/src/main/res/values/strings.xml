@@ -60,6 +60,14 @@
     <string name="dl_done_inapp">✅ ดาวน์โหลดเสร็จ: %1$s</string>
     <string name="dl_failed_inapp">⚠️ ดาวน์โหลดไม่สำเร็จ — แตะเพื่อดูรายละเอียด</string>
     <string name="cancel">ยกเลิก</string>
+    <!-- v1.7.0: หยุดพัก / ดาวน์โหลดต่อ stream downloads -->
+    <string name="pause">พัก</string>
+    <string name="download_paused_toast">หยุดพักแล้ว — ไฟล์ชั่วคราวถูกเก็บไว้ กด “ดาวน์โหลดต่อ” ในแท็บกำลังดาวน์โหลดได้เลย</string>
+    <string name="paused_section">⏸ หยุดพักไว้ (%1$d)</string>
+    <string name="resume_dl">▶ ดาวน์โหลดต่อ</string>
+    <string name="download_resumed_toast">ดาวน์โหลดต่อจากจุดเดิมแล้ว</string>
+    <string name="paused_meta">พักไว้ %1$s · ไฟล์ชั่วคราว %2$d ไฟล์</string>
+    <string name="paused_deleted_toast">ลบไฟล์ชั่วคราวแล้ว %1$d ไฟล์</string>
     <string name="refresh">รีเฟรช</string>
     <string name="render_gone">หน้าเว็บนี้ทำให้ตัวแสดงผลล่ม — ป้อน URL อื่นในช่องด้านล่างได้เลย</string>
 </resources>

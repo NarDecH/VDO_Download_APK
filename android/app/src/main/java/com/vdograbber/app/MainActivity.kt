@@ -104,6 +104,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
+        PausedJobs.init(filesDir) // v1.7.0: หยุดพักไว้ registry (paused_jobs.tsv)
         FileLog.app("INFO", "app", "VDO Grabber 1.6.1 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
@@ -490,6 +491,7 @@ class MainActivity : AppCompatActivity() {
         val items = MediaStore.list()
         val dls = DownloadCleaner.systemList(this)
         val active = StreamDownloadService.activeJobs()
+        val paused = PausedJobs.all() // v1.7.0: หยุดพักไว้ (persisted)
         sheetFoundCount = items.size
         sheetLastActive = active.size
         sheetShown.clear()
@@ -505,7 +507,7 @@ class MainActivity : AppCompatActivity() {
         sheetButtons.forEach { (tab, b) ->
             val n = when (tab) {
                 TAB_FOUND -> items.size
-                TAB_DL -> active.size
+                TAB_DL -> active.size + paused.size
                 else -> dls.size
             }
             b.text = tabLabel(tab, n)
@@ -535,12 +537,15 @@ class MainActivity : AppCompatActivity() {
             }
             TAB_DL -> {
                 sheetShownPids = active.take(15).map { it.pid }
-                if (active.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_downloading)))
+                if (active.isEmpty() && paused.isEmpty())
+                    container.addView(sheetEmptyBox(getString(R.string.empty_downloading)))
                 for (j in active.take(15)) {
                     val row = bindDownloadingRow(j)
                     sheetShown[j.pid] = row
                     container.addView(row)
                 }
+                // v1.7.0: หยุดพักไว้ - kept .part files, ดาวน์โหลดต่อ resumes
+                for (p in paused.take(10)) container.addView(bindPausedRow(p))
             }
             else -> {
                 if (dls.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_done)))
@@ -568,6 +573,13 @@ class MainActivity : AppCompatActivity() {
             }
         }
         paint()
+        // v1.7.0: หยุดพัก - keep the .part files, resume later from the sheet
+        row.findViewById<TextView>(R.id.dPause).setOnClickListener {
+            FileLog.event("download_pause_click", mapOf("url" to j.url.take(200), "pid" to j.pid))
+            StreamDownloadService.pause(this@MainActivity, j.pid)
+            Toast.makeText(this, R.string.download_paused_toast, Toast.LENGTH_SHORT).show()
+            renderSheet()
+        }
         row.findViewById<TextView>(R.id.dCancel).setOnClickListener {
             FileLog.event("download_cancel_click", mapOf("url" to j.url.take(200), "pid" to j.pid))
             FileLog.app("INFO", "dl", "cancel requested: ${j.url}")
@@ -576,6 +588,46 @@ class MainActivity : AppCompatActivity() {
             renderSheet()
         }
         return row
+    }
+
+    /** v1.7.0: one row of the หยุดพักไว้ section - ดาวน์โหลดต่อ re-runs the
+     *  SAME yt-dlp command (engine resumes its kept .part files) or ลบ drops
+     *  the entry together with the partial artifacts. */
+    private fun bindPausedRow(p: PausedJobs.Entry): View {
+        val row = layoutInflater.inflate(R.layout.item_paused, sheetContainer, false)
+        row.findViewById<TextView>(R.id.pLabel).text = p.title.ifEmpty { p.titleBase }
+        val workDir = StreamArgs.engineWorkDir(getExternalFilesDir(null) ?: filesDir)
+        val partials = StreamArgs.partialFilesFor(workDir, p.titleBase)
+        val ago = android.text.format.DateUtils.getRelativeTimeSpanString(
+            p.savedAt, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS)
+        row.findViewById<TextView>(R.id.pMeta).text =
+            getString(R.string.paused_meta, ago.toString(), partials.size)
+        row.findViewById<TextView>(R.id.pResume).setOnClickListener {
+            FileLog.event("download_resume_click", mapOf("url" to p.url.take(200)))
+            StreamDownloadService.resume(this@MainActivity, p)
+            Toast.makeText(this, R.string.download_resumed_toast, Toast.LENGTH_SHORT).show()
+            renderSheet()
+        }
+        row.findViewById<TextView>(R.id.pDelete).setOnClickListener { deletePaused(p) }
+        return row
+    }
+
+    /** v1.7.0: forget a paused job and remove its partial artifacts - the
+     *  finished file is never matched (partialFilesFor takes only
+     *  .part/.part-FragN/.ytdl names). */
+    private fun deletePaused(p: PausedJobs.Entry) {
+        val workDir = StreamArgs.engineWorkDir(getExternalFilesDir(null) ?: filesDir)
+        var n = 0
+        for (f in StreamArgs.partialFilesFor(workDir, p.titleBase)) if (f.delete()) n++
+        try {
+            PausedJobs.remove(p.titleBase)
+        } catch (e: Exception) {
+            FileLog.app("ERROR", "dl", "paused unbook failed: $e")
+        }
+        FileLog.event("paused_deleted", mapOf("title_base" to p.titleBase.take(120), "files" to n))
+        FileLog.app("INFO", "dl", "paused download deleted: ${p.titleBase} ($n partial files)")
+        Toast.makeText(this, getString(R.string.paused_deleted_toast, n), Toast.LENGTH_SHORT).show()
+        renderSheet()
     }
 
     /** One row of the พบวิดีโอ tab (same behaviour as pre-v1.5.0). */

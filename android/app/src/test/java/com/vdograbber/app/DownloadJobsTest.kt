@@ -73,4 +73,41 @@ class DownloadJobsTest {
         assertEquals(-1, DownloadJobs.currentPercent())
         assertFalse(DownloadJobs.consumeCancelled("aaa")) // flags wiped too
     }
+
+    // ---- v1.7.0: หยุดพัก (pause) mirrors the cancel one-shot semantics ----
+
+    @Test
+    fun `register keeps titleBase for the paused resume`() {
+        DownloadJobs.register("aaa", "http://x/a.m3u8", "A", "clip 2")
+        assertEquals("clip 2", DownloadJobs.get("aaa")?.titleBase)
+        // default when the service did not pass one (old call shape)
+        DownloadJobs.register("bbb", "http://x/b.m3u8", "B")
+        assertEquals("", DownloadJobs.get("bbb")?.titleBase)
+    }
+
+    @Test
+    fun `markPaused hides the job once and arms the one-shot flag`() {
+        DownloadJobs.register("aaa", "http://x/a.m3u8", "A", "stem")
+        assertTrue(DownloadJobs.markPaused("aaa"))
+        assertEquals(0, DownloadJobs.count()) // immediately gone from the tab
+        assertTrue(DownloadJobs.consumePaused("aaa"))
+        assertFalse("flag is one-shot", DownloadJobs.consumePaused("aaa"))
+        // unknown / already-finished pid: nothing to pause
+        assertFalse(DownloadJobs.markPaused("aaa"))
+        assertFalse(DownloadJobs.consumePaused("nope"))
+    }
+
+    @Test
+    fun `pause and cancel flags do not leak into each other`() {
+        DownloadJobs.register("aaa", "http://x/a.m3u8", "A")
+        assertTrue(DownloadJobs.markPaused("aaa"))
+        assertFalse("a paused job cannot be cancelled afterwards",
+            DownloadJobs.markCancelled("aaa"))
+        assertFalse(DownloadJobs.consumeCancelled("aaa"))
+        DownloadJobs.register("bbb", "http://x/b.m3u8", "B")
+        assertTrue(DownloadJobs.markCancelled("bbb"))
+        assertFalse("a cancelled job cannot be paused afterwards",
+            DownloadJobs.markPaused("bbb"))
+        assertFalse(DownloadJobs.consumePaused("bbb"))
+    }
 }

@@ -171,4 +171,33 @@ class StreamArgsTest {
         assertTrue(StreamArgs.progressLogDue(0L, 5L, gapMs = 3L))
         assertTrue(!StreamArgs.progressLogDue(5L, 6L, gapMs = 3L))
     }
+
+    // ---- v1.7.0: partial files of a paused download (หยุดพัก / ลบ) ----
+
+    @Test
+    fun `partialFilesFor keeps yt-dlp partials and never the finished file`() {
+        val dir = java.nio.file.Files.createTempDirectory("vg-part").toFile()
+        try {
+            val stem = "คลิปหลุด ทดสอบ"
+            val part = File(dir, "$stem.f0.mp4.part").apply { writeText("x") }
+            val frag = File(dir, "$stem.f0.mp4.part-Frag12").apply { writeText("x") }
+            val ytdl = File(dir, "$stem.f0.mp4.ytdl").apply { writeText("x") }
+            val audioPart = File(dir, "$stem.f1.m4a.part").apply { writeText("x") }
+            val finished = File(dir, "$stem.mp4").apply { writeText("x") }
+            val other = File(dir, "other.f0.mp4.part").apply { writeText("x") }
+
+            val got = StreamArgs.partialFilesFor(dir, stem).map { it.name }.toSet()
+            assertTrue("video .part kept", part.name in got)
+            assertTrue("fragment state kept", frag.name in got)
+            assertTrue(".ytdl state kept", ytdl.name in got)
+            assertTrue("audio .part kept", audioPart.name in got)
+            assertTrue("the finished file must survive ลบ", finished.name !in got)
+            assertTrue("other stems untouched", other.name !in got)
+            assertEquals(4, got.size)
+            // blank stem can never prefix-match anything
+            assertTrue(StreamArgs.partialFilesFor(dir, "").isEmpty())
+        } finally {
+            dir.deleteRecursively()
+        }
+    }
 }

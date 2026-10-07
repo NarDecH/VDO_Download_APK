@@ -46,14 +46,32 @@
         android:max="100"
         android:progressTint="#FF5F6D" />
 
-    <TextView
-        android:id="@+id/dCancel"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
-        android:background="#7f1d1d"
-        android:paddingHorizontal="16dp"
-        android:paddingVertical="6dp"
-        android:text="@string/cancel"
-        android:textColor="#FCA5A5" />
+        android:orientation="horizontal">
+
+        <!-- v1.7.0: หยุดพัก keeps yt-dlp's .part files - ดาวน์โหลดต่อ later -->
+        <TextView
+            android:id="@+id/dPause"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:background="#4a3208"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="@string/pause"
+            android:textColor="#FFC371" />
+
+        <TextView
+            android:id="@+id/dCancel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="#7f1d1d"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="6dp"
+            android:text="@string/cancel"
+            android:textColor="#FCA5A5" />
+    </LinearLayout>
 </LinearLayout>
