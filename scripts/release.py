@@ -34,7 +34,9 @@ import time
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 
-EXPECTED_ASSETS = 8  # 4 APKs + exe + checksums.txt + 2x .sha256
+# v1.6.1: 4 APKs + exe + desktop exe .sha256 + 4x android .sha256 from #46
+# (android.yml attaches a .sha256 per APK; desktop keeps checksums.txt)
+EXPECTED_ASSETS = 12
 
 
 def run(cmd: list[str], **kw) -> tuple[int, str]:
@@ -242,7 +244,7 @@ def wait_for_ci(tag: str, timeout_min: int = 30) -> bool:
 
 def verify_release(version: str, wait: bool) -> None:
     tag = "v" + version
-    if wait and not wait_for_ci(tag):
+    if wait and not wait_for_ci(tag, timeout_min=int(os.environ.get("VERIFY_TIMEOUT_MIN", "50"))):
         die("CI did not go green - fix or rerun the failed jobs, then re-verify")
     rc, out = gh(["release", "view", tag, "--json", "isDraft,assets",
                   "--template", "{{.isDraft}}|{{len .assets}}"])
