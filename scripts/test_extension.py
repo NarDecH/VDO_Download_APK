@@ -132,6 +132,13 @@ def js(cdp, session, expr, timeout=15000):
 # ------------------------------------------------------------------ main
 def main():
     global TMP_PROFILE
+    # Thai check names/details are normal output - a cp1252 Windows console
+    # would raise UnicodeEncodeError inside check()'s print (same fix as
+    # release.py / analyze_events)
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[attr-defined]
+    except (AttributeError, ValueError):
+        pass
     keep = "--keep" in sys.argv
     sample = os.path.join(TESTS, "sample.mp4")
     sample_hash = hashlib.sha256(open(sample, "rb").read()).hexdigest()
@@ -689,6 +696,55 @@ def main():
         sb_file = wait_for_hash(TMP_DL, sb_expected, 60)
         check("SegmentBase download is exactly the chosen <BaseURL> file (byte-identical)", bool(sb_file), sb_file or "timeout")
 
+        # ==== master playlist quality + separate audio (v1.9.0 size fix) ======
+        # The old variant loop compared raw BANDWIDTH only, so a master
+        # WITHOUT BANDWIDTH attributes scored every variant 0 and silently
+        # saved the FIRST (usually lowest) variant - a much smaller file than
+        # the desktop app. RESOLUTION must break the tie, and a separate
+        # audio track (EXT-X-MEDIA rendition / separate DASH AdaptationSet)
+        # must be REFUSED: the browser cannot remux, so the old code saved a
+        # smaller, SILENT file and claimed success.
+        # chrome may still be finalizing UUID leftovers from earlier phases -
+        # wait for the folder to go quiet, THEN snapshot the baseline, so a
+        # late landing file cannot be mistaken for junk written by a refusal
+        wait_downloads_quiet(TMP_DL)
+        before_master = set(os.listdir(TMP_DL))
+        masterr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/hls/master.m3u8', 'kind': 'm3u8', 'name': 'e2e-hls-master'}))})")
+        check("master playlist picks the highest-BANDWIDTH variant",
+              bool(masterr and masterr.get("ok") and masterr.get("hls")), json.dumps(masterr or {}))
+        master_file = wait_for_new_file(TMP_DL, before_master, 60)
+        master_ok = bool(master_file) and hashlib.sha256(open(master_file, "rb").read()).hexdigest() == hls_expected
+        check("master playlist download == HIGH variant bytes (seg1+seg2)", master_ok,
+              os.path.basename(master_file or ""))
+
+        wait_downloads_quiet(TMP_DL)
+        before_nobw = set(os.listdir(TMP_DL))
+        nobwr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/hls/master-nobw.m3u8', 'kind': 'm3u8', 'name': 'e2e-hls-nobw'}))})")
+        check("master WITHOUT BANDWIDTH still succeeds",
+              bool(nobwr and nobwr.get("ok") and nobwr.get("hls")), json.dumps(nobwr or {}))
+        nobw_file = wait_for_new_file(TMP_DL, before_nobw, 60)
+        nobw_ok = bool(nobw_file) and hashlib.sha256(open(nobw_file, "rb").read()).hexdigest() == hls_expected
+        check("no-BANDWIDTH master download == HIGH variant bytes (old code saved the low one)",
+              nobw_ok, os.path.basename(nobw_file or ""))
+
+        wait_downloads_quiet(TMP_DL)
+        before_aud = set(os.listdir(TMP_DL))
+        audr = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/hls/master-audio.m3u8', 'kind': 'm3u8', 'name': 'e2e-hls-audio'}))})")
+        check("HLS master with a separate audio rendition is refused with a clear reason",
+              bool(audr is not None) and not (audr or {}).get("ok")
+              and "audio" in str((audr or {}).get("error", "")).lower(), json.dumps(audr or {}))
+        # let chrome finalize leftovers from EARLIER phases before snapshotting
+        wait_downloads_quiet(TMP_DL)
+        time.sleep(2)
+        check("separate-audio HLS refusal wrote no file",
+              set(os.listdir(TMP_DL)) - before_aud == set(),
+              str(set(os.listdir(TMP_DL)) - before_aud))
+
+        dashaud = js(cdp, sid, f"({ASK})('debugDownload', {json.dumps(json.dumps({'url': f'http://127.0.0.1:{PORT}/dash/audio.mpd', 'kind': 'mpd', 'name': 'e2e-dash-audio'}))})")
+        check("DASH with a separate audio AdaptationSet is refused with a clear reason",
+              bool(dashaud is not None) and not (dashaud or {}).get("ok")
+              and "audio" in str((dashaud or {}).get("error", "")).lower(), json.dumps(dashaud or {}))
+
     finally:
         try:
             proc.terminate()
@@ -717,6 +773,24 @@ def wait_for_new_file(folder, before, timeout_s):
                 pass
         time.sleep(0.5)
     return None
+
+
+def wait_downloads_quiet(folder, extra=2.0, timeout_s=30):
+    """chrome may still be renaming/finalizing earlier .crdownload files when a
+    snapshot of the folder is taken (v1.9.0 e2e flake: two UUID leftovers
+    landed right at the refusal check and looked like "junk written by the
+    refusal"). Wait until the folder stops changing for at least `extra`
+    seconds, then let the caller snapshot it."""
+    deadline = time.time() + timeout_s
+    last = None
+    while time.time() < deadline:
+        now = frozenset((f, os.path.getsize(os.path.join(folder, f)))
+                        for f in os.listdir(folder) if not f.endswith((".tmp",)))
+        if now == last and not any(f.endswith(".crdownload") for f, _ in now):
+            return time.time()
+        last = now
+        time.sleep(0.5)
+    return 0.0
 
 
 ASK = """(type, value) => new Promise(res => {

@@ -360,15 +360,34 @@ async function collectPlaylist(url, depth = 0) {
   const text = await r.text();
   if (!/#EXTM3U/i.test(text)) throw new Error("not an M3U8 playlist");
   const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  // master playlist: take the highest-bandwidth variant and recurse
+  // master playlist: take the highest-quality variant and recurse.
+  // v1.9.0 size fix: the old loop compared raw BANDWIDTH only, so a master
+  // WITHOUT BANDWIDTH attributes scored every variant 0 and silently saved
+  // the FIRST variant (usually the lowest) - a much smaller file than the
+  // desktop app (yt-dlp always picks its best). Score BANDWIDTH (or
+  // AVERAGE-BANDWIDTH) with RESOLUTION as the tiebreak, honor a URI="..."
+  // attribute on the STREAM-INF line itself, and refuse masters that declare
+  // a separate audio rendition: the browser cannot remux, so saving just the
+  // video variant used to produce a smaller, SILENT file with no warning.
   if (lines.some((l) => /^#EXT-X-STREAM-INF/i.test(l))) {
     if (depth > 2) throw new Error("master playlist nesting too deep");
-    let best = null, bestBw = -1;
+    if (lines.some((l) => /^#EXT-X-MEDIA:.*TYPE=AUDIO/i.test(l) && /URI="[^"]+"/i.test(l))) {
+      throw new Error("HLS master has a separate audio rendition - the video-only file would have NO sound; use the desktop app (yt-dlp)");
+    }
+    let best = null, bestScore = -1;
     for (let i = 0; i < lines.length - 1; i++) {
       if (!/^#EXT-X-STREAM-INF/i.test(lines[i])) continue;
-      const bw = parseInt((lines[i].match(/BANDWIDTH=(\d+)/i) || [])[1] || "0", 10);
+      const attrs = lines[i];
+      const bw = parseInt((attrs.match(/(?:AVERAGE-)?BANDWIDTH=(\d+)/i) || [])[1] || "0", 10);
+      const res = attrs.match(/RESOLUTION=(\d+)x(\d+)/i) || [];
+      const px = (parseInt(res[1] || "0", 10) || 0) * (parseInt(res[2] || "0", 10) || 0);
       const next = lines[i + 1].startsWith("#") ? null : lines[i + 1];
-      if (next && bw > bestBw) { bestBw = bw; best = next; }
+      const uri = (attrs.match(/URI="([^"]+)"/i) || [])[1] || next;
+      if (!uri) continue;
+      // bandwidth dominates (like yt-dlp), resolution breaks ties / covers
+      // masters that omit BANDWIDTH entirely
+      const score = bw * 1e9 + px;
+      if (score > bestScore) { bestScore = score; best = uri; }
     }
     if (!best) throw new Error("master playlist has no variant");
     return collectPlaylist(resolveUrl(best, url), depth + 1);
@@ -424,6 +443,23 @@ function resolveTemplate(tpl, rep) {
     .replace(/\$Time(?:%0(\d+)d)?\$/g, (_, w) => w ? String(rep._time).padStart(Number(w), "0") : String(rep._time))
     .replace(/\$\$/g, "$");
 }
+// v1.9.0: true when the MPD declares audio and video in DIFFERENT
+// AdaptationSets / Representations (neither alone is enough: a muxed A/V rep
+// or an audio-only MPD must keep flowing through the existing pipeline)
+function dashHasSeparateAudio(mpdText) {
+  const kinds = new Set();
+  for (const m of (mpdText.matchAll(MPD_XML_TAGS))) {
+    if (m[1] === "/") continue;
+    const name = m[2].toLowerCase();
+    if (name !== "adaptationset" && name !== "representation") continue;
+    const a = lowerAttrs(xmlAttrs(m[3]));
+    const t = String(a.contenttype || a.mimetype || "").toLowerCase();
+    if (t.includes("audio")) kinds.add("audio");
+    else if (t.includes("video")) kinds.add("video");
+  }
+  return kinds.has("audio") && kinds.has("video");
+}
+
 function highestRepresentation(mpdText) {
   // Flatten the MPD into one "best" Representation: attributes on MPD/
   // Period/AdaptationSet are defaults inherited by Representations that omit
@@ -599,6 +635,13 @@ async function downloadDash(mpdUrl, filename, tabId) {
     return { ok: false, hls: true, error: "DASH manifest: " + (e.message || e) };
   }
   if (!/<mpd[\s>]/i.test(mpdText)) return { ok: false, hls: true, error: "DASH manifest: not an MPD" };
+  // v1.9.0 size fix: an MPD with separate audio and video AdaptationSets
+  // (the standard streaming layout) means the assembled file would be
+  // VIDEO-ONLY - smaller than the desktop app's ffmpeg merge and silent.
+  // Refuse loudly instead of saving a broken file quietly.
+  if (dashHasSeparateAudio(mpdText)) {
+    return { ok: false, hls: true, error: "DASH with a separate audio track - the extension would save a silent, video-only file; use the desktop app (yt-dlp)" };
+  }
   let segs;
   try {
     segs = collectDashSegments(mpdUrl, mpdText);
