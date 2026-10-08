@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.0] — 2026-10-08
+
+### การเปลี่ยนแปลง
+- ส่วนขยายเลือก variant คุณภาพสูงสุดของ HLS master เสมอ (แก้ไฟล์เล็กกว่าแอป Windows เมื่อ master ไม่มี BANDWIDTH)
+- ปฏิเสธสตรีมที่เสียงแยกไฟล์ (HLS EXT-X-MEDIA / DASH AdaptationSet) ด้วยข้อความชัดเจน แทนการเซฟไฟล์เล็กและไม่มีเสียง
+- E2E ส่วนขยาย 75 เคส (+5 ใหม่) ผ่านครบ
+
+
 ## [1.8.0] — 2026-10-07
 
 ### การเปลี่ยนแปลง
