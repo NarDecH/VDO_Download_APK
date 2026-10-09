@@ -36,7 +36,21 @@ object DownloadCleaner {
         val identities: Int get() = listOfNotNull(if (id >= 0) id else null, uri, raw).size
     }
 
-    /** DownloadManager jobs that finished successfully (direct files). */
+    /**
+     * DownloadManager jobs that finished successfully (direct files).
+     *
+     * v1.9.1 (field-log fix): the old loop read COLUMN_LOCAL_FILENAME, which
+     * Android throws a SecurityException for on every row when targeting
+     * N+ ("deprecated; use ContentResolver.openFileDescriptor"). Worse, the
+     * throw escaped the per-row loop and killed the WHOLE query, so the media
+     * sheet's "finished files" tab was always empty and app.log filled up
+     * with hundreds of "list download jobs failed" lines.
+     *
+     * Read COLUMN_LOCAL_URI instead (a file:// URI permitted to the enqueuing
+     * app) and wrap the per-row access so one bad row cannot sink the rest:
+     * a job that still has no reachable identity is skipped, and the systemList
+     * merge catches the file again through MediaStore or the raw directory.
+     */
     fun dmSuccessful(ctx: Context): List<Candidate> {
         val out = mutableListOf<Candidate>()
         try {
@@ -44,16 +58,22 @@ object DownloadCleaner {
             val q = DownloadManager.Query().setFilterByStatus(DownloadManager.STATUS_SUCCESSFUL)
             dm.query(q)?.use { c ->
                 while (c.moveToNext()) {
-                    val id = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))
-                    val local = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_FILENAME)) ?: continue
-                    if (!local.contains("VDOGrabber")) continue
-                    val f = File(local)
-                    if (!f.exists()) continue
-                    val title = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)).orEmpty()
-                    // no uri here: getUriForDownloadedFile returns the downloads-
-                    // provider URI, which we cannot delete from - the MediaStore
-                    // entry (when present) provides the deletable content URI
-                    out.add(Candidate(id, null, f, title.ifEmpty { f.name }, f.length()))
+                    try {
+                        val id = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_ID))
+                        val localUri = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_LOCAL_URI))
+                        val local = localUri?.let { Uri.parse(it).path }.orEmpty()
+                        if (!local.contains("VDOGrabber")) continue
+                        val f = File(local)
+                        if (!f.exists()) continue
+                        val title = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)).orEmpty()
+                        // no content uri here: getUriForDownloadedFile returns
+                        // the downloads-provider URI, which we cannot delete
+                        // from - the MediaStore entry (when present) provides
+                        // the deletable content URI
+                        out.add(Candidate(id, null, f, title.ifEmpty { f.name }, f.length()))
+                    } catch (e: Exception) { // one bad row must not sink the list
+                        FileLog.app("WARN", "dl", "skip download job row: $e")
+                    }
                 }
             }
         } catch (e: Exception) {
