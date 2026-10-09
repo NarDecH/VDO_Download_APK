@@ -6,6 +6,7 @@
 
 ### การเปลี่ยนแปลง
 - Windows app ปรับจาก feedback: ปุ่ม 📋 บนแถบเครื่องมือเปิด URL จากคลิปบอร์ดทันที ไม่ต้องรอกด Enter อีกต่อไป
+- **ไฟล์ติดตั้ง Windows แนบใน release แล้ว**: `VDOGrabber-1.9.5-windows-x64.exe` (PyInstaller onefile, selftest ผ่าน) + `.sha256` แยกต่างหาก — หน้าดาวน์โหลด (Pages) ดึง assets ผ่าน GitHub API จึงโชว์ไฟล์นี้เองอัตโนมัติ
 
 
 ## [1.9.4] — 2026-10-10
