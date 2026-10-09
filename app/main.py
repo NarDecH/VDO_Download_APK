@@ -44,6 +44,59 @@ def public_settings() -> dict:
     return data
 
 
+def _write_clipboard_text(text: str) -> bool:
+    """Put text on the Windows clipboard (CF_UNICODETEXT via ctypes - the
+    write side of read_clipboard_text, needed by the selftest's toolbar
+    clipboard phase; frozen-safe, no extra dependency)."""
+    if os.name != "nt":
+        return False
+    try:
+        import ctypes
+        from ctypes import wintypes
+
+        CF_UNICODETEXT = 13
+        GMEM_MOVEABLE = 0x0002
+        user32 = ctypes.WinDLL("user32", use_last_error=True)
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        user32.OpenClipboard.argtypes = [wintypes.HWND]
+        user32.OpenClipboard.restype = wintypes.BOOL
+        user32.EmptyClipboard.restype = wintypes.BOOL
+        user32.SetClipboardData.argtypes = [wintypes.UINT, wintypes.HANDLE]
+        user32.SetClipboardData.restype = wintypes.HANDLE
+        user32.CloseClipboard.restype = wintypes.BOOL
+        kernel32.GlobalAlloc.argtypes = [wintypes.UINT, ctypes.c_size_t]
+        kernel32.GlobalAlloc.restype = wintypes.HGLOBAL
+        kernel32.GlobalLock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalLock.restype = wintypes.LPVOID
+        kernel32.GlobalUnlock.argtypes = [wintypes.HGLOBAL]
+        kernel32.GlobalUnlock.restype = wintypes.BOOL
+        if not user32.OpenClipboard(None):
+            return False
+        try:
+            user32.EmptyClipboard()
+            buf = ctypes.create_unicode_buffer(text)
+            size_bytes = ctypes.sizeof(buf)
+            handle = kernel32.GlobalAlloc(GMEM_MOVEABLE, size_bytes)
+            if not handle:
+                return False
+            ptr = kernel32.GlobalLock(handle)
+            if not ptr:
+                kernel32.GlobalFree(handle)
+                return False
+            try:
+                ctypes.memmove(ptr, buf, size_bytes)
+            finally:
+                kernel32.GlobalUnlock(handle)
+            ok = bool(user32.SetClipboardData(CF_UNICODETEXT, handle))
+            if not ok:
+                kernel32.GlobalFree(handle)
+            return ok
+        finally:
+            user32.CloseClipboard()
+    except Exception:
+        return False
+
+
 def read_clipboard_text() -> str:
     """Current Windows clipboard text (CF_UNICODETEXT) via ctypes - no extra
     dependency and it works in the frozen exe. Returns '' when the clipboard
@@ -823,6 +876,66 @@ def selftest() -> int:
         results["detection"] = {"ok": False, "error": repr(e)}
         app.logm.exception("selftest detection", e)
 
+    # --- 2.2) toolbar clipboard button (v1.9.4/1.9.5) - a real webview test
+    # of the exact user path: the page's TOOLBAR 📋 handler calls Api
+    # .open_clipboard('peek') and navigates IN-PAGE to the URL (v1.9.5: no
+    # Enter needed). Clipboard is set on the Python side; the page has no
+    # toolbar in the bare window, so we evaluate TOOLBAR_JS first (same
+    # injection as _on_loaded) and simulate the click on its shadow button.
+    try:
+        target_url = f"http://127.0.0.1:{port2}/embed.html"
+        # seed the clipboard with the target URL (ctypes writer, frozen-safe)
+        ok_seed = _write_clipboard_text(target_url)
+        src2 = os.path.join(os.path.dirname(os.path.abspath(__file__)), "tests", "testpage.html")
+        with open(src2, "r", encoding="utf-8") as f:
+            html2 = f.read().replace("__PORT__", str(port)).replace("__PORT2__", str(port2))
+        tmp_page2 = os.path.join(app.data_dir, "selftest-toolbar.html")
+        with open(tmp_page2, "w", encoding="utf-8") as f:
+            f.write(html2)
+        w2 = webview.create_window("selftest-toolbar", url="file:///" + tmp_page2.replace("\\", "/"),
+                                   js_api=app.api, width=640, height=480, hidden=True)
+        app.browser = w2
+        final_url_holder = [""]
+
+        def on_loaded2():
+            try:
+                time.sleep(1.5)                       # bridge ready
+                w2.evaluate_js(TOOLBAR_JS)            # mount the toolbar
+                time.sleep(0.5)
+                # click the 📋 button in its shadow root; the handler is
+                # async (pywebview callback + .then) - let it finish
+                click_result = w2.evaluate_js(
+                    "(() => { const b = document.querySelector('#vg-toolbar-host')"
+                    ".shadowRoot.querySelector('button[data-act=clip]');"
+                    " if (!b) return 'no-button'; b.click(); return 'clicked'; })()"
+                )
+                app.logm.log("selftest toolbar click: %s" % click_result,
+                             event="selftest_toolbar_click", result=str(click_result))
+                time.sleep(3)                         # peek callback + location.href + load
+                # read the URL while the window is still alive - after destroy()
+                # get_current_url() returns "" (empty, the postmortem of v1.9.6)
+                final_url_holder[0] = w2.get_current_url() or ""
+                app.logm.log("selftest toolbar final url: %s" % (final_url_holder[0] or "?"),
+                             event="selftest_toolbar_url", url=final_url_holder[0][:160])
+            except Exception as e:
+                app.logm.exception("selftest toolbar", e)
+            try:
+                w2.destroy()
+            except Exception:
+                pass
+
+        webview.start(func=on_loaded2, gui="edgechromium")
+        final_url = final_url_holder[0]
+        results["toolbar_clipboard"] = {
+            "ok": ok_seed and final_url.rstrip("/") == target_url.rstrip("/"),
+            "seeded": ok_seed,
+            "final_url": final_url[:120],
+            "target": target_url,
+        }
+    except Exception as e:
+        results["toolbar_clipboard"] = {"ok": False, "error": repr(e)}
+        app.logm.exception("selftest toolbar clipboard", e)
+
     # --- 2.5) detector pair sync (desktop DETECT_JS <-> android Detector.kt) -
     try:
         results["pair_sync"] = check_pair_sync()
@@ -919,7 +1032,8 @@ def selftest() -> int:
     print(json.dumps(results, ensure_ascii=False, indent=2))
     passed = (results["ytdlp"]["ok"] and results["detection"]["ok"]
               and results["pair_sync"]["ok"] and results["download"]["ok"]
-              and results["delete_file"]["ok"] and results["exclusions"]["ok"])
+              and results["delete_file"]["ok"] and results["exclusions"]["ok"]
+              and results["toolbar_clipboard"]["ok"])
     app.logm.log("SELFTEST %s" % ("PASS" if passed else "FAIL"), event="selftest", passed=passed,
                  results={k: v.get("ok") for k, v in results.items() if isinstance(v, dict)})
     return 0 if passed else 1
