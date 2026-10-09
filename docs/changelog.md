@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.6] — 2026-10-10
+
+### การเปลี่ยนแปลง
+- Windows app: เพิ่ม selftest phase ตรวจปุ่ม 📋 บนแถบเครื่องมือจริงใน webview — ใส่ URL ในคลิปบอร์ด กดปุ่ม แล้วหน้าต้องไปถึง URL นั้นทันที (ปิดช่องที่ v1.9.4/1.9.5 มีแค่ unit-level)
+
+
 ## [1.9.5] — 2026-10-10
 
 ### การเปลี่ยนแปลง
