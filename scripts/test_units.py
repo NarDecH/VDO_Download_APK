@@ -743,6 +743,47 @@ def test_analyze_events_zip_without_events() -> bool:
     return True
 
 
+# --------------------------------------------------------- clipboard helpers
+def test_clipboard_url_rules() -> bool:
+    """clipboard_url() turns clipboard text into a loadable http(s) URL -
+    scheme kept as-is, bare domain gets https://, non-URL text rejected.
+    (v1.9.4: the toolbar 📋 button reuses this same function for mode=peek.)"""
+    sys.path.insert(0, os.path.join(ROOT, "app"))
+    import main as app_main
+
+    assert app_main.clipboard_url("https://merrylion2.com/ou2myn7f92/output.mpd") == \
+        "https://merrylion2.com/ou2myn7f92/output.mpd"
+    assert app_main.clipboard_url("http://insecure.example") == "http://insecure.example"
+    assert app_main.clipboard_url("merrylion2.com") == "https://merrylion2.com"
+    # multi-line clipboard: first URL-looking line wins
+    assert app_main.clipboard_url("title line\nmerrylion2.com/abc") == "https://merrylion2.com/abc"
+    # non-URL content rejected
+    assert app_main.clipboard_url("") == ""
+    assert app_main.clipboard_url("hello world") == ""
+    assert app_main.clipboard_url("mail@example.com") == ""
+    return True
+
+
+def test_toolbar_has_clipboard_button_parity() -> bool:
+    """v1.9.4: the in-page toolbar gets a 📋 button (data-act="clip") that
+    calls open_clipboard('peek') and puts the URL in the urlbox - never
+    navigating from the callback (same race rule as back/fwd/reload)."""
+    sys.path.insert(0, os.path.join(ROOT, "app", "core"))
+    import detector
+    assert 'data-act="clip"' in detector.TOOLBAR_JS, "clipboard button rendered"
+    assert "open_clipboard('peek')" in detector.TOOLBAR_JS, "calls peek mode"
+    assert "urlbox.value = r.url" in detector.TOOLBAR_JS, "fills the urlbox"
+    # navigation happens only through the existing urlbox Enter path
+    assert "location.href" in detector.TOOLBAR_JS
+    # open_clipboard('go') still navigates for the Control Center
+    import main as app_main
+    import inspect
+    src = inspect.getsource(app_main.Api.open_clipboard)
+    assert 'threading.Timer(0.08, _APP.navigate' in src, "go mode navigates"
+    assert 'if mode == "peek"' in src, "peek mode returns without navigating"
+    return True
+
+
 def main() -> int:
     tests = {
         "sieve_request_building": test_sieve_request_building,
@@ -775,6 +816,8 @@ def main() -> int:
         "analyze_events_cli": test_analyze_events_cli_missing_file_and_filter,
         "analyze_events_zip_input": test_analyze_events_zip_input,
         "analyze_events_zip_without_events": test_analyze_events_zip_without_events,
+        "clipboard_url_rules": test_clipboard_url_rules,
+        "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
     }
     failed = []
     for name, fn in tests.items():

@@ -166,11 +166,16 @@ class Api:
         _APP.logm.log("manual detection requested", event="detect_manual")
         _APP.browser.evaluate_js("window.__vgDetect && window.__vgDetect.scan('manual')")
 
-    def open_clipboard(self) -> dict:
-        """Read a URL from the Windows clipboard and load it in the browser
-        window. Clipboard is read on the Python side because WebView2 only
-        grants navigator.clipboard.readText() after a permission prompt that
-        does not reliably appear in the Control Center window."""
+    def open_clipboard(self, mode: str = "go") -> dict:
+        """Read a URL from the Windows clipboard. Clipboard is read on the
+        Python side because WebView2 only grants navigator.clipboard.readText()
+        after a permission prompt that does not reliably appear in the Control
+        Center window.
+
+        v1.9.4: mode="go" (default) navigates the browser window to the URL,
+        mode="peek" only returns it so the in-page toolbar can put it in the
+        urlbox and navigate itself (in-page location.href - never races the
+        pywebview return-value callback)."""
         raw = read_clipboard_text()
         url = clipboard_url(raw)
         if not url:
@@ -178,6 +183,10 @@ class Api:
             _APP.logm.log("open from clipboard: %s" % reason, level="debug",
                           event="clipboard_open", ok=False, reason=reason)
             return {"ok": False, "error": "คลิปบอร์ดว่าง" if reason == "empty" else "ในคลิปบอร์ดไม่มี URL"}
+        if mode == "peek":
+            # no app-level navigation, no clipboard_open event dup - the
+            # caller (toolbar) logs its own clipboard_paste_to_urlbox
+            return {"ok": True, "url": url}
         _APP.logm.log("open URL from clipboard: %s" % url[:120], event="clipboard_open", url=url)
         # Deferred like navigate(): let the JS return-value callback win first.
         threading.Timer(0.08, _APP.navigate, args=(url,)).start()

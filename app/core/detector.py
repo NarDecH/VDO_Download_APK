@@ -241,6 +241,7 @@ TOOLBAR_JS = r"""
     <button data-act="fwd"   title="Forward">→</button>
     <button data-act="reload" title="Reload">⟳</button>
     <div class="urlbox"><input spellcheck="false" placeholder="ป้อน URL แล้วกด Enter"></div>
+    <button data-act="clip" title="Put the clipboard URL into the address box (Enter to go)">📋</button>
     <button data-act="detect" title="Scan this page for videos">🔍 ตรวจหาวิดีโอ</button>
     <button data-act="panel"  title="Videos found">🎬 วิดีโอ <span class="badge">0</span></button>
     <button data-act="ctrl"   title="Downloads / Logs / Settings">⚙️</button>
@@ -265,6 +266,24 @@ TOOLBAR_JS = r"""
     if (act === 'fwd') { history.forward(); return; }
     if (act === 'reload') { location.reload(); return; }
     if (act === 'detect') { pyapi() && pyapi().detect_now(); badge.textContent = '...'; return; }
+    // v1.9.4: 📋 clipboard - read the URL on the Python side (WebView2's own
+    // navigator.clipboard needs an unreliable permission prompt) and ONLY
+    // put it into the urlbox; navigation stays an in-page action (Enter) so
+    // it never races the pywebview return-value callback like back/fwd/reload
+    if (act === 'clip') {
+      if (!pyapi()) return;
+      badge.textContent = '...';
+      pyapi().open_clipboard('peek').then(function (r) {
+        if (r && r.ok) {
+          urlbox.value = r.url; urlbox.focus();
+          badge.textContent = '📋 ok - กด Enter';
+        } else {
+          badge.textContent = '📋 ' + ((r && r.error) || 'ไม่ทราบสาเหตุ').slice(0, 16);
+        }
+        window.setTimeout(function () { badge.textContent = ''; }, 2500);
+      });
+      return;
+    }
     if (act === 'panel') { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; return; }
     if (act === 'ctrl') { pyapi() && pyapi().show_control(); return; }
     // open an iframe embed page as the top-level page (in-page navigation)
