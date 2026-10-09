@@ -2,6 +2,13 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.3] — 2026-10-09
+
+### การเปลี่ยนแปลง
+- Android: ปุ่มลองใหม่แบบแตะครั้งเดียวสำหรับงานดาวน์โหลดที่ติดขัด (watchdog 1.9.2 ต่อยอด) — Snackbar ถามลองใหม่แล้วจัดคิวใหม่ผ่านเส้นทางเดิมทั้งหมด + event download_retry_offer/download_retry วัดผลใน field log
+- เอกสารทดสอบเครื่องจริงเพิ่มวิธีวิเคราะห์ zip ที่ผู้ใช้ส่งมาโดยตรง
+
+
 ## [1.9.2] — 2026-10-09
 
 ### การเปลี่ยนแปลง
