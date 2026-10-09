@@ -411,6 +411,10 @@ class MainActivity : AppCompatActivity() {
                         } else {
                             updateChip()
                         }
+                        // v1.9.2: direct-download jobs that were enqueued but never
+                        // started/completed (the field-log "queued and vanished" fd)
+                        // are named in the logs once, then forgotten
+                        Downloader.watchStaleJobs()
                         updateOpenSheet() // v1.5.0: live rows inside the open sheet
                     }
                 }

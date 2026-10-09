@@ -90,17 +90,48 @@ object Downloader {
      * v1.3.4: id -> (url, title) of direct downloads, used by the
      * ACTION_DOWNLOAD_COMPLETE receiver to re-route an HTML payload to the
      * yt-dlp engine (in-process only; capped to avoid unbounded growth).
+     *
+     * v1.9.2: the second element also tracks enqueue timestamps for the
+     * field-log "queued but never started" watchdog (watchStaleJobs).
      */
-    private val pendingDm = object : LinkedHashMap<Long, Pair<String, String>>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Pair<String, String>>?): Boolean = size > 32
+    private val pendingDm = object : LinkedHashMap<Long, Triple<String, String, Long>>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Triple<String, String, Long>>?): Boolean = size > 32
     }
 
-    fun pendingFor(id: Long): Pair<String, String>? = synchronized(pendingDm) { pendingDm[id] }
+    fun pendingFor(id: Long): Pair<String, String>? = synchronized(pendingDm) {
+        pendingDm[id]?.let { it.first to it.second }
+    }
 
     fun forget(id: Long) { synchronized(pendingDm) { pendingDm.remove(id) } }
 
-    /** Test hook: seed the pending map like enqueue() does (E2E). */
-    fun putPending(id: Long, pair: Pair<String, String>) { synchronized(pendingDm) { pendingDm[id] = pair } }
+    /**
+     * v1.9.2 field-log lesson: a DownloadManager job that never fires
+     * ACTION_DOWNLOAD_COMPLETE (never starts, silently lost) shows up in
+     * the logs ONLY as download_queued with no follow-up event. This
+     * "queue-and-vanish" was invisible to the field diagnosis of 2026-10-09
+     * (cdend.com panama888.mp4 x4). Call this from a periodic tick (the
+     * media-sheet progress ticker) with a stale threshold in ms - when a
+     * tracked direct-download job is older than the threshold it is logged
+     * as download_stuck and FORGOTTEN (a later completion for it will be
+     * handled by the plain DownloadManager notification instead).
+     */
+    fun watchStaleJobs(thresholdMs: Long = 120_000) {
+        val now = System.currentTimeMillis()
+        synchronized(pendingDm) {
+            val stale = pendingDm.entries.filter { now - it.value.third > thresholdMs }
+            for ((_, t) in stale) {
+                FileLog.app("WARN", "dl", "download may be stuck (no status after ${thresholdMs / 1000}s): ${t.first.take(160)}")
+                FileLog.event("download_stuck", mapOf("url" to t.first.take(300), "age_s" to (now - t.third) / 1000))
+            }
+            stale.forEach { pendingDm.remove(it.key) }
+        }
+    }
+
+    /** Test hook: seed the pending map like enqueue() does (E2E).
+     * v1.9.2: an optional timestamp for the stale-jobs watchdog tests. */
+    fun putPending(id: Long, pair: Pair<String, String>, queuedAtMs: Long = System.currentTimeMillis()) {
+        synchronized(pendingDm) { pendingDm[id] = Triple(pair.first, pair.second, queuedAtMs) }
+    }
 
     /**
      * v1.3.4: check a finished DownloadManager job - when the payload is
@@ -199,7 +230,7 @@ object Downloader {
         }
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val id = dm.enqueue(req)
-        synchronized(pendingDm) { pendingDm[id] = url to title } // for the HTML-check re-route
+        synchronized(pendingDm) { pendingDm[id] = Triple(url, title, System.currentTimeMillis()) } // HTML-check re-route + v1.9.2 watchdog
         FileLog.download("enqueue #$id url=$url -> Downloads/VDOGrabber/$fileName")
         FileLog.event("download_queued", mapOf("id" to id, "url" to url, "file" to fileName))
         return id

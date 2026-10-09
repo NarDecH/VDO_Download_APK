@@ -10,6 +10,12 @@ Usage
 -----
   python scripts/analyze_events.py                       # desktop log path
   python scripts/analyze_events.py path/to/events.jsonl  # any log file
+  python scripts/analyze_events.py logzip.zip            # diagnostics ZIP
+                                                         # (ระบบปฏิบัติการ
+                                                         # "share logs" zip:
+                                                         # events.jsonl +
+                                                         # app.log +
+                                                         # downloads.log)
   python scripts/analyze_events.py --event download_no_file --event download_error
   python scripts/analyze_events.py --json                # machine output
 
@@ -23,6 +29,7 @@ import datetime
 import json
 import os
 import sys
+import zipfile
 
 # The debugging funnel, in the order a healthy download flows through it.
 KNOWN_EVENTS = [
@@ -30,8 +37,8 @@ KNOWN_EVENTS = [
     "download_queued", "download_start", "download_rerouted",
     "download_skipped_blob", "download_not_media", "download_no_file",
     "download_no_file_probe", "download_done", "download_error",
-    "download_failed", "download_canceled", "engine_download_start",
-    "download_no_ffmpeg", "download_fallback",
+    "download_failed", "download_canceled", "download_stuck",
+    "engine_download_start", "download_no_ffmpeg", "download_fallback",
 ]
 
 # Problems we know how to name (field-log lessons).
@@ -40,6 +47,7 @@ PROBLEM_EVENTS = {
     "download_not_media": "saved file was an HTML player page, not video",
     "download_no_file": "engine exited 0 but wrote no file",
     "download_error": "engine/download error (see the reason column)",
+    "download_stuck": "direct download queued but never started - watchdog gave up",
 }
 
 
@@ -49,6 +57,40 @@ def default_log_path() -> str:
     if appdata:
         return os.path.join(appdata, "VDOGrabber", "logs", "events.jsonl")
     return os.path.join("logs", "events.jsonl")
+
+
+def _load_input(path: str):
+    """Read a log source -> (records, bad_lines, list-of-file-notes).
+
+    Accepts a plain events.jsonl or the diagnostics ZIP (FileLog export /
+    "แชร์ log" zip on Android): the events file inside wins for the funnel,
+    and the other log files' line counts are reported so a missing file is
+    visible even though events.jsonl is the only structured source.
+    """
+    notes: list[str] = []
+    if zipfile.is_zipfile(path):
+        with zipfile.ZipFile(path) as zf:
+            names = zf.namelist()
+            candidates = [n for n in names
+                          if os.path.basename(n).lower() in ("events.jsonl", "events")]
+            if not candidates:
+                raise ValueError("no events.jsonl inside the zip: " + ", ".join(names))
+            with zf.open(candidates[0]) as fh:
+                records, bad = parse_events(
+                    fh.read().decode("utf-8", errors="replace").splitlines())
+            for other in ("app.log", "downloads.log", "crash.log"):
+                hit = next((n for n in names
+                            if os.path.basename(n).lower() == other), None)
+                if hit:
+                    line_count = sum(1 for _ in zf.open(hit))
+                    notes.append("%s: %d lines (แนบมาด้วย - เปิดดูข้อความดิบได้ในไฟล์ zip)"
+                                 % (other, line_count))
+                else:
+                    notes.append("%s: (missing)" % other)
+        return records, bad, notes
+    with open(path, "r", encoding="utf-8", errors="replace") as fh:
+        records, bad = parse_events(fh)
+    return records, bad, notes
 
 
 def parse_events(lines):
@@ -120,6 +162,10 @@ def diagnose(summary: dict, records: list[dict]) -> list[str]:
     if counts.get("download_not_media"):
         out.append("ไฟล์ที่ได้เป็นหน้า HTML ปลอม %d ครั้ง - ถูกตรวจ/ลบ/re-route แล้ว"
                    % counts["download_not_media"])
+    if counts.get("download_stuck"):
+        out.append("งานดาวน์โหลดตรงที่จัดคิวแล้วเงียบหาย %d ครั้ง (download_stuck) - "
+                   "DownloadManager ไม่เริ่มทำงาน (เน็ตหลุด/คิวเต็ม/เซิร์ฟเวอร์ปฏิเสธ) "
+                   "กดปุ่มดาวน์โหลดอีกครั้งได้" % counts["download_stuck"])
     if summary["engine_ready_seen"] and not summary["engine_version"]:
         out.append("engine_ready แต่ version ว่าง (vnull) - ตรวจการติดตั้ง yt-dlp")
     if counts.get("media_found") and not (counts.get("download_queued") or counts.get("download_start")):
@@ -185,14 +231,13 @@ def main(argv: list[str] | None = None) -> int:
     args = ap.parse_args(argv)
 
     path = args.path or default_log_path()
-    if not os.path.isfile(path):
+    if not os.path.exists(path):
         print("log not found: %s" % path, file=sys.stderr)
         return 2
     try:
-        with open(path, "r", encoding="utf-8", errors="replace") as fh:
-            records, bad = parse_events(fh)
-    except OSError as e:
-        print("cannot read %s: %r" % (path, e), file=sys.stderr)
+        records, bad, zip_notes = _load_input(path)
+    except (OSError, ValueError) as e:
+        print("cannot read %s: %s" % (path, e), file=sys.stderr)
         return 2
 
     if args.event:
@@ -202,9 +247,14 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.json:
         print(json.dumps({"path": path, "bad_lines": bad, "summary": summary,
-                          "findings": findings}, ensure_ascii=False, indent=2))
+                          "findings": findings, "zip_notes": zip_notes,
+                          }, ensure_ascii=False, indent=2))
     else:
         print(render_text(summary, records, findings, records))
+        if zip_notes:
+            print("\n-- zip contents --")
+            for n in zip_notes:
+                print(n)
         if bad:
             print("\n(skipped %d unparseable line(s))" % bad)
     return 0

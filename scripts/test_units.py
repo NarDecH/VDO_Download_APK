@@ -677,6 +677,72 @@ def test_analyze_events_cli_missing_file_and_filter() -> bool:
     return True
 
 
+def test_analyze_events_zip_input() -> bool:
+    """v1.9.2: the "share logs"/FileLog diagnostics ZIP (events.jsonl +
+    app.log + downloads.log as the real user attachment on 2026-10-09)
+    must load straight into the analyzer - no manual unzip step."""
+    import contextlib
+    import io
+    import os
+    import tempfile
+    import zipfile as zf
+
+    import analyze_events
+
+    fd, jsonl_path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write('{"ts":1,"event":"download_queued","url":"https://x/a.mp4"}\n')
+        fh.write('{"ts":2,"event":"download_stuck","url":"https://x/a.mp4","age_s":125}\n')
+    fdz, zip_path = tempfile.mkstemp(suffix=".zip")
+    os.close(fdz)
+    try:
+        with zf.ZipFile(zip_path, "w") as z:
+            z.write(jsonl_path, "events.jsonl")
+            z.writestr("app.log", "x\n" * 10)
+            z.writestr("downloads.log", "y\n" * 20)
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = analyze_events.main([zip_path])
+        assert rc == 0, "zip input must analyze cleanly"
+        out = buf.getvalue()
+        assert "download_stuck" in out, "stuck event must appear in the funnel table"
+        assert "app.log: 10 lines" in out and "downloads.log: 20 lines" in out, \
+            "sibling log line counts reported"
+        assert "crash.log: (missing)" in out
+        # findings: the stuck-event lesson must surface
+        assert "download_stuck" in "\n".join(analyze_events.diagnose(
+            analyze_events.summarize(analyze_events.parse_events(
+                open(jsonl_path, encoding="utf-8").readlines())[0]), []))
+    finally:
+        os.remove(jsonl_path)
+        os.remove(zip_path)
+    return True
+
+
+def test_analyze_events_zip_without_events() -> bool:
+    import contextlib
+    import io
+    import zipfile as zf
+    import tempfile
+    import os
+
+    import analyze_events
+
+    fdz, zip_path = tempfile.mkstemp(suffix=".zip")
+    os.close(fdz)
+    try:
+        with zf.ZipFile(zip_path, "w") as z:
+            z.writestr("app.log", "x\n")
+        buf_err = io.StringIO()
+        with contextlib.redirect_stdout(buf_err), contextlib.redirect_stderr(buf_err):
+            rc = analyze_events.main([zip_path])
+        assert rc == 2, "a zip without events.jsonl must exit 2 with a clear reason"
+        assert "no events.jsonl" in buf_err.getvalue()
+    finally:
+        os.remove(zip_path)
+    return True
+
+
 def main() -> int:
     tests = {
         "sieve_request_building": test_sieve_request_building,
@@ -707,6 +773,8 @@ def main() -> int:
         "analyze_events_parse_and_diagnose": test_analyze_events_parsing_and_diagnosis,
         "analyze_events_clean_log": test_analyze_events_clean_log_has_no_known_problem,
         "analyze_events_cli": test_analyze_events_cli_missing_file_and_filter,
+        "analyze_events_zip_input": test_analyze_events_zip_input,
+        "analyze_events_zip_without_events": test_analyze_events_zip_without_events,
     }
     failed = []
     for name, fn in tests.items():
