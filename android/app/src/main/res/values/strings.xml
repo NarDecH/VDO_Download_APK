@@ -20,6 +20,10 @@
     <string name="download_failed">ดาวน์โหลดไม่สำเร็จ: %1$s</string>
     <string name="not_media_rerouted">ลิงก์นี้ไม่ใช่ไฟล์วิดีโอตรง — สลับไปใช้เอนจิน yt-dlp ให้แล้ว รอสักครู่จนดาวน์โหลดเสร็จ</string>
     <string name="blob_unsupported">ลิงก์ blob: ใช้ได้เฉพาะภายในหน้าเว็บ — ใช้ลิงก์วิดีโออื่นในรายการ 🎬 แทน</string>
+    <!-- v1.9.3: one-tap retry for a direct download that was queued but never started -->
+    <string name="stuck_retry_prompt">ดาวน์โหลด %1$s อาจค้าง (ไม่มีความคืบหน้า) — ลองใหม่?</string>
+    <string name="stuck_retry_action">ลองใหม่</string>
+    <string name="stuck_requeued">จัดคิวใหม่แล้ว</string>
     <string name="logs_title">Logs</string>
     <string name="share_logs">แชร์ log (zip)</string>
     <string name="logs_shared_error">แชร์ log ไม่สำเร็จ: %1$s</string>

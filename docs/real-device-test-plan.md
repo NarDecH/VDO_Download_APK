@@ -21,8 +21,14 @@
 - หรือผ่าน adb: `adb pull /data/data/com.vdograbber.app/files/logs/ ./logs/`
 - วิเคราะห์ events.jsonl ด้วยเครื่องมือใหม่ (ฝั่ง desktop):
   `python scripts/analyze_events.py path/to/events.jsonl`
+- **รับไฟล์ zip ที่ได้จาก "แชร์ log (zip)" ได้ตรง ๆ (v1.9.2) ไม่ต้องแตกไฟล์:**
+  `python scripts/analyze_events.py vdograbber-logs-YYYYMMDD-HHMMSS.zip`
+  (อ่าน events.jsonl ข้างใน + รายงานจำนวนบรรทัดของ app.log/downloads.log/crash.log ที่แนบมาด้วย)
 - กรองเฉพาะเหตุการณ์ที่สนใจ:
-  `python scripts/analyze_events.py events.jsonl --event download_no_file --event download_not_media`
+  `python scripts/analyze_events.py events.jsonl --event download_no_file --event download_not_media --event download_stuck`
+- เหตุการณ์ `download_stuck` (v1.9.2+): งานดาวน์โหลดตรงที่จัดคิวแล้วไม่มีการเริ่มทำงานเลย
+  (DownloadManager เงียบหาย) — แอปจะขึ้น Snackbar ถาม "ลองใหม่?" (v1.9.3) และกดลองใหม่ได้ทันที
+  ยืนยันใน log: `download_retry_offer` → (กดลองใหม่) → `download_retry` → `download_queued` อีกครั้ง
 
 ## 2. เคสทดสอบ (เรียงตามบทเรียนจาก field log)
 

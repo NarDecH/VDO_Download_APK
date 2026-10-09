@@ -109,22 +109,37 @@ object Downloader {
      * ACTION_DOWNLOAD_COMPLETE (never starts, silently lost) shows up in
      * the logs ONLY as download_queued with no follow-up event. This
      * "queue-and-vanish" was invisible to the field diagnosis of 2026-10-09
-     * (cdend.com panama888.mp4 x4). Call this from a periodic tick (the
-     * media-sheet progress ticker) with a stale threshold in ms - when a
-     * tracked direct-download job is older than the threshold it is logged
-     * as download_stuck and FORGOTTEN (a later completion for it will be
-     * handled by the plain DownloadManager notification instead).
+     * (cdend.com panama888.mp4 x4). Called from the periodic tick - stale
+     * tracked jobs are selected-and-forgotten by [staleDirectJobs] (v1.9.3:
+     * now JVM-testable, and the caller gets URLs back so the UI can offer a
+     * one-tap retry), logged here as download_stuck once each.
      */
-    fun watchStaleJobs(thresholdMs: Long = 120_000) {
-        val now = System.currentTimeMillis()
-        synchronized(pendingDm) {
-            val stale = pendingDm.entries.filter { now - it.value.third > thresholdMs }
-            for ((_, t) in stale) {
-                FileLog.app("WARN", "dl", "download may be stuck (no status after ${thresholdMs / 1000}s): ${t.first.take(160)}")
-                FileLog.event("download_stuck", mapOf("url" to t.first.take(300), "age_s" to (now - t.third) / 1000))
-            }
-            stale.forEach { pendingDm.remove(it.key) }
+    fun watchStaleJobs(thresholdMs: Long = 120_000): List<Pair<Long, String>> {
+        val stale = staleDirectJobs(thresholdMs)
+        for ((_, title) in stale) {
+            FileLog.app("WARN", "dl", "download may be stuck (no status after ${thresholdMs / 1000}s): $title")
+            FileLog.event("download_stuck", mapOf("title" to title.take(120)))
         }
+        return stale
+    }
+
+    /**
+     * v1.9.3: pure (lock-only, injectable clock) selection+removal of stale
+     * entries - the file URL is needed by the retry UI, so return (id,url).
+     */
+    fun staleDirectJobs(thresholdMs: Long, nowMs: Long = System.currentTimeMillis()): List<Pair<Long, String>> {
+        val out = mutableListOf<Pair<Long, String>>()
+        synchronized(pendingDm) {
+            val it = pendingDm.entries.iterator()
+            while (it.hasNext()) {
+                val e = it.next()
+                if (nowMs - e.value.third > thresholdMs) {
+                    out.add(e.key to e.value.first)
+                    it.remove()
+                }
+            }
+        }
+        return out
     }
 
     /** Test hook: seed the pending map like enqueue() does (E2E).

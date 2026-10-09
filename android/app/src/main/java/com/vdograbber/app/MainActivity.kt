@@ -73,6 +73,9 @@ class MainActivity : AppCompatActivity() {
     // fight the user's taps (renderSheet rebuilds views)
     private var lastDlNoticeMs = 0L
     private var lastDlNoticeOk = false
+    // v1.9.3: one-tap retry offer for stuck direct downloads (debounce)
+    private var lastStuckOfferMs = 0L
+    private var lastStuckOfferUrl = ""
 
     inner class Bridge {
         @JavascriptInterface
@@ -413,13 +416,42 @@ class MainActivity : AppCompatActivity() {
                         }
                         // v1.9.2: direct-download jobs that were enqueued but never
                         // started/completed (the field-log "queued and vanished" fd)
-                        // are named in the logs once, then forgotten
-                        Downloader.watchStaleJobs()
+                        // are named in the logs once, then forgotten...
+                        val stuck = Downloader.watchStaleJobs()
+                        // v1.9.3: ...and the UI offers a one-tap retry per stuck job
+                        for (job in stuck) offerStuckRetry(job.second)
                         updateOpenSheet() // v1.5.0: live rows inside the open sheet
                     }
                 }
             }, 500, 500)
         }
+    }
+
+    /**
+     * v1.9.3: one-tap retry for a direct download that was enqueued but never
+     * started (v1.9.2 watchdog). Shows the Snackbar with a ลองใหม่ action that
+     * re-enqueues through the same guarded path as a normal tap
+     * (tryDownload -> Downloader.enqueue), so a retry respects every routing
+     * rule. Debounced per URL so a Toast burst does not spam the user.
+     */
+    private fun offerStuckRetry(url: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastStuckOfferMs < 5_000 && url == lastStuckOfferUrl) return
+        lastStuckOfferMs = now
+        lastStuckOfferUrl = url
+        FileLog.event("download_retry_offer", mapOf("url" to url.take(300)))
+        val root = window.decorView as? ViewGroup ?: return
+        Snackbar.make(
+            root,
+            getString(R.string.stuck_retry_prompt, Downloader.urlStem(url).take(28)),
+            Snackbar.LENGTH_LONG,
+        )
+            .setAction(R.string.stuck_retry_action) {
+                FileLog.event("download_retry", mapOf("url" to url.take(300)))
+                tryDownload(url, "")
+                Toast.makeText(this, R.string.stuck_requeued, Toast.LENGTH_SHORT).show()
+            }
+            .show()
     }
 
     // ------------------------------------------------------------------ media sheet
