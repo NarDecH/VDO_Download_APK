@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.5] — 2026-10-10
+
+### การเปลี่ยนแปลง
+- Windows app ปรับจาก feedback: ปุ่ม 📋 บนแถบเครื่องมือเปิด URL จากคลิปบอร์ดทันที ไม่ต้องรอกด Enter อีกต่อไป
+
+
 ## [1.9.4] — 2026-10-10
 
 ### การเปลี่ยนแปลง
