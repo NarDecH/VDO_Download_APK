@@ -2,6 +2,13 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.2] — 2026-10-09
+
+### การเปลี่ยนแปลง
+- Android: watchdog จับงานดาวน์โหลดตรงที่จัดคิวแล้วเงียบหาย (download_queued ไม่มีตามเลย) เขียน event download_stuck ให้เห็นใน field log
+- สคริปต์วิเคราะห์ log อ่านไฟล์ zip ของ diagnostics ได้โดยตรงไม่ต้องแตกไฟล์
+
+
 ## [1.9.1] — 2026-10-09
 
 ### การเปลี่ยนแปลง
