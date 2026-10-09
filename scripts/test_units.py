@@ -765,16 +765,21 @@ def test_clipboard_url_rules() -> bool:
 
 
 def test_toolbar_has_clipboard_button_parity() -> bool:
-    """v1.9.4: the in-page toolbar gets a 📋 button (data-act="clip") that
-    calls open_clipboard('peek') and puts the URL in the urlbox - never
-    navigating from the callback (same race rule as back/fwd/reload)."""
+    """v1.9.4.1: the toolbar 📋 button goes STRAIGHT to the clipboard URL
+    (user request: no Enter needed). Navigation still happens in-page
+    (location.href after the peek result - the data-open race rule), never
+    from inside the pywebview callback; the Control Center 📋 keeps its go
+    behavior."""
     sys.path.insert(0, os.path.join(ROOT, "app", "core"))
     import detector
     assert 'data-act="clip"' in detector.TOOLBAR_JS, "clipboard button rendered"
     assert "open_clipboard('peek')" in detector.TOOLBAR_JS, "calls peek mode"
-    assert "urlbox.value = r.url" in detector.TOOLBAR_JS, "fills the urlbox"
-    # navigation happens only through the existing urlbox Enter path
-    assert "location.href" in detector.TOOLBAR_JS
+    # immediate navigation: urlbox filled then location.href, no Enter needed
+    assert "urlbox.value = r.url; location.href = r.url" in detector.TOOLBAR_JS, \
+        "goes immediately - no Enter"
+    # navigation is NOT in the same statement as the pywebview call (race rule)
+    line = next(l for l in detector.TOOLBAR_JS.splitlines() if "location.href = r.url" in l)
+    assert "pyapi().open_clipboard" not in line
     # open_clipboard('go') still navigates for the Control Center
     import main as app_main
     import inspect

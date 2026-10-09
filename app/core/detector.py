@@ -241,7 +241,7 @@ TOOLBAR_JS = r"""
     <button data-act="fwd"   title="Forward">→</button>
     <button data-act="reload" title="Reload">⟳</button>
     <div class="urlbox"><input spellcheck="false" placeholder="ป้อน URL แล้วกด Enter"></div>
-    <button data-act="clip" title="Put the clipboard URL into the address box (Enter to go)">📋</button>
+    <button data-act="clip" title="Go straight to the URL on the clipboard">📋</button>
     <button data-act="detect" title="Scan this page for videos">🔍 ตรวจหาวิดีโอ</button>
     <button data-act="panel"  title="Videos found">🎬 วิดีโอ <span class="badge">0</span></button>
     <button data-act="ctrl"   title="Downloads / Logs / Settings">⚙️</button>
@@ -272,14 +272,13 @@ TOOLBAR_JS = r"""
     // it never races the pywebview return-value callback like back/fwd/reload
     if (act === 'clip') {
       if (!pyapi()) return;
+      // v1.9.4.1 (user request): go IMMEDIATELY, no Enter needed. Navigation
+      // happens in-page after the peek result returns (same location.href
+      // pattern as data-open), never inside the pywebview callback itself.
       badge.textContent = '...';
       pyapi().open_clipboard('peek').then(function (r) {
-        if (r && r.ok) {
-          urlbox.value = r.url; urlbox.focus();
-          badge.textContent = '📋 ok - กด Enter';
-        } else {
-          badge.textContent = '📋 ' + ((r && r.error) || 'ไม่ทราบสาเหตุ').slice(0, 16);
-        }
+        if (r && r.ok) { urlbox.value = r.url; location.href = r.url; return; }
+        badge.textContent = '📋 ' + ((r && r.error) || 'ไม่ทราบสาเหตุ').slice(0, 16);
         window.setTimeout(function () { badge.textContent = ''; }, 2500);
       });
       return;
