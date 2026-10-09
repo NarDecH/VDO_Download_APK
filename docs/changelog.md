@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.1] — 2026-10-09
+
+### การเปลี่ยนแปลง
+- Android: แก้แท็บไฟล์ที่ดาวน์โหลดแล้วในชีต 🎬 ว่างเปล่าเพราะ COLUMN_LOCAL_FILENAME โดน SecurityException — อ่านผ่าน COLUMN_LOCAL_URI แทน และกันให้แถวเดียวพังไม่ล้มทั้งลิสต์ (วิเคราะห์จาก field logs ผู้ใช้)
+
+
 ## [1.9.0] — 2026-10-08
 
 ### การเปลี่ยนแปลง
