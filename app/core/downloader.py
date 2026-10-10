@@ -496,9 +496,14 @@ class DownloadManager:
                 if cand and cand != job.url:
                     self.log.log("unsupported URL #%s -> retrying with %s" % (job.id, cand[:120]),
                                  event="download_fallback", id=job.id, from_url=job.url, to_url=cand)
+                    # v1.9.7 UX: while the fallback retry is in flight, the job
+                    # leaves "error" - the user never sees a dead-looking red
+                    # badge for a download that is about to succeed
+                    # (field log: both real sessions showed error, then done).
+                    job.status = "fallback"
+                    job.error = ""
                     self.push_ui("download_update", job.public())
                     job.url = cand
-                    job.error = ""
                     # the fallback stream is a bare manifest - name it after
                     # the page the user actually wanted (v1.1.2 case)
                     if not job.title_base:
@@ -569,8 +574,13 @@ class DownloadManager:
             if cand and cand != job.url:
                 self.log.log("not-media payload #%s -> retrying with %s" % (job.id, cand[:120]),
                              event="download_fallback", id=job.id, from_url=job.url, to_url=cand)
-                job.url = cand
+                # v1.9.7 UX: same as the "Unsupported URL" path - show the
+                # user "กำลังลองแหล่งอื่น" instead of an error right before
+                # the retry that usually succeeds
+                job.status = "fallback"
                 job.error = ""
+                self.push_ui("download_update", job.public())
+                job.url = cand
                 job.status = "queued"
                 if not job.title_base:
                     job.title_base = job.title

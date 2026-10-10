@@ -33,6 +33,7 @@ td{padding:7px 8px;border-bottom:1px solid #1a2340;vertical-align:top}
 .badge{display:inline-block;padding:1px 9px;border-radius:9px;font-size:11px;font-weight:700}
 .st-running{background:#164e63;color:#67e8f9}.st-done{background:#14532d;color:#86efac}
 .st-error{background:#7f1d1d;color:#fca5a5}.st-queued{background:#3f3f46;color:#d4d4d8}
+.st-fallback{background:#78350f;color:#fcd34d} /* v1.9.7: กำลังลองแหล่งอื่น */
 .st-canceled{background:#3f3f46;color:#a1a1aa}.st-merging{background:#78350f;color:#fcd34d}
 .st-paused{background:#4a3208;color:#fcd34d}
 .bar{height:7px;background:#0b1120;border-radius:4px;overflow:hidden;margin-top:5px;border:1px solid #1c2748}
@@ -273,7 +274,7 @@ function openInBrowser(url){ py().navigate(url); status('เปิดหน้�
 
 function renderDownloads(list){
   state.downloads = list;
-  const act = list.filter(j=>['running','queued','merging'].includes(j.status)).length;
+  const act = list.filter(j=>['running','queued','merging','fallback'].includes(j.status)).length;
   const done = list.filter(j=>j.status==='done').length;
   document.getElementById('stActive').childNodes[0].nodeValue = act;
   document.getElementById('stDone').childNodes[0].nodeValue = done;
@@ -284,7 +285,7 @@ function renderDownloads(list){
   <div class="card">
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
       <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(j.title || j.url.slice(0,80))}</b>
-      <span class="badge st-${j.status}">${j.status}</span>
+      <span class="badge st-${j.status}">${j.status==='fallback'?'ลองแหล่งอื่น…':j.status}</span>
     </div>
     <div class="url">${esc(j.url)}</div>
     <div class="bar"><i style="width:${j.percent||0}%"></i></div>
@@ -295,7 +296,7 @@ function renderDownloads(list){
         :(j.title_base?`<span class="pill" title="ตั้งชื่อจากหน้าเว็บ">ชื่อไฟล์: ${esc(j.title_base)}.${esc(j.ext||'mp4')}</span>`:'')}${j.error?`<span style="color:var(--red)" title="${esc(j.error.slice(0,300))}">${esc(friendlyError(j.error))}</span>`:''}
       ${/Unsupported URL/i.test(j.error||'')?`<button class="act" style="padding:2px 10px" onclick="openInBrowser('${esc(j.url)}')">🌐 เปิดหน้านี้ในเบราว์เซอร์</button>`:''}
       <span style="flex:1"></span>
-      ${['running','queued','merging'].includes(j.status)?`<button class="act" style="padding:3px 10px" onclick="pause('${j.id}')">⏸ พัก</button>
+      ${['running','queued','merging','fallback'].includes(j.status)?`<button class="act" style="padding:3px 10px" onclick="pause('${j.id}')">⏸ พัก</button>
       <button class="act red" style="padding:3px 10px" onclick="cancel('${j.id}')">ยกเลิก</button>`:''}
       ${j.status==='paused'?`<button class="act" style="padding:3px 10px" onclick="resume('${j.id}')">▶ ดาวน์โหลดต่อ</button>`:''}
       ${j.status==='done'?`<button class="act" style="padding:3px 10px" onclick="py().download_open_file('${j.id}')">เปิดไฟล์</button>
@@ -375,7 +376,7 @@ async function openFromClipboard(){
     }
   } catch(e){ status('เปิดจากคลิปบอร์ดไม่ได้: ' + e); }
 }
-function isLive(j){ return ['running','queued','merging'].includes(j.status); }
+function isLive(j){ return ['running','queued','merging','fallback'].includes(j.status); }
 // pywebview swallows window.confirm/alert, so use a small in-page dialog
 function confirmBox(msg, onYes){
   const ov = document.createElement('div');
