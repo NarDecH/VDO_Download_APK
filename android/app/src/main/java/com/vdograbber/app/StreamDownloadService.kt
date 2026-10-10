@@ -236,7 +236,12 @@ class StreamDownloadService : Service() {
                 notifyMainActivity(true, published?.first ?: file.name)
             } else {
                 val cause = StreamArgs.ytDlpErrorLine(errorMsg)
-                FileLog.event("download_error", mapOf("url" to url, "engine" to "ytdl-android", "error" to errorMsg.take(200)))
+                // v1.9.9 (desktop parity): keep a parsed reason alongside the
+                // raw error - comparable across sessions (app/core/
+                // downloader.py download_error_line reason field)
+                FileLog.event("download_error", mapOf(
+                    "url" to url, "engine" to "ytdl-android",
+                    "error" to errorMsg.take(200), "reason" to cause))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
                 finishNotification(false, cause)
                 notifyMainActivity(false, "")

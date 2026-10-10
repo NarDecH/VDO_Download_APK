@@ -63,12 +63,28 @@ object FileLog {
         write("downloads.log", "${ts.format(Date())}: $msg")
     }
 
+    /** v1.9.9 (desktop parity - app/core/logger.py set_event_origin): tag
+     * every structured event with its origin so analyze_events.py can split
+     * real-user stats from selftest noise. "app" outside the selftest. */
+    @Volatile
+    var eventOrigin: String = "app"
+
     fun event(type: String, data: Map<String, Any?> = emptyMap()) {
+        write("events.jsonl", buildEvent(type, data).toString(), rotate = false)
+    }
+
+    /** Test hook (JVM tests cannot read filesDir): return the exact record
+     * event() would append, without touching the disk. */
+    fun captureEvent(type: String, data: Map<String, Any?> = emptyMap()): JSONObject =
+        buildEvent(type, data)
+
+    private fun buildEvent(type: String, data: Map<String, Any?>): JSONObject {
         val rec = JSONObject()
         rec.put("ts", System.currentTimeMillis() / 1000.0)
         rec.put("event", type)
+        if (!rec.has("origin")) rec.put("origin", eventOrigin)
         for ((k, v) in data) rec.put(k, v ?: JSONObject.NULL)
-        write("events.jsonl", rec.toString(), rotate = false)
+        return rec
     }
 
     fun tail(name: String, lines: Int = 300): String = try {

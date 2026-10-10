@@ -58,6 +58,10 @@ dependencies {
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
     testImplementation("junit:junit:4.13.2")
+    // v1.9.9: the real org.json classes for JVM tests - the android.jar stub
+    // throws "not mocked" (TelemetryParityTest needs JSONObject/put/get for
+    // the origin-tag parity checks)
+    testImplementation("org.json:json:20240303")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
 }
