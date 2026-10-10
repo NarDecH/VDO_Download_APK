@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.9] — 2026-10-10
+
+### การเปลี่ยนแปลง
+- Android telemetry parity: origin tag + parsed download_error reason (เสมอกับ desktop v1.9.8) + TelemetryParityTest 5 ตัว
+
+
 ## [1.9.8] — 2026-10-10
 
 ### การเปลี่ยนแปลง
