@@ -7,10 +7,17 @@ updates:
       interval: "weekly"
 
   # Android (junit, androidx.*, material)
+  # gradle-wrapper is EXCLUDED: AGP 8.x uses a Gradle internal API that was
+  # removed in Gradle 9.6 - the wrapper must stay on 9.5.1 until the AGP
+  # upgrade lands (PR #14 CI failure, closed 2026-10-10). Re-enable when
+  # android/app/build.gradle.kts moves to an AGP that supports Gradle 9.6+.
   - package-ecosystem: "gradle"
     directory: "/android"
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "gradle-wrapper"
+        versions: [">= 9.6"]
 
   # GitHub Actions themselves (checkout, setup-python, setup-java, ...)
   - package-ecosystem: "github-actions"
