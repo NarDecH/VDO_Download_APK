@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.7] — 2026-10-10
+
+### การเปลี่ยนแปลง
+- fallback retry: UX ใหม่ - ระหว่างลอง fallback แสดง badge 'lองแหล่งอื่น' แทน error สีแดง (จาก field log จริง 2 session)
+
+
 ## [1.9.6] — 2026-10-10
 
 ### การเปลี่ยนแปลง
