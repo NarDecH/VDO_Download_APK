@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.8] — 2026-10-10
+
+### การเปลี่ยนแปลง
+- telemetry: แยก selftest ออกจากสถิติผู้ใช้จริง (origin tag) + เก็บ reason ของ download_error_line + ทดสอบ fallback ข้าม 6 patterns
+
+
 ## [1.9.7] — 2026-10-10
 
 ### การเปลี่ยนแปลง
