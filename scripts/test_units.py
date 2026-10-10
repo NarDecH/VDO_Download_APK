@@ -13,6 +13,7 @@ cannot be imported from Python; the desktop side is the reference test.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -174,6 +175,42 @@ def test_page_fallback_scanner() -> bool:
     # nothing to find -> both None
     assert not DownloadManager._MEDIA_IN_HTML_RE.search("<p>hello</p>")
     assert not DownloadManager._IFRAME_RE.search("<p>hello</p>")
+    return True
+
+
+def test_page_fallback_site_patterns() -> bool:
+    """v1.9.8: the fallback must not be tuned to one site (field-log bias:
+    both real sessions were the same player page). Real-world wrappers seen
+    across free stream sites, one pattern per case:"""
+    from core.downloader import DownloadManager
+
+    # 1) direct link inside a <source> tag (WordPress-style players)
+    m = DownloadManager._MEDIA_IN_HTML_RE.search(
+        '<video><source src="https://cd1.site.cn/video/uax/uf9-1080.mp4" type="video/mp4"></video>')
+    assert m and m.group(0) == "https://cd1.site.cn/video/uax/uf9-1080.mp4"
+
+    # 2) JW Player setup JSON blob
+    m = DownloadManager._MEDIA_IN_HTML_RE.search(
+        'jwplayer("box").setup({file: "https://cdn.jwpsrv/x/playlist.m3u8", title: "x"})')
+    assert m and m.group(0) == "https://cdn.jwpsrv/x/playlist.m3u8"
+
+    # 3) HLS in a JS variable with single quotes + params
+    m = DownloadManager._MEDIA_IN_HTML_RE.search(
+        "const src='https://live.tv/hls/master.m3u8?wmsAuthSign=abc==';")
+    assert m and m.group(0) == "https://live.tv/hls/master.m3u8?wmsAuthSign=abc=="
+
+    # 4) iframe embed with quoted relative URL (resolved upstream by urljoin)
+    m = DownloadManager._IFRAME_RE.search("<EMBED data='https://x/e/1'></EMBED>")
+    assert m and m.group(1) == "https://x/e/1"
+
+    # 5) mpd via double-quoted iframe + iframe fallback ordering
+    iframe_html = '<iframe src="https://xd.site/embed/QP2?autoplay=1"></iframe>'
+    m = DownloadManager._IFRAME_RE.search(iframe_html)
+    assert m and m.group(1) == "https://xd.site/embed/QP2?autoplay=1"
+
+    # 6) nothing: decoy .jpg / .css / .png must NOT match media regex
+    noise = '<img src="https://x/pic.jpg"><link href="https://x/a.css">'
+    assert not DownloadManager._MEDIA_IN_HTML_RE.search(noise)
     return True
 
 
@@ -644,6 +681,64 @@ def test_analyze_events_clean_log_has_no_known_problem() -> bool:
     return True
 
 
+def test_analyze_events_origin_split_and_filter() -> bool:
+    """v1.9.8: selftest vs real-user split - origin tag on events + the
+    --origin CLI filter (legacy rows without the field count as app)."""
+    import analyze_events
+
+    records, bad = analyze_events.parse_events(
+        ['{"ts":1,"event":"media_found","origin":"selftest","url":"http://127.0.0.1/x.mp4"}',
+         '{"ts":2,"event":"media_found","origin":"app","url":"https://x/a.mp4"}',
+         '{"ts":3,"event":"download_done","url":"https://x/a.mp4"}'])
+    assert bad == 0
+    s = analyze_events.summarize(records)
+    assert s["origins"] == {"selftest": 1, "app": 1, "app (legacy)": 1}, s["origins"]
+
+    # --origin app also keeps legacy rows; --origin selftest keeps only tagged
+    import contextlib
+    import io
+    import os
+    import tempfile
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(json.dumps(r) for r in records) + "\n")
+    try:
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = analyze_events.main([path, "--origin", "app", "--json"])
+        assert rc == 0
+        got = json.loads(buf.getvalue())
+        assert got["summary"]["counts"]["media_found"] == 1
+        assert got["summary"]["counts"].get("download_done") == 1
+        assert "selftest" not in got["summary"]["origins"], "--origin app excludes selftest"
+    finally:
+        os.remove(path)
+    return True
+
+
+def test_eventlog_origin_tagging() -> bool:
+    """v1.9.8: EventLog stamps every record with the global origin and
+    set_event_origin() flips it (selftest path)."""
+    import core.logger as lg
+
+    assert lg._event_origin == "app"
+    fd, path = tempfile.mkstemp(suffix=".jsonl")
+    os.close(fd)
+    try:
+        ev = lg.EventLog(path)
+        ev.write("media_found", url="https://x/a.mp4")
+        lg.set_event_origin("selftest")
+        ev.write("media_found", url="http://127.0.0.1:1/a.mp4")
+        rows = [json.loads(l) for l in open(path, encoding="utf-8") if l.strip()]
+        assert len(rows) == 2
+        assert rows[0]["origin"] == "app" and rows[1]["origin"] == "selftest"
+        assert rows[1]["event"] == "media_found"
+    finally:
+        os.remove(path)
+    return True
+
+
+
 def test_analyze_events_cli_missing_file_and_filter() -> bool:
     import contextlib
     import io
@@ -819,6 +914,9 @@ def main() -> int:
         "analyze_events_parse_and_diagnose": test_analyze_events_parsing_and_diagnosis,
         "analyze_events_clean_log": test_analyze_events_clean_log_has_no_known_problem,
         "analyze_events_cli": test_analyze_events_cli_missing_file_and_filter,
+        "page_fallback_site_patterns": test_page_fallback_site_patterns,
+        "analyze_events_origin": test_analyze_events_origin_split_and_filter,
+        "eventlog_origin_tagging": test_eventlog_origin_tagging,
         "analyze_events_zip_input": test_analyze_events_zip_input,
         "analyze_events_zip_without_events": test_analyze_events_zip_without_events,
         "clipboard_url_rules": test_clipboard_url_rules,

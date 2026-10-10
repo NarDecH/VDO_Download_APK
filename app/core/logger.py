@@ -25,6 +25,18 @@ APP_VERSION = "1.9.7"
 
 _levels = {"DEBUG": logging.DEBUG, "INFO": logging.INFO, "WARNING": logging.WARNING, "ERROR": logging.ERROR}
 
+# v1.9.8: one global event origin ("app" by default). The selftest sets
+# this to "selftest" during its run so every event it provokes (media_found
+# from the test page, download queues, toolbar probes...) gets tagged -
+# analyze_events.py can then report the real-user funnel without the
+# selftest noise (26% of media_found rows were selftest).
+_event_origin = "app"
+
+
+def set_event_origin(origin: str) -> None:
+    global _event_origin
+    _event_origin = origin
+
 
 class EventLog:
     """Structured JSONL event stream (events.jsonl)."""
@@ -45,7 +57,7 @@ class EventLog:
             "session": self.session_id,
             "event": event_type,
         }
-        rec.update(data)
+        rec.update({"origin": _event_origin, **data})
         # defense in depth: credentials must never reach disk, even via a
         # stray kwarg (v1.2.2 exclusion cloud sync; v1.3.0 Sieve key)
         for key in ("token", "github_pat", "authorization", "api_key", "sieve_api_key", "bearer"):

@@ -29,7 +29,7 @@ import webview  # noqa: E402
 
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager, is_usable_download_url  # noqa: E402
-from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir  # noqa: E402
+from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir, set_event_origin  # noqa: E402
 from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
 from core.sieve import DEVICE_CLIENT_NAME, SieveError, SieveManager, device_login  # noqa: E402
 from core.ytdlp_mgr import EngineManager  # noqa: E402
@@ -791,6 +791,10 @@ class App:
 def selftest() -> int:
     """Headless smoke test: detection JS + real download via yt-dlp + delete-file API."""
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    # v1.9.8: tag every event this run provokes as origin="selftest" so
+    # analyze_events.py can split real-user stats from selftest noise
+    set_event_origin("selftest")
 
     app = App()
     results = {}

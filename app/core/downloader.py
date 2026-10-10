@@ -634,7 +634,12 @@ class DownloadManager:
             return
         if line.startswith("ERROR:"):
             job.error = line
-            self.log.log("yt-dlp error line: %s" % line, level="error", event="download_error_line", id=job.id)
+            # v1.9.8: keep a parsed reason on the event too - reason codes are
+            # comparable across sessions ("Unsupported URL", geo-block, 403,
+            # DRM...) while the raw line is free text
+            reason = line[len("ERROR:"):].strip()
+            self.log.log("yt-dlp error line: %s" % line, level="error",
+                         event="download_error_line", id=job.id, reason=reason[:200])
         elif "[download] 100%" in line and job.total == 0:
             job.percent = 100.0
 

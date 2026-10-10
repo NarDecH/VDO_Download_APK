@@ -130,6 +130,13 @@ def summarize(records: list[dict]) -> dict:
     for rec in records:
         counts[str(rec.get("event") or "?")] = counts.get(str(rec.get("event") or "?"), 0) + 1
 
+    # v1.9.8: selftest vs real-user split - selftest now tags its events
+    # origin="selftest"; old logs have no origin field at all.
+    origins: dict[str, int] = {}
+    for rec in records:
+        origins[str(rec.get("origin") or "app (legacy)")] = \
+            origins.get(str(rec.get("origin") or "app (legacy)"), 0) + 1
+
     blob_urls = sorted({_url(r) for r in records if _url(r).startswith("blob:")})
     engine_ready = [r for r in records if r.get("event") == "engine_ready"]
     engine_version = engine_ready[-1].get("version") if engine_ready else None
@@ -137,6 +144,7 @@ def summarize(records: list[dict]) -> dict:
     return {
         "total": len(records),
         "counts": counts,
+        "origins": origins,
         "blob_urls": blob_urls,
         "engine_ready_seen": bool(engine_ready),
         "engine_version": engine_version,
@@ -191,6 +199,10 @@ def render_text(summary: dict, records: list[dict], findings: list[str],
     lines.append("=== events.jsonl summary ===")
     lines.append("records: %d   span: %s .. %s"
                  % (summary["total"], _fmt_ts(summary["first_ts"]), _fmt_ts(summary["last_ts"])))
+    origins = summary.get("origins") or {}
+    if set(origins) - {"app", "app (legacy)"}:
+        lines.append("origin: " + "   ".join("%s=%d" % (k, v) for k, v in sorted(origins.items()))
+                     + "   (ใช้ --origin selftest เพื่อกรอง)")
     lines.append("")
     lines.append("-- events (funnel order) --")
     for ev in KNOWN_EVENTS + sorted(set(counts) - set(KNOWN_EVENTS)):
@@ -227,6 +239,9 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Analyze VDO Grabber events.jsonl")
     ap.add_argument("path", nargs="?", default=None, help="events.jsonl path (default: desktop log)")
     ap.add_argument("--event", action="append", default=[], help="show only this event (repeatable)")
+    ap.add_argument("--origin", action="append", default=[],
+                    help="show only records with this origin (repeatable; selftest logs "
+                         "carry origin=selftest since v1.9.8, legacy app events default to app)")
     ap.add_argument("--json", action="store_true", help="machine-readable output")
     args = ap.parse_args(argv)
 
@@ -242,6 +257,11 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.event:
         records = [r for r in records if r.get("event") in set(args.event)]
+    if args.origin:
+        wanted = set(args.origin)
+        if "app" in wanted:
+            wanted.add("app (legacy)")  # pre-v1.9.8 logs have no origin field
+        records = [r for r in records if str(r.get("origin") or "app (legacy)") in wanted]
     summary = summarize(records)
     findings = diagnose(summary, records)
 
