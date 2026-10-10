@@ -61,7 +61,7 @@ dependencies {
     // v1.9.9: the real org.json classes for JVM tests - the android.jar stub
     // throws "not mocked" (TelemetryParityTest needs JSONObject/put/get for
     // the origin-tag parity checks)
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
     androidTestImplementation("androidx.test.ext:junit:1.3.0")
     androidTestImplementation("androidx.test:runner:1.7.0")
 }
