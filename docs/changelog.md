@@ -2,6 +2,15 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.10] — 2026-10-11
+
+### อัปเดต dependencies (Dependabot sweep)
+- Android Gradle deps: material 1.13.0→1.14.0, junit 4.13.2→5.13/1.3.0 line, org.json 20240303→20260814 (JVM 72/72 ผ่าน + CI emulator E2E เขียวบน main)
+- CI: actions/checkout v7, setup-java v6, gradle/actions/setup-gradle v6, upload-artifact v7, cache v6, ubuntu-24.04 pinned (หมายเหตุ migration 2026-10-19)
+- Windows/dependabot config: จัดกลุ่ม minor/patch, กำหนด schedule monthly
+- PR ถูกปิด: youtubedl-android 0.18.1 (รวม yt-dlp เก่ากว่า 90 วัน — engine guard บล็อก, ยังใช้ 0.17.3)
+
+
 ## [1.9.9] — 2026-10-10
 
 ### การเปลี่ยนแปลง
