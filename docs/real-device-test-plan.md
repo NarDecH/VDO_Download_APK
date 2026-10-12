@@ -1,4 +1,7 @@
-# แผนทดสอบบนเครื่องจริง — v1.3.6 (ต่อยอดจาก field log ของ v1.3.4/1.3.5)
+# แผนทดสอบบนเครื่องจริง — v1.9.10 (ต่อยอดจาก field log ของ v1.3.4/1.3.5)
+
+> v1.9.10: bump Android deps (material 1.14.0, junit 1.3.0, org.json 20260814) + CI actions —
+> เอนจินยังเป็น youtubedl-android 0.17.3 เหมือนเดิม (PR 0.18.1 ถูกปิดเพราะ engine guard) จึงเน้น regression UI + เคสเดิมทั้งหมด
 
 > ที่มา: log จริงจากผู้ใช้ (Android 16, 23113RKC6G) — 3 ปัญหาคือ engine `done: null`,
 > WebView `[sniff] intercept failed` spam และ blob: หลุดเข้าเอนจิน
@@ -6,9 +9,9 @@
 
 ## 0. เตรียมเครื่อง
 
-1. ติดตั้ง APK จาก release (แนะนำ `VDOGrabber-1.3.6-android-arm64.apk`; universal ก็ได้)
-   จากหน้า [Downloads](../index.html) หรือ GitHub Releases
-2. ยืนยันเวอร์ชัน: ตั้งค่า → แอป → VDO Grabber → เวอร์ชัน 1.3.6 (versionCode 19)
+1. ติดตั้ง APK จาก release (แนะนำ `VDOGrabber-1.9.10-android-arm64.apk`; universal ก็ได้)
+   จากหน้า [Downloads](../index.html) หรือ GitHub Releases และตรวจ sha256 กับ `checksums.txt` ก่อนติดตั้ง
+2. ยืนยันเวอร์ชัน: ตั้งค่า → แอป → VDO Grabber → เวอร์ชัน 1.9.10 (versionCode 36)
 3. เปิดแอปครั้งแรกแล้วรอ "yt-dlp ready" (log เหตุการณ์ `engine_ready`)
 
 ## 1. เก็บ log กลับมาวิเคราะห์
@@ -66,6 +69,12 @@
 1. เปิดหน้าเสิร์ฟโฆษณาหนัก ๆ / เปลี่ยนหน้าบ่อย ๆ 30 วินาที
 2. คาดหวัง: **ไม่มี** spam `[sniff] intercept failed: A WebView method was called on
    thread 'ThreadPoolForeg'` ใน app.log (แก้ด้วยการย้ายการอ่าน title/url ขึ้น main thread)
+
+### เคส G — regression จาก dep bump (v1.9.10 เฉพาะ)
+1. เปิดแชต 🎬 → สลับแท็บ (กำลังดาวน์โหลด / ไฟล์ที่ดาวน์โหลดแล้ว / ประวัติ) และปุ่ม Logs ⚙ + Engine 📝
+2. คาดหวัง: theme/ปุ่ม/Dialog ของ Material 1.14.0 แสดงถูกต้อง ไม่มี UI แตกหรือฟอนต์หาย
+3. เปิดหน้าที่มีวิดีโอเล่นปกติ 1 หน้า → กด 🎬 → ยืนยัน `media_found` มาใน events.jsonl (parity เดิม)
+4. ยืนยันใน log: `engine_ready` ยังมาถึง (bundled engine ยังเป็น 0.17.3)
 
 ## 3. เกณฑ์ผ่านทั้งชุด
 
