@@ -1,6 +1,16 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.11] — 2026-10-12
+
+### การเปลี่ยนแปลง
+- **probe-first fallback (Windows desktop, จาก funnel จริง):** งานที่ URL หน้าตา player (.html/.php/.aspx, /player) ถูกสแกนหาสตรีมจริงใน worker thread ก่อนเรียกเอนจิน — เจอ candidate (.mpd/.m3u8) ก็โหลดมันตรง ไม่พาด "Unsupported URL" ไม่เสีย engine-run เปล่า (field log: 10/10 error ที่ผ่านมาเป็น player.html → output.mpd ทุกตัว recovery ด้วย fallback เดิม)
+- ถ้าหน้าซ่อนสตรีมไว้ไม่เจอ → เอนจินลอง URL ต้นฉบับตามเดิม (fallback เดิมยังเฝ้าหลังบ้านอยู่ครบ)
+- docs/real-device-test-plan.md: เพิ่มเคส G (regression จาก dep bump v1.9.10) + ตรวจ sha256 ก่อนติดตั้ง
+- ยืนยันแล้ว: test_units 35/35, selftest desktop PASS (exit 0)
+
+### รอรอบถัดไป (ยังไม่รวมในรุ่นนี้)
+- Android parity ของ probe-first — log ที่เก็บได้วันนี้เป็นของฝั่ง desktop จึงยังไม่เปลี่ยนพฤติกรรมฝั่ง Android
+
 
 ## [1.9.10] — 2026-10-11
 

@@ -133,6 +133,38 @@ class DownloadManager:
             return title
         return ""
 
+    # v1.9.11 funnel insight (field log, all sessions):
+    # 10/10 "Unsupported URL" errors were the same pattern - a player page
+    # URL downloaded directly, yt-dlp fails, then the page fallback re-routes
+    # to the real manifest and succeeds (merrylion2: player.html -> output.mpd,
+    # 3/3 done after ~90s of wasted engine time). Probe-first: queue the job
+    # against the manifest candidate straight away and keep the original page
+    # URL as the repair target, so the user never sees the red "Unsupported
+    # URL" flash or pays the wasted engine run.
+    @staticmethod
+    def _fallback_worthy_url(url: str) -> bool:
+        """True for URLs that are known to make yt-dlp fail and be re-routed
+        by the page fallback (HTML player/bar pages). Manifests, direct media
+        and blob: links are excluded - blob: is rejected earlier with its own
+        message, and a manifest/media URL would be harmed by a scan."""
+        u = str(url or "").lower()
+        path = u.split("?", 1)[0].split("#", 1)[0]
+        if path.endswith((".html", ".htm", ".php", ".aspx")) or "/player" in path:
+            return True
+        return False
+
+    def _pre_probe_candidate(self, job: Job) -> str | None:
+        """If the queued URL looks like a player page, scan the HTML once and
+        return the candidate stream URL (or None when the page hides none -
+        the engine then tries the original URL as before)."""
+        try:
+            return self._page_fallback(job)
+        except Exception as e:
+            self.log.log("pre-probe failed on %s: %r" % (job.url[:120], e),
+                         level="debug", event="download_preprobe_error",
+                         id=job.id, url=job.url, error=repr(e))
+            return None
+
     def start(self, url: str, **kw) -> Job:
         # Sniff the source extension, then decide the filename stem (above).
         if not kw.get("ext"):
@@ -142,12 +174,22 @@ class DownloadManager:
             url, str(kw.get("kind") or "media"), str(kw.get("ext") or ""),
             str(kw.get("title") or ""), str(kw.get("title_base") or ""))
         job = Job(url, out_dir=kw.pop("out_dir", "") or self.settings.get("download_dir"), **kw)
+        # v1.9.11 probe-first re-route: remember the page the user actually
+        # clicked so the existing fallback repair can bring it back
+        if not job.page_url and job.url != job.page_url:
+            job.page_url = job.url
+        os.makedirs(job.out_dir, exist_ok=True)
         os.makedirs(job.out_dir, exist_ok=True)
         with self._lock:
             self.jobs[job.id] = job
         self.log.log("download queued: %s (kind=%s fmt=%s)" % (url, job.kind, job.format_id or "auto"),
                      event="download_queued", id=job.id, url=url, kind=job.kind, format_id=job.format_id,
                      title=job.title, page_title=job.page_title, title_base=job.title_base)
+
+        # NOTE: the v1.9.11 probe-first re-route runs in the worker thread
+        # (_run, below) - never here: start() is called from the pywebview
+        # Api thread and the page scan can block up to 20s.
+
         threading.Thread(target=self._run, args=(job,), name=f"dl-{job.id}", daemon=True).start()
         return job
 
@@ -350,6 +392,30 @@ class DownloadManager:
 
     # ----------------------------------------------------------------- core
     def _run(self, job: Job) -> None:
+        # v1.9.11 probe-first: a known player-page URL is scanned once here,
+        # in the worker thread (network fetch up to 20s), and the job goes
+        # straight to the real stream candidate - the user never sees the
+        # "Unsupported URL" error flash or pays a wasted engine run
+        # (field-log funnel: 10/10 errors were this same player.html pattern,
+        # every one recovered by the post-error fallback).
+        if self._fallback_worthy_url(job.url):
+            cand = self._pre_probe_candidate(job)
+            if cand and cand != job.url and is_usable_download_url(cand):
+                self.log.log("pre-probe re-route #%s: %s -> %s" % (job.id, job.url[:120], cand[:120]),
+                             event="download_preprobe_reroute", id=job.id,
+                             from_url=job.url, to_url=cand)
+                job.url = cand
+                job.ext = ""  # re-sniff on the new URL
+                m = MEDIA_EXT_RE.search(cand)
+                if m:
+                    job.ext = m.group(1).lower()
+                low = cand.lower().split("?", 1)[0]
+                if low.endswith((".m3u8", ".mpd")):
+                    job.kind = "hls" if low.endswith(".m3u8") else "dash"
+                else:
+                    job.kind = "media" if m else "page"
+                if not job.title_base:
+                    job.title_base = job.title
         with self._sem:
             if job.status == "canceled":
                 return
