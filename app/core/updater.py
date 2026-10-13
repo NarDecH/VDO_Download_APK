@@ -224,16 +224,27 @@ class Updater:
         return {"ok": True, "version": self.remote_version}
 
     def _spawn_swap(self, exe_path: str) -> str:
-        """Write the .bat that waits for us to exit and swaps the exe
-        (Windows cannot overwrite a running exe)."""
+        """Write the .bat that swaps the exe and restarts it.
+
+        v1.9.14 (E2E field finding, v1.9.12->1.9.13 flow): copy-over-the-
+        running-exe raced the dying bootloader's extraction-cache cleanup -
+        the restarted instance showed "Failed to load Python DLL ...\_MEI*
+        because the freshly killed process tree still owned the seed.
+        Rename the running exe out of the way INSTEAD (Windows allows this
+        even for a live exe), copy the new file into the freed slot, then
+        start it and sweep the .old tombstone.
+        """
         bat = os.path.join(self._updates_dir(), "apply_update.bat")
         me = self._exe_path()
         with open(bat, "w", encoding="ascii", errors="replace") as fh:
             fh.write("@echo off\r\n")
-            fh.write("ping -n 3 127.0.0.1 >nul\r\n")   # wait ~2s for exit
+            fh.write("ping -n 3 127.0.0.1 >nul\r\n")          # brief settle
+            fh.write('move /y "%s" "%s.old" >nul\r\n' % (me, me))
             fh.write('copy /y "%s" "%s" >nul\r\n' % (exe_path, me))
-            fh.write('if errorlevel 1 exit /b 1\r\n')
+            fh.write("if errorlevel 1 exit /b 1\r\n")
             fh.write('start "" "%s"\r\n' % me)
+            fh.write("ping -n 6 127.0.0.1 >nul\r\n")          # let old die
+            fh.write('del "%s.old" >nul 2>&1\r\n' % me)
         self.log.log("update swap script: %s" % bat, event="update_apply_script", path=bat)
         return bat
 

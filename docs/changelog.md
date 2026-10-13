@@ -1,6 +1,13 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.13] — 2026-10-13
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.14] — 2026-10-13
+
+### การแก้ (จากการทดสอบ flow จริง)
+- **แก้บั๊ก restart หลังอัปเดต:** 1.9.12→1.9.13 ทดสอบจริงพบว่า .bat ที่ copy ทับ exe ที่กำลังรันแล้ว start ใหม่ทันที ชนกับ cleanup ของ bootloader ตัวเก่า ทำให้รุ่นใหม่เด้ง "Failed to load Python DLL ..._MEI*" — เปลี่ยนเป็น **rename** exe ที่รันอยู่คาชื่อ `.old` ก่อน (Windows อนุญาตแม้กำลังรัน) copy ไฟล์ใหม่เข้าเลขชื่อเดิม แล้ว start + ลบ `.old` ทีหลัง
+- ยืนยัน: ตัว exe ที่สลับแล้ว boot เองได้ปกติ (บั๊กเฉพาะจังหวะ restart), test_units 37/37, selftest exit 0
+
+
+## [1.9.13] — 2026-10-13
 
 ### การเปลี่ยนแปลง
 - ตั้งค่า "เช็คอัปเดตตัวแอปทุก (ชั่วโมง)" ได้ในแท็บ ⚙ ตั้งค่าแล้ว (0 = ปิดเช็คอัตโนมัติ)
