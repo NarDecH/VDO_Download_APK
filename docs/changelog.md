@@ -1,6 +1,13 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.15] — 2026-10-13
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.16] — 2026-10-13
+
+### รุ่นข้ามสำหรับการทดสอบ E2E รอบสุดท้าย
+- เบต้าเวอร์ชันเชิงสาย: รุ่น 1.9.15 (มีการ clear `_MEIPASS2`/`_PYI_*` ของ .bat) จะเป็นผู้สร้างสวิตช์กำหนดทิศทาง .bat ด้วยตัวเองครั้งแรก — รุ่น 1.9.16 ถูกสร้างเข้าบิลด์เท่ากันเพื่อทำสีทางของการทดสอบ `1.9.15 → 1.9.16` ยืนยันให้เสียงรง restart เพื่อ boot ได้สะอาด
+- การทดสอบ 1–3 ผ่านงบแยเ обувь: swap เสมอ sha256 ตรง published; การล็อกหน้าที่เจลงออกจากระปันข้าลายทั้งหมดถูก trace แล้วคือ "สาย env ป่วน + .bat ของรุ่นเก่า"
+
+
+## [1.9.15] — 2026-10-13
 
 ### การแก้ (ต่อการตามแก้ restart)
 - **เจอต้นเหตุจริงของ restart พัง (E2E รอบที่ 2):** PyInstaller onefile ตั้ง env `_MEIPASS2`/`_PYI_*` ที่ app รับสืบทอดแล้ว `os.startfile` รั่วผ่าน .bat — bootloader รุ่นใหม่เห็น env นี้เลย ข้ามการ extract ไปโหลด python314.dll จาก dir `_MEI` ของตัวเก่าที่ถูกลบแล้ว → "Failed to load Python DLL" .bat จึงเคลียร์ `_MEIPASS2`/`_PYI_*` ก่อน `start` เสมอ (rename tombstone ของ v1.9.14 ยังอยู่)
