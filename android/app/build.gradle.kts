@@ -11,8 +11,8 @@ android {
         applicationId = "com.vdograbber.app"
         minSdk = 26
         targetSdk = 35
-        versionCode = 37
-        versionName = "1.9.11"
+        versionCode = 38
+        versionName = "1.9.12"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

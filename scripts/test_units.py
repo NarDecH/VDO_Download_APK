@@ -884,6 +884,58 @@ def test_toolbar_has_clipboard_button_parity() -> bool:
     return True
 
 
+# ------------------------------------------------- self-update (v1.9.12)
+def test_updater_version_compare() -> bool:
+    """Component-wise version compare powering the desktop self-update"""
+    import sys as _s
+    _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app"))
+    from core.updater import compare_versions, parse_version
+    cases = [
+        ("1.9.12", "v1.9.13", -1),   # remote newer
+        ("1.9.12", "1.9.12", 0),
+        ("1.9.12", "1.9.11", 1),     # local newer
+        ("v1.9.9", "1.10.0", -1),    # numeric not lexicographic (2 < 10)
+        ("1.9.12.0", "1.9.12", 0),   # trailing .0 ==
+        ("1.10", "1.9.9", 1),
+    ]
+    for local, remote, want in cases:
+        got = compare_versions(local, remote)
+        assert got == want, f"compare_versions({local!r}, {remote!r}) = {got}, want {want}"
+    assert parse_version("v2.1") == (2, 1)
+    assert parse_version("junk") in ((0,), (0, 0))
+    return True
+
+
+def test_updater_asset_selection_and_swap_bat() -> bool:
+    """The updater targets the same asset name CI attaches and writes a swap
+    .bat that replaces the frozen exe then restarts it."""
+    import sys as _s
+    import tempfile
+    _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app"))
+    import core.updater as U
+
+    class _Log:
+        def log(self, *a, **k): pass
+        def exception(self, *a, **k): pass
+    class _Set:
+        def get(self, k, d=None): return 0   # disable throttle
+    class _Settings:
+        def get(self, k, d=None): return 0
+    tmp = tempfile.mkdtemp(prefix="vgupd-")
+    up = U.Updater(tmp, _Set(), _Log())
+    up.remote_version = "9.9.9"
+    # asset base must point into the release download dir for the right repo
+    assert U.ASSET_BASE % "9.9.9" == "https://github.com/%s/releases/download/v9.9.9/" % U.REPO
+    # swap .bat: waits, copies staged exe over the running one, restarts
+    staged = os.path.join(tmp, "staged.exe")
+    open(staged, "wb").write(b"MZ")
+    bat = up._spawn_swap(staged)
+    text = open(bat, encoding="ascii", errors="replace").read()
+    assert "copy /y" in text and "start" in text
+    assert os.path.basename(staged) in text.replace('"', "")
+    return True
+
+
 def main() -> int:
     tests = {
         "sieve_request_building": test_sieve_request_building,
@@ -921,6 +973,8 @@ def main() -> int:
         "analyze_events_zip_without_events": test_analyze_events_zip_without_events,
         "clipboard_url_rules": test_clipboard_url_rules,
         "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
+        "updater_version_compare": test_updater_version_compare,
+        "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
     }
     failed = []
     for name, fn in tests.items():

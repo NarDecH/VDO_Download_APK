@@ -1,6 +1,16 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.11] — 2026-10-12
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.12] — 2026-10-13
+
+### การเปลี่ยนแปลง
+- **Auto update (Windows desktop):** เช็ค GitHub Releases/latest หลังเปิดแอป 20 วิ. (throttle 12 ชม. ตาม `update_check_interval_hours`, ปิดได้ด้วยค่า 0) — มีรุ่นใหม่จะแจ้งใน Control Center + แท็บ ⚙ ตั้งค่า มีปุ่ม "ตรวจอัปเดตตอนนี้" เรียกใช้ได้เอง
+- ดาวน์โหลด `VDOGrabber-<รุ่น>-windows-x64.exe` + `.sha256` พร้อม progress, ตรวจ sha256 ก่อนใช้, แล้วสลับไฟล์ตัวเองผ่าน .bat (copy เมื่อโปรเซสปิด → รีสตาร์ทอัตโนมัติ)
+- UI ใหม่: การ์ด "อัปเดตตัวแอป" ในแท็บ ตั้งค่า + สถานะตรวจ/ดาวน์โหลด/ติดตั้งบน status bar; event ใหม่ update_check / update_available / update_downloading / update_downloaded / update_apply / update_error
+- Android ไม่แตะ - อัปเดตด้วยการติดตั้ง APK ใหม่ต่อไป
+- ยืนยันแล้ว: test_units 37/37, selftest desktop PASS (exit 0)
+
+
+## [1.9.11] — 2026-10-12
 
 ### การเปลี่ยนแปลง
 - **probe-first fallback (Windows desktop, จาก funnel จริง):** งานที่ URL หน้าตา player (.html/.php/.aspx, /player) ถูกสแกนหาสตรีมจริงใน worker thread ก่อนเรียกเอนจิน — เจอ candidate (.mpd/.m3u8) ก็โหลดมันตรง ไม่พาด "Unsupported URL" ไม่เสีย engine-run เปล่า (field log: 10/10 error ที่ผ่านมาเป็น player.html → output.mpd ทุกตัว recovery ด้วย fallback เดิม)

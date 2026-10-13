@@ -29,6 +29,7 @@ DEFAULTS = {
     "github_pat": "",           # v1.2.2: GitHub token (gist scope) for cloud sync - stored locally only
     "gist_id": "",              # secret gist that carries vdograbber-exclusions.json (empty = create on first sync)
     "sieve_api_key": "",        # v1.3.0: Sieve scrape API key (dc_sk_...) - server-side only, never logged/exported
+    "update_check_interval_hours": 12,   # v1.9.12: desktop self-update throttling (0 = disabled)
 }
 
 # Settings that are credentials: never surfaced to the UI state, never logged,

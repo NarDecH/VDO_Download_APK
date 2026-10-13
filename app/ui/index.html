@@ -154,6 +154,12 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <div style="margin-top:10px"><button class="act grn" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
       <button class="act" onclick="updateEngine()">⬆ อัปเดต yt-dlp</button></div>
     </div>
+    <div class="card" id="updCard">
+      <h2>อัปเดตตัวแอป</h2>
+      <div class="hint">ตรวจเวอร์ชันใหม่จาก GitHub Releases แล้วดาวน์โหลด + ตรวจ sha256 + สลับตัว exe ให้อัตโนมัติ (เช็คเองทุก 12 ชม. หลังเปิดแอป)</div>
+      <div style="margin-top:10px"><button class="act grn" onclick="updCheck()">⬆ ตรวจอัปเดตตอนนี้</button>
+      <button class="act" id="updApply" style="display:none" onclick="updApply()">🔄 ติดตั้งเวอร์ชันใหม่และรีสตาร์ท</button></div>
+    </div>
     <div class="card">
       <h2>การตรวจจับ &amp; Logging</h2>
       <label><input type="checkbox" id="sAutoDetect" style="width:auto"> สแกนหาวิดีโออัตโนมัติเมื่อเปิดหน้าเว็บ</label>
@@ -232,6 +238,7 @@ const demoApi = {
     : '{"ts":1759120327.1,"event":"page_loaded","url":"https://example.com/travel"}\n{"ts":1759120328.1,"event":"media_found","url":"https://cdn.example.com/clips/sunset-beach-4k.mp4","kind":"mp4","via":"DOM scan"}\n{"ts":1759120335.0,"event":"download_start","id":"a2","url":"https://live.example.tv/hls/master.m3u8","kind":"hls"}',
   open_logs_folder(){}, export_diagnostics(){ return {ok:true, path:'~/Desktop/VDOGrabber-diagnostics.zip'} },
   set_setting(){ return {ok:true} }, update_engines(){ return {ok:true,message:'up to date'} },
+  check_updates(){ return {ok:true, update_available:false, version:'demo'} }, download_update(){ return {ok:false} }, apply_update(){ return {ok:false} },
   download_start: async (s)=>({ok:true,job:{id:'new'}}), download_cancel(){ return {ok:true} },
   choose_download_dir(){ return {ok:false} }, downloads_list(){ return [] }, media_list(){ return [] },
   downloads_clear(){ return {ok:true, removed:1} }, media_clear(){ return {ok:true, removed:3} },
@@ -578,6 +585,29 @@ function updateEngine(){
   status('กำลังอัปเดต yt-dlp…');
   py().update_engines().then(r => status(r.ok ? ('yt-dlp: ' + (r.version||'') + ' — ' + (r.message||'').slice(-80)) : 'อัปเดตไม่สำเร็จ'));
 }
+// v1.9.12 self-update
+function updCheck(){
+  status('กำลังตรวจอัปเดต…');
+  py().check_updates().then(r => {
+    if (r && r.update_available){
+      status('เวอร์ชันใหม่ ' + r.version + ' — กำลังดาวน์โหลด…');
+      py().download_update().then(r2 => {
+        if (r2 && r2.ok){ status('สเตจรุ่น ' + r2.version + ' เรียบร้อย (' + (r2.size_mb||0) + ' MB' + (r2.verified ? ', sha256 ✓' : '') + ')');
+          const b = document.getElementById('updApply'); if (b) b.style.display = '';
+        } else status('ดาวน์โหลดอัปเดตไม่สำเร็จ: ' + ((r2&&r2.error)||'?'));
+      });
+    }
+    else if (r && r.ok) status('ยังใช้เวอร์ชันล่าสุดอยู่ (' + (r.version||'-') + ')');
+    else status('ตรวจอัปเดตไม่สำเร็จ: ' + ((r&&r.error)||'?'));
+  });
+}
+function updApply(){
+  if (!confirm('ปิดแอป สลับไฟล์เป็น ' + 'เวอร์ชันใหม่ แล้วรีสตาร์ท — ดำเนินการต่อ?')) return;
+  py().apply_update().then(r => {
+    if (r && r.ok) status('กำลังรีสตาร์ทเป็นเวอร์ชันใหม่…');
+    else status('ติดตั้งไม่สำเร็จ: ' + ((r&&r.error)||'?'));
+  });
+}
 function exportDiag(){ py().export_diagnostics().then(r => status(r.ok ? 'บันทึก diagnostics: ' + r.path : 'ล้มเหลว: ' + (r.error||''))); }
 function status(msg){ document.getElementById('ftStatus').textContent = msg; }
 
@@ -599,6 +629,15 @@ window.__onEvent = function (event, payload) {
     state.media = []; renderMedia([]); status('ล้างรายการวิดีโอที่ตรวจพบแล้ว');
   }  else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
   else if (event === 'engine_progress') { status('กำลังเตรียม ' + payload.engine + '… ' + payload.percent + '%'); }
+  else if (event === 'update_progress') { status('ดาวน์โหลดอัปเดต… ' + payload.percent + '% (' + Math.round(payload.downloaded/1048576) + '/' + Math.round(payload.total/1048576) + ' MB)'); }
+  else if (event === 'update_available') {
+    status('มีเวอร์ชันใหม่ ' + payload.version + ' — เปิดแท็บ ⚙ ตั้งค่า เพื่อติดตั้ง');
+    const c = document.getElementById('updCard'); if (c) c.style.outline = '2px solid #39d98a';
+  }
+  else if (event === 'update_ready') {
+    status('รุ่น ' + payload.version + ' พร้อมติดตั้ง');
+    const b = document.getElementById('updApply'); if (b) b.style.display = '';
+  }
   else if (event === 'sieve_run_update') { refreshSieve(); }
   else if (event === 'sieve_login') {
     const s = payload && payload.status;

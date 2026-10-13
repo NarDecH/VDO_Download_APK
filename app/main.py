@@ -32,6 +32,7 @@ from core.downloader import DownloadManager, is_usable_download_url  # noqa: E40
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir, set_event_origin  # noqa: E402
 from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
 from core.sieve import DEVICE_CLIENT_NAME, SieveError, SieveManager, device_login  # noqa: E402
+from core.updater import Updater, spawn_startup_check  # noqa: E402
 from core.ytdlp_mgr import EngineManager  # noqa: E402
 
 
@@ -615,6 +616,34 @@ class Api:
     def update_engines(self) -> dict:
         return _APP.engines.update_ytdlp()
 
+    # --------------------------------------------------- v1.9.12 self-update
+    def check_updates(self) -> dict:
+        r = _APP.updater.check(force=True)
+        if r.get("update_available"):
+            _APP.push_control("update_available", {"version": _APP.updater.remote_version,
+                                                    "notes": _APP.updater.remote_notes})
+        return r
+
+    def download_update(self) -> dict:
+        r = _APP.updater.download()
+        if r.get("ok"):
+            _APP.push_control("update_ready", {"version": r.get("version")})
+        return r
+
+    def apply_update(self) -> dict:
+        r = _APP.updater.apply()
+        if r.get("ok"):
+            # the swap .bat is running - give the window a beat to close itself
+            import webview as _w
+            try:
+                if _APP.control:
+                    _APP.control.destroy()
+                if _APP.browser:
+                    _APP.browser.destroy()
+            except Exception:
+                pass
+        return r
+
     def open_external(self, url: str) -> None:
         webbrowser.open(url)
 
@@ -636,6 +665,7 @@ class App:
         self.media = MediaStore(self.logm)
         self.downloads = DownloadManager(self.settings, self.engines, self.logm, push_ui=self._push)
         self.sieve = SieveManager(self.settings, self.logm, self.data_dir, push_ui=self._push)
+        self.updater = Updater(self.data_dir, self.settings, self.logm, push_ui=self._push)
         self.api = Api()
         self.browser: webview.Window | None = None
         self.control: webview.Window | None = None
@@ -704,6 +734,8 @@ class App:
         threading.Thread(target=warm, name="warmup", daemon=True).start()
         threading.Thread(target=self._resume_sieve, name="sieve-resume", daemon=True).start()
         threading.Thread(target=self._watchdog, name="watchdog", daemon=True).start()
+        # v1.9.12: throttled self-update check (selftest exits before this point)
+        spawn_startup_check(self)
 
     def _resume_sieve(self):
         """Resume polling of runs persisted before a crash/restart. No-op when
