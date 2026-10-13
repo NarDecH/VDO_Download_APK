@@ -1,6 +1,14 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.12] — 2026-10-13
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.13] — 2026-10-13
+
+### การเปลี่ยนแปลง
+- ตั้งค่า "เช็คอัปเดตตัวแอปทุก (ชั่วโมง)" ได้ในแท็บ ⚙ ตั้งค่าแล้ว (0 = ปิดเช็คอัตโนมัติ)
+- updater อ่าน APP_VERSION แบบ attribute access (แก้จาก value import) — E2E ผ่านจริงกับ release จริง: check → download 31MB → sha256 ตรง → .bat stage
+- ยืนยันแล้ว: test_units 37/37, selftest desktop PASS (exit 0)
+
+
+## [1.9.12] — 2026-10-13
 
 ### การเปลี่ยนแปลง
 - **Auto update (Windows desktop):** เช็ค GitHub Releases/latest หลังเปิดแอป 20 วิ. (throttle 12 ชม. ตาม `update_check_interval_hours`, ปิดได้ด้วยค่า 0) — มีรุ่นใหม่จะแจ้งใน Control Center + แท็บ ⚙ ตั้งค่า มีปุ่ม "ตรวจอัปเดตตอนนี้" เรียกใช้ได้เอง

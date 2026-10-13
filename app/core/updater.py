@@ -24,7 +24,9 @@ import threading
 import time
 import urllib.request
 
-from core.logger import APP_VERSION  # noqa: E402 - core is on sys.path in every entry point
+# attribute access (not a value import): APP_VERSION is read live at each
+# check so unit/E2E harnesses can monkeypatch core.logger.APP_VERSION
+from core import logger as _logger  # noqa: E402 - core is on sys.path in every entry point
 
 REPO = "NarDecH/VDO_Download_APK"
 RELEASES_API = "https://api.github.com/repos/%s/releases/latest" % REPO
@@ -131,17 +133,17 @@ class Updater:
         except Exception:
             pass
 
-        newer = compare_versions(APP_VERSION, self.remote_version) < 0
+        newer = compare_versions(_logger.APP_VERSION, self.remote_version) < 0
         if not newer:
             self.status = "none"
-            self.log.log("no update: local %s vs remote %s" % (APP_VERSION, self.remote_version),
+            self.log.log("no update: local %s vs remote %s" % (_logger.APP_VERSION, self.remote_version),
                          event="update_check_done", version=self.remote_version)
             return {"ok": True, "update_available": False,
                     "version": self.remote_version, "checked": True}
 
         self.status = "available"
-        self.log.log("update available: %s -> %s" % (APP_VERSION, self.remote_version),
-                     event="update_available", local=APP_VERSION,
+        self.log.log("update available: %s -> %s" % (_logger.APP_VERSION, self.remote_version),
+                     event="update_available", local=_logger.APP_VERSION,
                      remote=self.remote_version)
         return {"ok": True, "update_available": True, "version": self.remote_version,
                 "notes": self.remote_notes, "checked": True}

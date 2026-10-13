@@ -153,6 +153,9 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <div class="hint">ตรวจสอบการอัปเดต yt-dlp เป็นระยะ เพราะเว็บฝั่ง upstream เปลี่ยนบ่อย</div>
       <div style="margin-top:10px"><button class="act grn" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
       <button class="act" onclick="updateEngine()">⬆ อัปเดต yt-dlp</button></div>
+      <label style="margin-top:8px">เช็คอัปเดตตัวแอปทุก (ชั่วโมง)</label>
+      <input type="number" id="sUpdHours" min="0" max="168" style="width:100px">
+      <div class="hint">0 = ปิดเช็คอัตโนมัติ (กดปุ่ม "ตรวจอัปเดตตอนนี้" ได้เสมอ) · ปกติตั้ง 12</div>
     </div>
     <div class="card" id="updCard">
       <h2>อัปเดตตัวแอป</h2>
@@ -334,6 +337,7 @@ function renderSettings(s){
   document.getElementById('sUA').value = s.user_agent || '';
   document.getElementById('sLogLevel').value = s.log_level || 'DEBUG';
   document.getElementById('sStartPage').value = s.start_page || '';
+  document.getElementById('sUpdHours').value = (s.update_check_interval_hours ?? 12);
   document.getElementById('sAutoDetect').checked = !!s.auto_detect;
   document.getElementById('sNotify').checked = !!s.notify_done;
 }
@@ -579,6 +583,7 @@ function saveSettings(){
   py().set_setting('auto_detect', document.getElementById('sAutoDetect').checked);
   py().set_setting('notify_done', document.getElementById('sNotify').checked);
   py().set_setting('start_page', document.getElementById('sStartPage').value.trim());
+  py().set_setting('update_check_interval_hours', parseInt(document.getElementById('sUpdHours').value) || 0);
   status('บันทึกการตั้งค่าแล้ว'); setTimeout(refresh, 400);
 }
 function updateEngine(){
