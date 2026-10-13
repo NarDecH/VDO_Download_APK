@@ -932,6 +932,12 @@ def test_updater_asset_selection_and_swap_bat() -> bool:
     bat = up._spawn_swap(staged)
     text = open(bat, encoding="ascii", errors="replace").read()
     assert "copy /y" in text and "start" in text
+    assert "move /y" in text  # v1.9.14 rename-first tombstone swap
+    # v1.9.15: PyInstaller env leak - the .bat must clear the markers BEFORE
+    # start, otherwise the restarted bootloader skips extraction and dies
+    # with "Failed to load Python DLL" (real E2E finding)
+    assert "set _MEIPASS2=" in text
+    assert "set _PYI_ARCHIVE_FILE=" in text
     assert os.path.basename(staged) in text.replace('"', "")
     return True
 

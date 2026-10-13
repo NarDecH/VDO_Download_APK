@@ -226,18 +226,30 @@ class Updater:
     def _spawn_swap(self, exe_path: str) -> str:
         """Write the .bat that swaps the exe and restarts it.
 
-        v1.9.14 (E2E field finding, v1.9.12->1.9.13 flow): copy-over-the-
-        running-exe raced the dying bootloader's extraction-cache cleanup -
-        the restarted instance showed "Failed to load Python DLL ...\_MEI*
-        because the freshly killed process tree still owned the seed.
-        Rename the running exe out of the way INSTEAD (Windows allows this
-        even for a live exe), copy the new file into the freed slot, then
-        start it and sweep the .old tombstone.
+    v1.9.14 (E2E field finding): copy-over-the-running-exe raced the dying
+    bootloader's extraction cache - rename the running exe out of the way
+    INSTEAD (Windows allows this even for a live exe), copy the new file
+    into the freed slot, then start it and sweep the .old tombstone.
+    v1.9.15 (E2E root cause): also clear PyInstaller's _MEIPASS2/_PYI_*
+    env markers in the .bat - os.startfile leaks them from the dying app
+    and the restarted bootloader would skip extraction entirely.
         """
         bat = os.path.join(self._updates_dir(), "apply_update.bat")
         me = self._exe_path()
         with open(bat, "w", encoding="ascii", errors="replace") as fh:
             fh.write("@echo off\r\n")
+            # ROOT CAUSE (v1.9.14 E2E): PyInstaller's onefile parent spawns a
+            # child with _MEIPASS2 pointing at the extraction dir; the python
+            # app inherits it, and os.startfile leaks it through the .bat so
+            # the restarted exe skips extraction and tries to load
+            # python314.dll from the OLD (now deleted) _MEI dir ->
+            # "Failed to load Python DLL ...". Clear the PyInstaller env
+            # markers in the .bat before starting the new instance.
+            fh.write("set _MEIPASS2=\r\n")
+            fh.write("set _PYI_ARCHIVE_FILE=\r\n")
+            fh.write("set _PYI_PARENT_DIR_LEVEL=\r\n")
+            fh.write("set _PYI_SPLASH=\r\n")
+            fh.write("set _PYI_UUID=\r\n")
             fh.write("ping -n 3 127.0.0.1 >nul\r\n")          # brief settle
             fh.write('move /y "%s" "%s.old" >nul\r\n' % (me, me))
             fh.write('copy /y "%s" "%s" >nul\r\n' % (exe_path, me))

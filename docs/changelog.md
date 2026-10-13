@@ -1,6 +1,13 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.14] — 2026-10-13
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.15] — 2026-10-13
+
+### การแก้ (ต่อการตามแก้ restart)
+- **เจอต้นเหตุจริงของ restart พัง (E2E รอบที่ 2):** PyInstaller onefile ตั้ง env `_MEIPASS2`/`_PYI_*` ที่ app รับสืบทอดแล้ว `os.startfile` รั่วผ่าน .bat — bootloader รุ่นใหม่เห็น env นี้เลย ข้ามการ extract ไปโหลด python314.dll จาก dir `_MEI` ของตัวเก่าที่ถูกลบแล้ว → "Failed to load Python DLL" .bat จึงเคลียร์ `_MEIPASS2`/`_PYI_*` ก่อน `start` เสมอ (rename tombstone ของ v1.9.14 ยังอยู่)
+- ยืนยัน: ทั้งรอบ 1–2 swap เอง sha256 ตรง published ทุกครั้ง, manual boot ผ่าน — บั๊กเกิดเฉพาะสาย env, unit test เพิ่มเคส set _MEIPASS2= ให้แทิน .bat
+
+
+## [1.9.14] — 2026-10-13
 
 ### การแก้ (จากการทดสอบ flow จริง)
 - **แก้บั๊ก restart หลังอัปเดต:** 1.9.12→1.9.13 ทดสอบจริงพบว่า .bat ที่ copy ทับ exe ที่กำลังรันแล้ว start ใหม่ทันที ชนกับ cleanup ของ bootloader ตัวเก่า ทำให้รุ่นใหม่เด้ง "Failed to load Python DLL ..._MEI*" — เปลี่ยนเป็น **rename** exe ที่รันอยู่คาชื่อ `.old` ก่อน (Windows อนุญาตแม้กำลังรัน) copy ไฟล์ใหม่เข้าเลขชื่อเดิม แล้ว start + ลบ `.old` ทีหลัง
