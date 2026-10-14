@@ -1,6 +1,17 @@
 # CHANGELOG
 
-รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)## [1.9.16] — 2026-10-13
+รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
+
+## [1.9.17] — 2026-10-14
+
+### การเปลี่ยนแปลง
+- **CI stale-checksum guard:** desktop/android release steps ตรวจแถว checksums.txt ที่ตัวเองอัปโหลดเทียบ `digest` ฝั่ง server (v1.9.15 audit ที่แถว exe ค้าง build เก่าจาก re-upload นอก CI)
+- เครื่องมือ `scripts/regen_checksums.py`: สร้าง checksums.txt จาก asset จริงทุกไฟล์ + โหมด `--verify` (ใช้แก้ย้อนหลัง 1.9.13/14/15 แล้ว)
+- unit 38/38: เทส sandbox ใหม่รันกลไก `.bat` swap จริงบน cmd.exe (rename→copy→tombstone sweep) โดย stub launcher
+- UI การ์ด "อัปเดตตัวแอป": แถบ progress สด (% + MB) + ปุ่ม "ดาวน์โหลดและติดตั้ง" คลิกเดียวที่เด้งจาก push update_available โดยไม่ต้องเปิดแท็บตั้งค่า
+- เพิ่ม `scripts/e2e_update_driver.py` (ขับ flow อัปเดตผ่าน CDP) + เอกสารสรุป docs/release-1.9.16-report.md
+
+## [1.9.16] — 2026-10-13
 
 ### รุ่นข้ามสำหรับการทดสอบ E2E รอบสุดท้าย
 - รุ่นคั่นสำหรับ E2E รอบสุดท้าย: 1.9.15 (แก้ .bat เคลียร์ `_MEIPASS2`/`_PYI_*`) ต้องเป็นผู้สร้าง `.bat` เองจึงพิสูจน์ได้ — 1.9.16 จึงถูกปล่อยคู่เพื่อให้ทดสอบ `1.9.15 → 1.9.16` ว่า restart บูตได้สะอาด
