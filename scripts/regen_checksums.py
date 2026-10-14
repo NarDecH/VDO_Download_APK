@@ -35,6 +35,37 @@ def all_assets(tag: str) -> list[dict]:
     return assets
 
 
+"""Rebuild a release's checksums.txt from the ACTUAL published assets.
+
+Why this exists (v1.9.15 audit): desktop.yml merges only its own exe .sha256
+into whatever checksums.txt already holds. If an asset gets re-uploaded
+outside CI (--clobber), the merged file silently keeps the STALE hash.
+Rebuilding from the assets themselves can never go stale.
+
+Usage:
+  python scripts/regen_checksums.py v1.9.15                       # download all assets, hash locally
+  python scripts/regen_checksums.py v1.9.15 --verify              # compare only, no upload
+  python scripts/regen_checksums.py v1.9.5 --from-digests         # fast: use server-side digests, then upload
+"""
+
+
+def build_from_digests(tag: str) -> list[tuple[str, str]]:
+    """Assemble rows straight from GitHub's server-side asset digests -
+    no asset download. Valid because digest is what GitHub hash-computed
+    from the stored bytes. Prefer --from-digests for old releases."""
+    assets = all_assets(tag)
+    out = []
+    for a in assets:
+        n = a["name"]
+        if n.lower() == "checksums.txt":
+            continue
+        d = a.get("digest") or ""
+        if not d.startswith("sha256:"):
+            raise SystemExit(f"{tag}: no sha256 digest for {n} - use the slow path")
+        out.append((d.split(":", 1)[1], n))
+    return out
+
+
 def build(tag: str) -> list[tuple[str, str]]:
     """[(sha256_hex, asset_name)] for every asset except checksums.txt itself."""
     rows = []
@@ -65,12 +96,13 @@ def main() -> int:
     argv = [a for a in sys.argv[1:] if not a.startswith("--")]
     flags = [a for a in sys.argv[1:] if a.startswith("--")]
     if not argv:
-        print("usage: regen_checksums.py v<semver> [--verify]", file=sys.stderr)
+        print("usage: regen_checksums.py v<semver> [--verify] [--from-digests]", file=sys.stderr)
         return 2
     tag = argv[0]
     verify_only = "--verify" in flags
+    use_digests = "--from-digests" in flags
 
-    rows = build(tag)
+    rows = build_from_digests(tag) if use_digests else build(tag)
     lines = ["%s  %s" % (digest, name) for digest, name in sorted(rows, key=lambda r: r[1])]
 
     remote = subprocess.run(

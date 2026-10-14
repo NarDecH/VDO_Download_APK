@@ -60,7 +60,9 @@ jobs:
                   findings.append(f"- **{tag}**: checksums.txt exists but is EMPTY/unparsable")
                   continue
               for aname, a in names.items():
-                  if aname == "checksums.txt":
+                  # .sha256 sidecar files are intentionally not listed in
+                  # checksums.txt (they are per-file digests themselves).
+                  if aname == "checksums.txt" or aname.endswith(".sha256"):
                       continue
                   want = (a.get("digest") or "").split(":", 1)[-1]
                   got = rows.get(aname)
