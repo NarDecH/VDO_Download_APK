@@ -161,7 +161,14 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <h2>อัปเดตตัวแอป</h2>
       <div class="hint">ตรวจเวอร์ชันใหม่จาก GitHub Releases แล้วดาวน์โหลด + ตรวจ sha256 + สลับตัว exe ให้อัตโนมัติ (เช็คเองทุก 12 ชม. หลังเปิดแอป)</div>
       <div style="margin-top:10px"><button class="act grn" onclick="updCheck()">⬆ ตรวจอัปเดตตอนนี้</button>
-      <button class="act" id="updApply" style="display:none" onclick="updApply()">🔄 ติดตั้งเวอร์ชันใหม่และรีสตาร์ท</button></div>
+      <button class="act" id="updApply" style="display:none" onclick="updApply()">🔄 ติดตั้งเวอร์ชันใหม่และรีสตาร์ท</button>
+      <button class="act grn" id="updGo" style="display:none" onclick="updCheck()">⬇ ดาวน์โหลดและติดตั้งรุ่นใหม่</button></div>
+      <div id="updBarWrap" style="display:none;margin-top:8px">
+        <div style="height:6px;background:#2a3444;border-radius:3px;overflow:hidden">
+          <div id="updBar" style="height:100%;width:0%;background:#39d98a;transition:width .3s"></div>
+        </div>
+        <div class="hint" id="updBarText">0%</div>
+      </div>
     </div>
     <div class="card">
       <h2>การตรวจจับ &amp; Logging</h2>
@@ -634,14 +641,26 @@ window.__onEvent = function (event, payload) {
     state.media = []; renderMedia([]); status('ล้างรายการวิดีโอที่ตรวจพบแล้ว');
   }  else if (event === 'page_loaded') { status('โหลด: ' + payload.url.slice(0, 70)); }
   else if (event === 'engine_progress') { status('กำลังเตรียม ' + payload.engine + '… ' + payload.percent + '%'); }
-  else if (event === 'update_progress') { status('ดาวน์โหลดอัปเดต… ' + payload.percent + '% (' + Math.round(payload.downloaded/1048576) + '/' + Math.round(payload.total/1048576) + ' MB)'); }
+  else if (event === 'update_progress') {
+    status('ดาวน์โหลดอัปเดต… ' + payload.percent + '% (' + Math.round(payload.downloaded/1048576) + '/' + Math.round(payload.total/1048576) + ' MB)');
+    const bw = document.getElementById('updBarWrap');
+    if (bw){ bw.style.display=''; document.getElementById('updBar').style.width = payload.percent + '%';
+      document.getElementById('updBarText').textContent = payload.percent + '% — ' + Math.round(payload.downloaded/1048576) + '/' + Math.round(payload.total/1048576) + ' MB'; }
+  }
   else if (event === 'update_available') {
-    status('มีเวอร์ชันใหม่ ' + payload.version + ' — เปิดแท็บ ⚙ ตั้งค่า เพื่อติดตั้ง');
+    status('มีเวอร์ชันใหม่ ' + payload.version + ' — กดดาวน์โหลดเพื่อติดตั้งได้เลย');
     const c = document.getElementById('updCard'); if (c) c.style.outline = '2px solid #39d98a';
+    // show a one-click path straight on the card (v1.9.16: no need to dig into settings)
+    const g = document.getElementById('updGo'); if (g){ g.style.display=''; g.textContent = '⬇ ดาวน์โหลดและติดตั้งรุ่น ' + payload.version; }
+    const b = document.getElementById('updApply'); if (b) b.style.display = 'none'; // refresh from a clean state
   }
   else if (event === 'update_ready') {
     status('รุ่น ' + payload.version + ' พร้อมติดตั้ง');
     const b = document.getElementById('updApply'); if (b) b.style.display = '';
+    const bw = document.getElementById('updBarWrap');
+    if (bw){ const bar = document.getElementById('updBar'); bar.style.width='100%';
+      document.getElementById('updBarText').textContent = 'พร้อมติดตั้ง — กด "ติดตั้งเวอร์ชันใหม่และรีสตาร์ท"'; }
+    const g = document.getElementById('updGo'); if (g) g.style.display = 'none';
   }
   else if (event === 'sieve_run_update') { refreshSieve(); }
   else if (event === 'sieve_login') {

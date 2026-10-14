@@ -938,7 +938,68 @@ def test_updater_asset_selection_and_swap_bat() -> bool:
     # with "Failed to load Python DLL" (real E2E finding)
     assert "set _MEIPASS2=" in text
     assert "set _PYI_ARCHIVE_FILE=" in text
+    # ordering is the actual bug class: every set-marker line must precede
+    # the first `start ""` call (v1.9.15 E2E round 3 root cause)
+    env_lines = [i for i, ln in enumerate(text.splitlines())
+                 if ln.startswith("set _MEIPASS2=") or ln.startswith("set _PYI_")]
+    assert env_lines, "no env-clearing lines in swap .bat"
+    start_idx = text.index("start \"\"")
+    assert max(env_lines) < start_idx, "env markers cleared AFTER start"
+    # the settle delay spans the rename, so the dying app releases the file
+    # before the copy takes the slot; tombstone swept after the new boot
+    assert text.index("ping -n 3") < text.index("move /y"), "no settle delay before rename"
+    assert ".old" in text and 'del ' in text, "missing .old tombstone sweep"
     assert os.path.basename(staged) in text.replace('"', "")
+    return True
+
+
+def test_updater_swap_choreography_sandbox() -> bool:
+    """Execute the real swap .bat under cmd.exe with the launcher stubbed
+    (start line -> sentinel file, ping waits erased): proves the actual
+    rename -> copy -> error-guard -> tombstone-sweep choreography works on
+    Windows without launching anything (needs cmd.exe)."""
+    import subprocess
+    import sys as _s
+    import tempfile
+    if not sys.platform.startswith("win"):
+        return True  # .bat choreography is Windows-only
+    _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app"))
+    import core.updater as U
+
+    class _Log:
+        def log(self, *a, **k): pass
+        def exception(self, *a, **k): pass
+    class _Set:
+        def get(self, k, d=None): return 0
+
+    tmp = tempfile.mkdtemp(prefix="vgswap-")
+    running = os.path.join(tmp, "app.exe")   # the "frozen" exe slot
+    staged = os.path.join(tmp, "staged.exe")
+    open(running, "wb").write(b"OLD-MZ")
+    open(staged, "wb").write(b"NEW-MZ")
+
+    argv0 = sys.argv[0]
+    sys.argv[0] = running                    # pretend this process IS app.exe
+    try:
+        up = U.Updater(tmp, _Set(), _Log())
+        bat = up._spawn_swap(staged)
+    finally:
+        sys.argv[0] = argv0
+
+    text = open(bat, encoding="ascii", errors="replace").read()
+    sentinel = os.path.join(tmp, "SENTINEL")
+    # lambda replacement: os paths contain backslashes that re.sub would eat
+    stub = re.sub(r'(?m)^start "".*$', lambda m: 'echo started> "' + sentinel + '"', text)
+    stub = stub.replace("ping -n 3 127.0.0.1 >nul", "")   # no live runner -> no settle needed
+    stub = stub.replace("ping -n 6 127.0.0.1 >nul", "")
+    stub_bat = os.path.join(tmp, "swap_stub.bat")
+    open(stub_bat, "w", encoding="ascii", errors="replace").write(stub)
+    rc = subprocess.run(["cmd", "/c", stub_bat], capture_output=True, text=True).returncode
+    assert rc == 0, f"swap .bat exited rc={rc}"
+
+    assert open(running, "rb").read() == b"NEW-MZ", "staged exe was not copied into the slot"
+    assert not os.path.exists(running + ".old"), ".old tombstone was not swept"
+    assert os.path.exists(os.path.join(tmp, "SENTINEL")), "copy succeeded but start stub never reached"
     return True
 
 
@@ -981,6 +1042,7 @@ def main() -> int:
         "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
         "updater_version_compare": test_updater_version_compare,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
+        "updater_swap_choreography": test_updater_swap_choreography_sandbox,
     }
     failed = []
     for name, fn in tests.items():

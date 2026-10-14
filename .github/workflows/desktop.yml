@@ -93,3 +93,22 @@ jobs:
           # guard: a re-created/moved tag would silently turn the release into a
           # draft (v1.1.7 incident) - force it published every time (v1.1.8)
           gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+
+      - name: Verify checksums.txt lines (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # stale-checksum guard (v1.9.15 audit): the merge above trusts the
+          # .sha256 file written moments ago, but if THIS asset was later
+          # re-uploaded outside CI the merged file kept the old hash. Compare
+          # every line this job owns against the server-side asset digest.
+          want=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+            --jq ".assets[] | select(.name==\"$EXE_NAME\") | .digest" | cut -d: -f2)
+          got=$(grep -E "^[[:xdigit:]]{64}( \\*|  ) ${EXE_NAME}" checksums.txt | cut -d' ' -f1)
+          if [ "$got" != "$want" ]; then
+            echo "checksums.txt stale for $EXE_NAME: wants $want got ${got:-<none>}"
+            exit 1
+          fi
+          echo "checksums.txt line OK: $EXE_NAME -> $want"

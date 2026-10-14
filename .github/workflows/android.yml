@@ -184,3 +184,25 @@ jobs:
           # guard: a re-created/moved tag would silently turn the release into a
           # draft (v1.1.7 incident) - force it published every time (v1.1.8)
           gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false
+
+      - name: Verify checksums.txt lines (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # stale-checksum guard (v1.9.15 audit): merged checksums.txt can keep
+          # a stale line if an asset is re-uploaded outside CI later. Check
+          # every APK line this job owns against the server-side digest.
+          bad=0
+          for f in $ABI_APKS "$APK_NAME"; do
+            want=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
+              --jq ".assets[] | select(.name==\"$f\") | .digest" | cut -d: -f2)
+            got=$(grep -E "^[[:xdigit:]]{64}( \\*|  ) ${f}" checksums.txt | cut -d' ' -f1)
+            if [ "$got" != "$want" ]; then
+              echo "checksums.txt stale for $f: wants $want got ${got:-<none>}"
+              bad=1
+            else
+              echo "checksums.txt line OK: $f -> $want"
+            fi
+          done
+          exit $bad
