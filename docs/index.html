@@ -298,6 +298,37 @@ async function ciBadges(){
 }
 ciBadges();
 
+// integrity dashboard badge: read the checksum-audit snapshot (unprotected
+// `snapshot` branch, raw.githubusercontent is CORS-open) and show a green
+// "ตรวจแล้ว N/N" / red "พบปัญหา N" chip linking to integrity.html
+(async function integrityBadge(){
+  try {
+    const res = await fetch("https://raw.githubusercontent.com/NarDecH/VDO_Download_APK/snapshot/docs/checksums-snapshot.json", { cache: "no-store" });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const snap = await res.json();
+    let ok = 0, bad = 0;
+    for (const r of Object.values(snap.releases || {})) {
+      const rows = r.rows || {}, truth = r.truth || {};
+      let mismatch = false;
+      for (const [name, want] of Object.entries(truth)) {
+        if (!want) continue;
+        if (rows[name] !== want) { mismatch = true; break; }
+      }
+      mismatch ? bad++ : ok++;
+    }
+    const total = ok + bad;
+    if (!total) return;
+    const b = document.createElement("a");
+    b.className = "badge" + (bad ? " red" : "");
+    b.href = "integrity.html";
+    b.title = "snapshot " + (snap.generated || "") + " — แถว checksums.txt เทียบ digest จริงของไฟล์ทุก release";
+    b.innerHTML = bad
+      ? `🔐 <b>✗ ${bad} release</b> <span class="dim">checksum ไม่ตรง</span> (${ok}/${total} ผ่าน)`
+      : `🔐 <b>✓ ${total} release</b> <span class="dim">checksum ตรงทุกแถว</span>`;
+    badges.appendChild(b);
+  } catch (e) { /* snapshot ยังไม่พร้อม/เน็ต — ปล่อยเงียบ ไว้เห็นที่หน้า integrity */ }
+})();
+
 load();
 </script>
 </body>

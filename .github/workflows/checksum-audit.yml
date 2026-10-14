@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "20 2 * * *"     # daily 02:20 UTC
   workflow_dispatch: {}
+  release:
+    types: [published]       # audit a fresh release immediately, before the
+                             # daily sweep can miss an out-of-band re-upload
 
 permissions:
   contents: write
