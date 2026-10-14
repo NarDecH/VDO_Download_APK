@@ -23,6 +23,12 @@ h1 span{background:linear-gradient(90deg,var(--acc),var(--acc2));-webkit-backgro
 .sub{color:var(--dim);max-width:600px;margin:0 auto}
 main{flex:1;padding:34px 0 50px}
 .release-card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:26px 28px;margin-bottom:22px}
+.badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+.badge{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:999px;
+       padding:6px 14px;font-size:13px;background:var(--card);color:var(--fg);text-decoration:none}
+.badge b{color:#39d98a}
+.badge.red b{color:#ff6b6b}
+.badge .dim{color:var(--dim)}
 .vrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
 .vtag{background:linear-gradient(90deg,var(--acc),var(--acc2));color:#fff;font-weight:800;border-radius:10px;padding:5px 16px;font-size:19px}
 .vtag-latest{background:#14532d;color:#86efac;border-radius:8px;padding:3px 11px;font-size:12px;font-weight:700}
@@ -83,6 +89,7 @@ a{color:#7fb3ff}
   <h1>VDO <span>Grabber</span> — ดาวน์โหลด</h1>
   <p class="sub">เปิดหน้าเว็บที่คุณต้องการ แล้วกดปุ่มดาวน์โหลดวิดีโอที่กำลังแสดงอยู่<br>
   หน้านี้ดึงข้อมูล release ล่าสุดจาก GitHub API อัตโนมัติ</p>
+  <div class="badges" id="badges"><span class="badge"><span class="dim">กำลังดึงสถานะ…</span></span></div>
 </div></section>
 
 <main class="wrap">
@@ -247,7 +254,48 @@ async function render(box, rel){
     </div>
     <div class="assets">${rows.join("") || '<div class="state">release นี้ยังไม่มีไฟล์แนบ</div>'}</div>
     ${notes}`;
+  setTagBadge(rel.tag_name, rel.html_url);
 }
+
+// ---- badge wiring + CI chips ----------------------------------------
+const badges = document.getElementById("badges");
+function setTagBadge(tag, url){
+  const b = document.createElement("a"); b.className = "badge"; b.href = url;
+  b.innerHTML = `🏷️ <b>${esc(tag)}</b> <span class="dim">Latest</span>`;
+  badges.appendChild(b);
+}
+function shimSpinnerChip(){ const s = badges.querySelector(".badge"); if (s && !s.querySelector("b")) s.remove(); }
+
+async function ciBadges(){
+  try {
+    const res = await fetch(`https://api.github.com/repos/${REPO}/actions/runs?per_page=20`,
+      { headers: { "Accept": "application/vnd.github+json" } });
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    // only tag pushes: head_branch is a tag name like "v1.9.17"
+    const latest = {};
+    for (const r of (data.workflow_runs || [])) {
+      if (r.event !== "push" || !/^v\d/.test(r.head_branch || "")) continue;
+      if (!latest[r.name] || new Date(latest[r.name].created_at) < new Date(r.created_at)) latest[r.name] = r;
+    }
+    const c = badges;
+    if (!c) return;
+    shimSpinnerChip();                          // drop the placeholder chip
+    for (const [name, r] of Object.entries(latest)) {
+      const b = document.createElement("span");
+      const isCI = !/pages/i.test(name);
+      if (!isCI) continue;
+      b.className = "badge" + (r.conclusion === "success" ? "" : r.conclusion ? " red" : "");
+      b.title = `${r.head_branch} · ${r.conclusion || "running"}`;
+      b.innerHTML = r.conclusion === "success" ? `<b>✓ CI</b> ${esc(name.replace(/\s+\(.*\)?$/, ""))}`
+        : r.conclusion ? `<b>✗ CI</b> ${esc(name)}` : `<b>… CI</b> ${esc(name)}`;
+      c.appendChild(b);
+    }
+  } catch (e) {
+    badges.innerHTML = `<span class="badge"><span class="dim">สถานะ CI ยังดึงไม่ได้</span></span>`;
+  }
+}
+ciBadges();
 
 load();
 </script>
