@@ -15,6 +15,8 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4   # workspace must exist for the docs/ snapshot commit
+
       - name: Audit every release's checksums.txt
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -134,7 +136,7 @@ jobs:
           # successive runs should land as comments in one thread, not as new
           # issues every day)
           NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --search "$TITLE in:title" \
-                  --json number,createdAt,state --jq ".[] | select(.state==\"open\" && (.createdAt|startswith(\"$TODAY\"))) | .number" | head -1)
+                  --json number,createdAt,state --jq '.[] | select(.state=="open" and (.createdAt|startswith("'"$TODAY"'"))) | .number' | head -1)
           if [ -n "$NUM" ]; then
             gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" \
               --body "repeat audit run found the same/still-open findings (${TODAY}):\n\n$FINDINGS_BLOB"
