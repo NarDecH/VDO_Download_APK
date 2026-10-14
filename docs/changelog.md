@@ -2,6 +2,16 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.18] — 2026-10-15
+
+### การเปลี่ยนแปลง
+- หน้า Integrity เพิ่มแดชบอร์ดตรวจ checksum ทุกรุ่นสด
+- checksum-audit รันทันทีหลัง publish release + ทุกวัน 02:20 UTC
+- หน้าดาวน์โหลดเพิ่ม badge สถานะ checksum (เขียว/แดง) ลิงก์ไปหน้า Integrity
+- แก้ jq +  missing checkout ใน checksum-audit workflow
+- snapshot checksum เผยแพร่ผ่าน branch snapshot (หลบ branch protection ของ main)
+
+
 ## [1.9.17] — 2026-10-14
 
 ### การเปลี่ยนแปลง
