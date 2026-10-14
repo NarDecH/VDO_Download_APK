@@ -44,6 +44,7 @@
 ## ลิงก์ด่วน
 
 - ⬇ **[หน้าดาวน์โหลด (GitHub Pages)](https://nardech.github.io/VDO_Download_APK/)** — ดึง release ล่าสุดอัตโนมัติ + checksum
+- 🔐 **[ความสมบูรณ์ของ checksum](docs/checksum-integrity.md)** — กลไก 3 ชั้นรับประกันว่า checksums.txt ตรงไฟล์จริงทุกแถว (guard ตอน release · audit รายวัน · เครื่องมือแก้ย้อนหลัง)
 - 📖 เอกสารฉบับเต็ม: [docs/readme.md](docs/readme.md) · วิเคราะห์ต้นแบบ: [docs/research.md](docs/research.md) · [docs/changelog.md](docs/changelog.md)
 - 🤖 คู่มือ AI/ผู้ดูแล: [AGENT.md](AGENT.md)
 

@@ -92,15 +92,27 @@ jobs:
 
           PYEOF
 
-      - name: Open issue on findings
+      - name: Open/comment issue on findings
         if: failure()
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh issue create --repo "$GITHUB_REPOSITORY" \
-            --title "checksum audit: stale checksums.txt rows found ($(date -u +%F))" \
-            --body "$FINDINGS_BLOB" \
-            --label "bug" || echo "issue create failed - findings are in the run log and step summary"
+          TITLE="checksum audit: stale checksums.txt rows"
+          TODAY=$(date -u +%F)
+          # reuse today's issue when it already exists (findings turning up on
+          # successive runs should land as comments in one thread, not as new
+          # issues every day)
+          NUM=$(gh issue list --repo "$GITHUB_REPOSITORY" --search "$TITLE in:title" \
+                  --json number,createdAt,state --jq ".[] | select(.state==\"open\" && (.createdAt|startswith(\"$TODAY\"))) | .number" | head -1)
+          if [ -n "$NUM" ]; then
+            gh issue comment "$NUM" --repo "$GITHUB_REPOSITORY" \
+              --body "repeat audit run found the same/still-open findings (${TODAY}):\n\n$FINDINGS_BLOB"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" \
+              --title "$TITLE (${TODAY})" \
+              --body "$FINDINGS_BLOB" \
+              --label "bug" || echo "issue create failed - findings are in the run log and step summary"
+          fi
 
         # the failed audit step above already marks the run failed; this step
         # merely files the visibility artifact.

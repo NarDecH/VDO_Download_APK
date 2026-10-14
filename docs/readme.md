@@ -32,6 +32,7 @@
 2. หรือจาก [GitHub Releases](https://github.com/NarDecH/VDO_Download_APK/releases/latest) ตรงๆ
    - `VDOGrabber-<เวอร์ชัน>-windows-x64.exe` — ไฟล์เดียวจบ ดับเบิลคลิกใช้ได้เลย ไม่ต้องติดตั้ง Python
    - `VDOGrabber-<เวอร์ชัน>-android.apk` — ติดตั้งจาก CI (อนุญาต "ติดตั้งจากแหล่งที่ไม่รู้จัก" ตามปกติ)
+3. รับประกันความถูกต้องของ checksum ทุกแถวโดยกลไก 3 ชั้น (อ่าน [checksum-integrity.md](checksum-integrity.md))
 3. Windows ใช้ WebView2 Runtime (มีในตัว Windows 10/11 อยู่แล้ว) · ffmpeg จะถูกดาวน์โหลดอัตโนมัติครั้งแรกเมื่อดาวน์โหลดสตรีม HLS/DASH
 
 ## การใช้งาน
