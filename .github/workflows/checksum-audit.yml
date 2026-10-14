@@ -1,0 +1,104 @@
+name: checksum-audit
+
+# Daily stale-checksum audit (born from the v1.9.15 incident where an
+# out-of-CI exe re-upload left checksums.txt silently stale for 3 releases).
+on:
+  schedule:
+    - cron: "20 2 * * *"     # daily 02:20 UTC
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Audit every release's checksums.txt
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python3 - <<'PYEOF'
+          import json, os, subprocess, sys
+
+          REPO = os.environ["GITHUB_REPOSITORY"]
+
+          def gh(*args, jq=None):
+              cmd = ["gh", "api", *args]
+              if jq:
+                  cmd += ["--jq", jq]
+              out = subprocess.run(cmd, capture_output=True, text=True)
+              if out.returncode != 0:
+                  sys.exit(f"gh api failed: {out.stderr.strip()}")
+              return out.stdout
+
+          releases = gh(f"repos/{REPO}/releases?per_page=30",
+                        jq='.[] | .tag_name + " " + (.draft|tostring)')
+          findings = []
+          audited = 0
+          for line in releases.strip().splitlines():
+              tag, draft = line.split()
+              if draft == "true":
+                  continue
+              assets = json.loads(gh(f"repos/{REPO}/releases/tags/{tag}", jq=".assets"))
+              names = {a["name"]: a for a in assets}
+              if "checksums.txt" not in names:
+                  findings.append(f"- **{tag}**: checksums.txt asset is MISSING")
+                  continue
+              # server-side digests of the checksums.txt itself, then compare rows
+              sums = subprocess.run(["gh", "release", "download", tag, "--pattern",
+                                     "checksums.txt", "--output", "-", "-R", REPO],
+                                    capture_output=True, text=True).stdout
+              rows = {}
+              for l in sums.splitlines():
+                  if not l.strip():
+                      continue
+                  digest, _, fname = l.partition(" ")
+                  rows[fname.lstrip("*").strip(" \"")] = digest.strip()
+              if not rows:
+                  findings.append(f"- **{tag}**: checksums.txt exists but is EMPTY/unparsable")
+                  continue
+              for aname, a in names.items():
+                  if aname == "checksums.txt":
+                      continue
+                  want = (a.get("digest") or "").split(":", 1)[-1]
+                  got = rows.get(aname)
+                  if not want:
+                      continue  # digest API not available for this asset
+                  if got is None:
+                      findings.append(f"- **{tag}**: `{aname}` has no line in checksums.txt")
+                  elif got != want:
+                      findings.append(f"- **{tag}**: `{aname}` STALE -"
+                                      f" checksums.txt={got} actual={want}")
+              audited += 1
+          summary = f"Audited {audited} releases; findings: {len(findings)}"
+          print(summary)
+          for f in findings:
+              print(f)
+          blob = summary + "\n\n" + "\n".join(findings)
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as fh:
+              fh.write(blob)
+          with open("findings.md", "w") as fh:
+              fh.write(blob + "\n")
+          with open(os.environ["GITHUB_ENV"], "a") as fh:
+              fh.write("FINDINGS_BLOB<<EOF\n" + blob + "\nEOF\n")
+          if findings:
+              print("AUDIT_FAIL")
+              sys.exit(42)
+          print("AUDIT_OK")
+
+          PYEOF
+
+      - name: Open issue on findings
+        if: failure()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh issue create --repo "$GITHUB_REPOSITORY" \
+            --title "checksum audit: stale checksums.txt rows found ($(date -u +%F))" \
+            --body "$FINDINGS_BLOB" \
+            --label "bug" || echo "issue create failed - findings are in the run log and step summary"
+
+        # the failed audit step above already marks the run failed; this step
+        # merely files the visibility artifact.

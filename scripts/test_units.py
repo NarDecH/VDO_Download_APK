@@ -953,6 +953,95 @@ def test_updater_asset_selection_and_swap_bat() -> bool:
     return True
 
 
+def test_updater_mock_flow() -> bool:
+    """Full in-process updater trip against a fake GitHub API: check ->
+    download (streams a real temp blob) -> apply. Monkeypatches
+    urllib.request.urlopen and os.startfile inside core.updater and asserts
+    the full ordered event sequence in the REAL events.jsonl (LogManager).
+    No network, no GUI, no process spawn."""
+    import io
+    import json as _json
+    import sys as _s
+    import tempfile
+    import urllib.request as _ur
+    _s.path.insert(0, os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app"))
+    from core.logger import LogManager
+    import core.updater as U
+
+    VER = "9.9.9"
+    BLOB = b"MZ" + b"x" * (3 << 20)                       # > progress_key
+    import hashlib as _hh
+    FAKE_SHA = _hh.sha256(BLOB).hexdigest()               # must match the served bytes
+    exe_name = f"VDOGrabber-{VER}-windows-x64.exe"
+
+    created_calls = []
+    real_urlopen = _ur.urlopen
+
+    class FakeResp(io.BytesIO):
+        def __enter__(self): return self
+        def __exit__(self, *a): self.close()
+        @property
+        def headers(self):
+            class H:
+                def get(self, k, d=None): return str(len(BLOB)) if k == "content-length" else d
+            return H()
+
+    def fake_urlopen(req, timeout=None):
+        url = req.full_url if hasattr(req, "full_url") else str(req)
+        if url.endswith("/releases/latest"):
+            created_calls.append("api:releases")
+            body = _json.dumps({"tag_name": f"v{VER}", "body": "notes"}).encode()
+            return FakeResp(body)
+        if url.endswith(exe_name):
+            created_calls.append("dl:exe")
+            return FakeResp(BLOB)
+        if url.endswith(exe_name + ".sha256"):
+            created_calls.append("dl:sha")
+            return FakeResp((FAKE_SHA + "  " + exe_name + "\n").encode())
+        raise AssertionError("unexpected URL " + url)
+
+    startfile_args = []
+    real_startfile = __import__("os").startfile
+
+    class _Set:
+        def get(self, k, d=None): return 0          # no throttle
+
+    tmp = tempfile.mkdtemp(prefix="vgupdmock-")
+    lm = LogManager(tmp)                             # real events.jsonl in tmp
+    up = U.Updater(tmp, _Set(), lm)
+
+    _ur.urlopen = fake_urlopen
+    os.startfile = lambda p, *a, **k: startfile_args.append(str(p))
+    try:
+        r1 = up.check(force=True)
+        assert r1.get("update_available") and r1.get("version") == VER, r1
+        r2 = up.download()
+        assert r2.get("ok") and r2.get("verified") is True, r2
+        assert r2.get("sha256") == FAKE_SHA, r2
+        r3 = up.apply()
+        assert r3.get("ok") is True, r3
+    finally:
+        _ur.urlopen = real_urlopen
+        os.startfile = real_startfile
+
+    # the .bat that gets spawned must be the env-clearing tombstone swap
+    bat = startfile_args[0]
+    bat_text = open(bat, encoding="ascii", errors="replace").read()
+    assert "set _MEIPASS2=" in bat_text and ".old" in bat_text and "start" in bat_text
+
+    # event order in the real events.jsonl, filtered to this run's dir
+    evs = [_json.loads(l) for l in open(os.path.join(tmp, "logs", "events.jsonl"), encoding="utf-8")]
+    seq = [e["event"] for e in evs]
+    want = ["update_check", "update_available", "update_downloading",
+            "update_downloaded", "update_apply", "update_apply_script"]
+    at = [seq.index(w) for w in want] if all(w in seq for w in want) else None
+    assert at is not None, seq[-10:]
+    assert at == sorted(at), f"update events out of order: {seq}"
+    # no update_error anywhere in this run's events
+    assert "update_error" not in seq, seq
+    return True
+
+
 def test_updater_swap_choreography_sandbox() -> bool:
     """Execute the real swap .bat under cmd.exe with the launcher stubbed
     (start line -> sentinel file, ping waits erased): proves the actual
@@ -1043,6 +1132,7 @@ def main() -> int:
         "updater_version_compare": test_updater_version_compare,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
         "updater_swap_choreography": test_updater_swap_choreography_sandbox,
+        "updater_mock_flow": test_updater_mock_flow,
     }
     failed = []
     for name, fn in tests.items():
