@@ -116,14 +116,18 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # always publish the snapshot so the integrity dashboard has fresh
-          # data even after a failing audit (findings > 0)
+          # data even after a failing audit (findings > 0).
+          # main is protected (required status check "build") so a plain
+          # GITHUB_TOKEN push is rejected - publish to the dedicated
+          # unprotected `snapshot` branch instead, which docs/integrity.html
+          # reads via raw.githubusercontent.com (CORS-open).
           if [ ! -f checksums-snapshot.json ]; then echo '{"releases":{}}' > checksums-snapshot.json; fi
           cp checksums-snapshot.json docs/checksums-snapshot.json
           git config user.name "checksum-audit bot"
           git config user.email "noreply@github.com"
           git add docs/checksums-snapshot.json
           git -c commit.gpgsign=false commit -m "checksum-audit: snapshot $(date -u +%FT%TZ)" || echo "no snapshot changes"
-          git push origin HEAD:main || echo "push failed (race) - retried by tomorrow's run"
+          git push --force origin HEAD:refs/heads/snapshot || echo "snapshot push failed - retried by tomorrow's run"
 
       - name: Open/comment issue on findings
         if: failure()
