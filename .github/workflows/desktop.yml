@@ -106,7 +106,7 @@ jobs:
           # every line this job owns against the server-side asset digest.
           want=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$GITHUB_REF_NAME" \
             --jq ".assets[] | select(.name==\"$EXE_NAME\") | .digest" | cut -d: -f2)
-          got=$(grep -E "^[[:xdigit:]]{64}( \\*|  ) ${EXE_NAME}" checksums.txt | cut -d' ' -f1)
+          got=$(grep -E "^[[:xdigit:]]{64}[ ][* ]?${EXE_NAME}" checksums.txt | cut -d' ' -f1)
           if [ "$got" != "$want" ]; then
             echo "checksums.txt stale for $EXE_NAME: wants $want got ${got:-<none>}"
             exit 1
