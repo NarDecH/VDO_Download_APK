@@ -8,7 +8,7 @@ on:
   workflow_dispatch: {}
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 jobs:
@@ -37,6 +37,7 @@ jobs:
                         jq='.[] | .tag_name + " " + (.draft|tostring)')
           findings = []
           audited = 0
+          snap = {}
           for line in releases.strip().splitlines():
               tag, draft = line.split()
               if draft == "true":
@@ -59,6 +60,16 @@ jobs:
               if not rows:
                   findings.append(f"- **{tag}**: checksums.txt exists but is EMPTY/unparsable")
                   continue
+              # dashboard snapshot: rows (checksums.txt as served) + digests
+              # (truth), keyed by asset - so docs/integrity.html can compare
+              # both sides without any API call (raw GH serves CORS)
+              snap[tag] = {
+                  "rows": {n: rows.get(n) or "" for n in names
+                           if n != "checksums.txt" and not n.endswith(".sha256")},
+                  "truth": {n: (a.get("digest") or "").split(":", 1)[-1]
+                            for n, a in names.items()
+                            if n != "checksums.txt" and not n.endswith(".sha256")},
+              }
               for aname, a in names.items():
                   # .sha256 sidecar files are intentionally not listed in
                   # checksums.txt (they are per-file digests themselves).
@@ -85,12 +96,32 @@ jobs:
               fh.write(blob + "\n")
           with open(os.environ["GITHUB_ENV"], "a") as fh:
               fh.write("FINDINGS_BLOB<<EOF\n" + blob + "\nEOF\n")
+
+          with open("checksums-snapshot.json", "w") as fh:
+              json.dump({"generated": __import__("datetime").datetime.utcnow().isoformat() + "Z",
+                         "releases": snap}, fh, indent=1)
+
           if findings:
               print("AUDIT_FAIL")
               sys.exit(42)
           print("AUDIT_OK")
 
           PYEOF
+
+      - name: Publish snapshot to docs/ (always)
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # always publish the snapshot so the integrity dashboard has fresh
+          # data even after a failing audit (findings > 0)
+          if [ ! -f checksums-snapshot.json ]; then echo '{"releases":{}}' > checksums-snapshot.json; fi
+          cp checksums-snapshot.json docs/checksums-snapshot.json
+          git config user.name "checksum-audit bot"
+          git config user.email "noreply@github.com"
+          git add docs/checksums-snapshot.json
+          git -c commit.gpgsign=false commit -m "checksum-audit: snapshot $(date -u +%FT%TZ)" || echo "no snapshot changes"
+          git push origin HEAD:main || echo "push failed (race) - retried by tomorrow's run"
 
       - name: Open/comment issue on findings
         if: failure()
