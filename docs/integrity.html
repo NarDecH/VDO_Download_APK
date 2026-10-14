@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VDO Grabber — ความสมบูรณ์ของ checksum</title>
+<style>
+:root{--bg:#0b1020;--bg2:#101830;--card:#141d38;--line:#25335a;--txt:#e8ecf4;--dim:#93a4c3;--faint:#5c6b8c;
+      --acc:#ff5f6d;--acc2:#ffc371;--grn:#16a34a}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font:15.5px/1.7 'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column}
+.wrap{max-width:940px;margin:0 auto;padding:0 22px;width:100%}
+nav.top{background:rgba(11,16,32,.92);border-bottom:1px solid var(--line);position:sticky;top:0;backdrop-filter:blur(8px);z-index:10}
+nav.top .wrap{display:flex;gap:4px;align-items:center;padding:9px 22px}
+nav a{color:var(--dim);text-decoration:none;padding:6px 12px;border-radius:8px;font-size:13.5px;font-weight:600}
+nav a:hover,nav a.on{background:#1a2547;color:#fff}
+nav .logo-sm{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,var(--acc),var(--acc2));display:inline-flex;align-items:center;justify-content:center;font-size:12px;margin-right:8px}
+.hero{background:radial-gradient(1200px 500px at 50% -80px,#1a2a3a 0%,transparent 60%),var(--bg);text-align:center;padding:50px 0 34px;border-bottom:1px solid var(--line)}
+.logo-lg{width:74px;height:74px;border-radius:20px;background:linear-gradient(135deg,#39d98a,#16a34a);
+  display:inline-flex;align-items:center;justify-content:center;font-size:33px;box-shadow:0 14px 44px rgba(22,163,74,.35)}
+h1{font-size:33px;margin:16px 0 8px}
+h1 span{background:linear-gradient(90deg,#39d98a,#a7f3d0);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sub{color:var(--dim);max-width:640px;margin:0 auto}
+main{flex:1;padding:30px 0 50px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px 24px;margin-bottom:20px}
+.summary{display:flex;gap:16px;flex-wrap:wrap}
+.sbox{background:#0f1729;border:1px solid var(--line);border-radius:12px;padding:14px 20px;text-align:center;min-width:130px}
+.sbox b{font-size:27px;display:block}
+.sbox span{color:var(--dim);font-size:13px}
+.sbox.ok b{color:#39d98a}.sbox.bad b{color:#ff6b6b}.sbox.warn b{color:var(--acc2)}
+.rel{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-top:14px;background:#0f1729}
+.rel .rhead{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.rel .rtag{font-weight:800;font-size:15.5px}
+.rel .pill{border-radius:999px;padding:2px 11px;font-size:12px;font-weight:700}
+.rel .pill.ok{background:#14532d;color:#86efac}
+.rel .pill.bad{background:#7f1d1d;color:#fecaca}
+.rel .pill.warn{background:#713f12;color:#fde68a}
+.rel .rdate{color:var(--dim);font-size:12.5px;margin-left:auto}
+.rel ul{margin:9px 0 0 20px;color:var(--dim);font-size:13.5px}
+.rel ul b{color:#ff6b6b;font-family:Consolas,monospace;font-size:12.5px}
+.rel .rowok{color:#5c8a63;font-size:13px;margin-top:8px}
+.state{color:var(--dim);padding:20px 0}
+.spin{display:inline-block;width:15px;height:15px;border:2.5px solid #64748b;border-top-color:#e2e8f0;border-radius:50%;animation:sp 0.9s linear infinite;vertical-align:-3px;margin-right:8px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.hint{color:var(--faint);font-size:12.5px;margin-top:16px}
+a{color:#7dd3fc}
+</style>
+</head>
+<body>
+<nav class="top"><div class="wrap">
+  <span class="logo-sm">▼</span>
+  <a href="index.html">ดาวน์โหลด</a>
+  <a href="integrity.html" class="on">Integrity</a>
+  <a href="readme.html">README</a>
+  <a href="research.html">RESEARCH</a>
+  <a href="changelog.html">CHANGELOG</a>
+</div></nav>
+
+<section class="hero"><div class="wrap">
+  <div class="logo-lg">🔐</div>
+  <h1>ความสมบูรณ์ <span>ของ checksum</span></h1>
+  <p class="sub">เทียบทุกแถวใน <b>checksums.txt</b> ของทุก release กับ digest ฝั่ง server ของไฟล์จริง
+  (GitHub คำนวณจากไบต์ที่เก็บจริง) — ตัวเลขสดจาก GitHub API เสมอ</p>
+</div></section>
+
+<main class="wrap">
+  <div class="card" id="summary">
+    <div class="state"><span class="spin"></span>กำลังตรวจทุก release จาก GitHub API…</div>
+  </div>
+  <p class="hint">ตรวจเองด้วยเครื่องมือ: <code>python scripts/regen_checksums.py vX.Y.Z --verify</code> ·
+  audit ขับเคลื่อนรายวันโดย <a href="https://github.com/NarDecH/VDO_Download_APK/actions/workflows/checksum-audit.yml">checksum-audit workflow</a> ·
+  กลไกทั้งหมดอธิบายใน <a href="checksum-integrity.md">checksum-integrity.md</a></p>
+</main>
+
+<footer><div class="wrap" style="padding:18px 0;border-top:1px solid var(--line);color:var(--dim);font-size:13px">
+  VDO Grabber · ตัวเลขนี้ไม่ผ่าน cache และตรวจจาก digest ของ GitHub เสมอ
+</div></footer>
+
+<script>
+const REPO = "NarDecH/VDO_Download_APK";
+const GH = "https://api.github.com/repos/" + REPO;
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+async function getJSON(url){
+  const r = await fetch(url, { headers: { "Accept": "application/vnd.github+json" } });
+  if (!r.ok) throw new Error("HTTP " + r.status + " @ " + url);
+  return r.json();
+}
+
+async function auditRelease(tag){
+  const rel = await getJSON(`${GH}/releases/tags/${tag}`);
+  const assets = (rel.assets || []);
+  const csAsset = assets.find(a => /checksums\.txt/i.test(a.name));
+  if (!csAsset) return { tag, state: "warn", issues: ["ไม่มีไฟล์ checksums.txt เลย"], checked: 0 };
+  const payloads = assets.filter(a => a.name !== csAsset.name && !a.name.endsWith(".sha256") && /^VDOGrabber-/.test(a.name));
+
+  let rows = {};
+  try {
+    const txt = await (await fetch(csAsset.browser_download_url)).text();
+    for (const l of txt.split("\n")) {
+      if (!l.trim()) continue;
+      const sp = l.indexOf(" ");
+      if (sp < 0) continue;
+      const d = l.slice(0, sp), n = l.slice(sp + 1);
+      rows[n.replace(/^\*/, "").trim().replace(/"/g, "")] = d.trim();
+    }
+  } catch (e) { return { tag, state: "warn", issues: ["โหลด checksums.txt ไม่ได้: " + e], checked: 0 }; }
+
+  if (!Object.keys(rows).length) return { tag, state: "warn", issues: ["checksums.txt ว่าง/อ่านไม่ได้"], checked: 0 };
+
+  const bad = [], missing = [], checked = [];
+  for (const a of payloads) {
+    const want = (a.digest || "").split(":")[1] || "";
+    const got = rows[a.name];
+    if (!want) { checked.push(a.name); continue; }           // legacy asset without digest
+    if (got === undefined) missing.push(a.name);
+    else if (got !== want) bad.push(`${a.name}: ไฟล์ใน list=${got.slice(0,10)}… จริง=${want.slice(0,10)}…`);
+    else checked.push(a.name);
+  }
+  const issues = bad.map(x => `MISMATCH ${x}`).concat(missing.map(x => `ไม่มีแถวสำหรับไฟล์จริง ${x}`));
+  const state = issues.length ? "bad" : "ok";
+  return { tag, state, issues, checked: checked.length, total: payloads.length };
+}
+
+(async function main(){
+  const box = document.getElementById("summary");
+  try {
+    const rels = await getJSON(`${GH}/releases?per_page=30`);
+    const published = rels.filter(r => !r.draft);
+    if (!published.length) { box.innerHTML = `<div class="state">ยังไม่มี release</div>`; return; }
+    const results = await Promise.all(published.map(r => auditRelease(r.tag_name)));
+    const nOk = results.filter(r => r.state === "ok").length;
+    const nBad = results.filter(r => r.state === "bad").length;
+    const nWarn = results.filter(r => r.state === "warn").length;
+
+    const relsHtml = results.map(r => `
+      <div class="rel">
+        <div class="rhead">
+          <span class="rtag">${esc(r.tag)}</span>
+          ${r.state === "ok" ? `<span class="pill ok">✓ ตรงทุกแถว${r.total != null ? " (" + r.checked + "/" + r.total + ")" : ""}</span>`
+            : r.state === "bad" ? `<span class="pill bad">✗ ไม่ตรง ${r.issues.length} แถว</span>`
+            : `<span class="pill warn">⚠ ตรวจไม่ได้</span>`}
+          <span class="rdate"></span>
+        </div>
+        ${r.issues.length ? `<ul>${r.issues.map(i => `<li>${esc(i)}</li>`).join("")}</ul>` : ""}
+        ${r.state === "ok" ? `<div class="rowok">แถวถูกต้องทุกไฟล์</div>` : ""}
+      </div>`).join("");
+
+    box.innerHTML = `
+      <div class="summary">
+        <div class="sbox ok"><b>${nOk}</b><span>release ตรงทุกแถว</span></div>
+        <div class="sbox bad"><b>${nBad}</b><span>มีแถวไม่ตรง</span></div>
+        <div class="sbox warn"><b>${nWarn}</b><span>ตรวจไม่สำเร็จ</span></div>
+        <div class="sbox"><b>${published.length}</b><span>release ที่ตรวจ (ล่าสุด 30)</span></div>
+      </div>
+      ${relsHtml}`;
+  } catch (e) {
+    box.innerHTML = `<div class="state">ดึงข้อมูลไม่สำเร็จ: ${esc(e.message)}<br>
+      ลองรีเฟรช หรือดู <a href="https://github.com/${REPO}/releases">Releases</a> ตรง ๆ</div>`;
+  }
+})();
+</script>
+</body>
+</html>
