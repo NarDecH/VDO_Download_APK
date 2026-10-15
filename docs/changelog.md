@@ -2,6 +2,13 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.20] — 2026-10-16
+
+### การเปลี่ยนแปลง
+- fix: flag ที่ผิด --concurrent-fragment-downloads (ไม่มีจริงใน yt-dlp) ทำ hls/dash ล้มทันที exit 2
+- แก้เป็น --concurrent-fragments (+N) ยืนยันกับ bundled yt-dlp v2026.08.19
+
+
 ## [1.9.19] — 2026-10-15
 
 ### การเปลี่ยนแปลง
