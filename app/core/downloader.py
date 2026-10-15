@@ -477,7 +477,12 @@ class DownloadManager:
         if self.settings.get("embed_thumbnail"):
             cmd += ["--embed-thumbnail"]
         if job.kind in ("hls", "dash"):
-            cmd += ["--concurrent-fragment-downloads", "4"]
+            # v1.9.20 fix (diagnostics 2026-10-16): the old flag name
+            # "--concurrent-fragment-downloads" does not exist in yt-dlp -
+            # every hls/dash job died immediately with "no such option"
+            # (yt-dlp exited with code 2). The real option is spelled
+            # --concurrent-fragments / -N (present since yt-dlp 2020).
+            cmd += ["--concurrent-fragments", "4"]
         cmd.append(job.url)
 
         self.log.dl("=" * 70)
