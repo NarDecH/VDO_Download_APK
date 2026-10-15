@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.19] — 2026-10-15
+
+### การเปลี่ยนแปลง
+- รายการวิดีโอแสดงภาพตัวอย่าง (poster/og:image) และขนาดไฟล์ (Range probe + transferSize) ทั้ง desktop toolbar และ Control Center
+- Android sheet แสดง thumbnail + ขนาด (Detector.kt sync ตาม desktop)
+- แก้ iframe scan เรียก report() จำนวนอาร์กิวเมนต์ผิด (label หาย) เป็น object-based
+
+
 ## [1.9.18] — 2026-10-15
 
 ### การเปลี่ยนแปลง
