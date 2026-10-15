@@ -11,7 +11,11 @@ import java.util.concurrent.ConcurrentHashMap
  * media of the previous page then stops re-filling the list.
  */
 object MediaStore {
-    class Item(val url: String, val kind: String, val label: String, val page: String, val title: String) {
+    class Item(
+        val url: String, val kind: String, val label: String, val page: String, val title: String,
+        val poster: String = "",        // v1.9.19: thumbnail URL for the sheet row
+        val byteHint: Long = 0L,        // v1.9.19: observed transfer size (0 = unknown)
+    ) {
         override fun toString(): String = label.ifEmpty { kind }
     }
 
@@ -19,14 +23,20 @@ object MediaStore {
     private var origin = ""
 
     @Synchronized
-    fun add(url: String, kind: String, label: String, page: String, title: String): Boolean {
+    fun add(url: String, kind: String, label: String, page: String, title: String,
+            poster: String = "", byteHint: Long = 0L): Boolean {
         if (items.containsKey(url)) {
-            // touch -> re-insert at the end so eviction is true LRU
+            // touch -> re-insert at the end so eviction is true LRU; a later
+            // report may carry the poster/hint the first one lacked
             val existing = items.remove(url) ?: return false
-            items[url] = existing
+            items[url] = if (poster.isNotEmpty() || byteHint > 0) Item(
+                existing.url, existing.kind, existing.label, existing.page, existing.title,
+                poster.ifEmpty { existing.poster },
+                if (byteHint > 0) byteHint else existing.byteHint,
+            ) else existing
             return false
         }
-        items[url] = Item(url, kind, label, page, title)
+        items[url] = Item(url, kind, label, page, title, poster, byteHint)
         if (items.size > 200) {
             val it = items.entries.iterator()
             it.next(); it.remove()

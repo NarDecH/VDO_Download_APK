@@ -22,7 +22,7 @@ object Detector {
       const EMBED_RE = /embed|player|video|watch|stream|play|media|vod|\/v\/|\/e\//i;
       const seen = new Set();
 
-      function report(url, kind, label) {
+      function report(url, kind, label, extra) {
         try {
           if (!url || url.startsWith('javascript:') || url.startsWith('about:')) return;
           const abs = new URL(url, location.href).href;
@@ -30,10 +30,15 @@ object Detector {
           if (!MEDIA_RE.test(abs) && !abs.startsWith('blob:') && kind !== 'embed') return;
           seen.add(abs);
           const ext = kind || (abs.match(MEDIA_RE) || [])[1] || (abs.startsWith('blob:') ? 'blob' : 'media');
-          AndroidBridge.reportMedia(JSON.stringify({
+          const o = {
             url: abs, kind: ext.toLowerCase(), label: label || '',
             page: location.href, title: document.title
-          }));
+          };
+          // v1.9.19: thumbnail + size estimate for the media sheet (keys kept
+          // OPTIONAL so all other call sites stay unchanged)
+          if (extra) { if (extra.poster) o.poster = extra.poster; if (extra.byte_hint) o.byte_hint = extra.byte_hint;
+            if (extra.width) o.width = extra.width; if (extra.height) o.height = extra.height; }
+          AndroidBridge.reportMedia(JSON.stringify(o));
         } catch (e) {}
       }
 
@@ -42,7 +47,10 @@ object Detector {
           document.querySelectorAll('video, audio').forEach(function (v) {
             const src = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
             if (src) report(src, null, v.tagName.toLowerCase() + ' element ' +
-              (v.videoWidth ? (v.videoWidth + 'x' + v.videoHeight) : ''));
+              (v.videoWidth ? (v.videoWidth + 'x' + v.videoHeight) : ''), {
+                poster: findPoster(v) || pagePoster() || '',
+                width: v.videoWidth || '', height: v.videoHeight || ''
+              });
           });
           document.querySelectorAll('video source, audio source').forEach(function (s) {
             if (s.src) report(s.src, null, '<source>');
@@ -91,9 +99,37 @@ object Detector {
       function scanResources() {
         try {
           performance.getEntriesByType('resource').forEach(function (r) {
-            if (MEDIA_RE.test(r.name)) report(r.name, null, 'network (timing)');
+            if (MEDIA_RE.test(r.name)) {
+              // CORS-exposed/same-origin responses carry real byte counts
+              const size = r.transferSize > 0 ? r.transferSize + r.encodedBodySize : 0;
+              report(r.name, null, 'network (timing)', size ? { byte_hint: size } : null);
+            }
           });
         } catch (e) {}
+      }
+
+      // v1.9.19: video thumbnails (twin of app/core/detector.py findPoster):
+      // 1) video[poster] 2) <img> near the player 3) og:image / twitter:image
+      function findPoster(videoEl) {
+        try {
+          if (videoEl.getAttribute && videoEl.getAttribute('poster')) return videoEl.getAttribute('poster');
+          if (videoEl.poster) return videoEl.poster;
+          let node = videoEl, hop = 0;
+          while (node && node !== document.body && hop++ < 4) {
+            const img = node.querySelector && node.querySelector('img[src]');
+            if (img && img.src && img.naturalWidth >= 100) return img.src;
+            node = node.parentElement; hop++;
+          }
+        } catch (e) {}
+        return null;
+      }
+      function pagePoster() {
+        try {
+          const m = document.querySelector('meta[property="og:image"], meta[name="og:image"],'
+            + 'meta[property="twitter:image"], meta[name="twitter:image"]');
+          if (m && m.content) return m.content;
+        } catch (e) {}
+        return null;
       }
 
       // ---- iframe scan (same policy as desktop DETECT_JS) ------------------
@@ -114,10 +150,12 @@ object Detector {
             } catch (e) { doc = null; }
             if (doc) {
               try {
-                doc.querySelectorAll('video, audio').forEach(function (v) {
-                  const s = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
-                  if (s) report(s, null, 'iframe: video element' + (v.videoWidth ? ' — ' + v.videoWidth + 'x' + v.videoHeight : ''));
-                });
+            doc.querySelectorAll('video, audio').forEach(function (v) {
+              const s = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
+              if (s) report(s, null, 'iframe: video element' + (v.videoWidth ? ' — ' + v.videoWidth + 'x' + v.videoHeight : ''), {
+                poster: findPoster(v) || '', width: v.videoWidth || '', height: v.videoHeight || ''
+              });
+            });
                 doc.querySelectorAll('video source, audio source').forEach(function (s) {
                   if (s.src) report(s.src, null, 'iframe: <source>');
                 });
@@ -125,9 +163,12 @@ object Detector {
                   if (MEDIA_RE.test(a.href)) report(a.href, null, 'iframe: link');
                 });
                 if (win && win.performance) {
-                  win.performance.getEntriesByType('resource').forEach(function (r) {
-                    if (MEDIA_RE.test(r.name)) report(r.name, null, 'iframe: network');
-                  });
+              win.performance.getEntriesByType('resource').forEach(function (r) {
+                if (MEDIA_RE.test(r.name)) {
+                  const size = r.transferSize > 0 ? r.transferSize + r.encodedBodySize : 0;
+                  report(r.name, null, 'iframe: network', size ? { byte_hint: size } : null);
+                }
+              });
                 }
               } catch (e) {}
             }
@@ -153,4 +194,11 @@ object Detector {
     } catch (e: Exception) {
         null
     }
+
+    /** Size estimate carried by a report (byte_hint from resource timing,
+     *  0 when the page could not observe the download). */
+    fun byteHint(o: JSONObject): Long = o.optLong("byte_hint", 0L)
+
+    /** Poster URL carried by a report ("" when the page had none). */
+    fun posterOf(o: JSONObject): String = o.optString("poster", "").take(600)
 }

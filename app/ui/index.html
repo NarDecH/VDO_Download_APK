@@ -323,19 +323,29 @@ function renderDownloads(list){
   </div>`).join('');
 }
 
+function fmtBytes(n){ if(!n) return ''; const u=['B','KB','MB','GB']; let i=0; while(n>=1024&&i<3){n/=1024;i++} return n.toFixed(i?1:0)+' '+u[i]; }
 function renderMedia(list){
   const el = document.getElementById('mediaList');
   if (!list || !list.length){ el.innerHTML = '<div class="empty">ยังไม่มีข้อมูล — เปิดเว็บในหน้าต่างเบราว์เซอร์ แล้วเล่น/สแกนวิดีโอ</div>'; return; }
-  el.innerHTML = list.slice().reverse().map(m => `
+  el.innerHTML = list.slice().reverse().map(m => {
+    const size = m.size ? fmtBytes(m.size) : (m.byte_hint ? '~'+fmtBytes(m.byte_hint) : '');
+    return `
   <div class="card">
-    <div style="display:flex;justify-content:space-between;gap:8px">
-      <b>${esc(m.label || m.kind)}</b>
-      <span><span class="pill">${esc(m.kind)}</span>${m.width?`<span class="pill">${m.width}×${m.height}</span>`:''}</span>
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <div style="width:96px;height:60px;flex:0 0 96px;border-radius:8px;overflow:hidden;background:#0b1120;border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:22px;color:#33477a">
+        ${m.poster?`<img src="${esc(m.poster)}" onerror="this.parentElement.textContent='🎬'" referrerpolicy="no-referrer" style="width:100%;height:100%;object-fit:cover">`:'🎬'}
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="display:flex;justify-content:space-between;gap:8px">
+          <b>${esc(m.label || m.kind)}</b>
+          <span><span class="pill">${esc(m.kind)}</span>${m.width?`<span class="pill">${m.width}×${m.height}</span>`:''}${size?`<span class="pill">📦 ${size}</span>`:''}${m.duration?`<span class="pill">⏱ ${Math.round(m.duration)}s</span>`:''}</span>
+        </div>
+        <div class="url mono">${esc(m.url.slice(0,180))}</div>
+        <div class="hint">จาก: ${esc((m.page_title||'').slice(0,60))} — ${esc((m.page_url||'').slice(0,80))} · ตรวจพบโดย ${esc(m.via||'?')}</div>
+        <div style="margin-top:8px"><button class="act grn" style="padding:5px 12px" onclick="quickDownload('${esc(m.url)}')">⬇ ดาวน์โหลด</button></div>
+      </div>
     </div>
-    <div class="url mono">${esc(m.url.slice(0,180))}</div>
-    <div class="hint">จาก: ${esc((m.page_title||'').slice(0,60))} — ${esc((m.page_url||'').slice(0,80))} · ตรวจพบโดย ${esc(m.via||'?')}</div>
-    <div style="margin-top:8px"><button class="act grn" style="padding:5px 12px" onclick="quickDownload('${esc(m.url)}')">⬇ ดาวน์โหลด</button></div>
-  </div>`).join('');
+  </div>`;}).join('');
 }
 
 function renderSettings(s){
@@ -630,6 +640,10 @@ window.__onEvent = function (event, payload) {
     renderDownloads(list);
   } else if (event === 'media_found') {
     state.media = (state.media || []).filter(m => m.url !== payload.url); state.media.push(payload);
+    renderMedia(state.media);
+  } else if (event === 'media_updated') {
+    // background size probe refined an item (size/poster) - patch in place
+    state.media = (state.media || []).map(m => m.url === payload.url ? Object.assign({}, m, payload) : m);
     renderMedia(state.media);
   } else if (event === 'state_changed') {
     renderDownloads(payload.downloads || []); renderMedia(payload.media || []);

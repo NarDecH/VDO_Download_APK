@@ -30,6 +30,7 @@ import webview  # noqa: E402
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager, is_usable_download_url  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir, set_event_origin  # noqa: E402
+from core import media_size  # noqa: E402
 from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
 from core.sieve import DEVICE_CLIENT_NAME, SieveError, SieveManager, device_login  # noqa: E402
 from core.updater import Updater, spawn_startup_check  # noqa: E402
@@ -189,6 +190,57 @@ class MediaStore:
             self.items.clear()
 
 
+class _SizeProbe:
+    """Sequential, throttled background media-size probes.
+
+    One worker thread consumes a queue, so a page that detects 15 videos at
+    once issues at most one request every few seconds - never a burst that
+    a CDN rate-limiter can pick up. Replacements (same URL reported again
+    with a poster/byte_hint refresh) reuse the pending slot instead of
+    queueing a second probe.
+    """
+
+    INTERVAL = 2.5
+
+    def __init__(self):
+        self.q: dict[str, dict] = {}
+        self._lock = threading.Lock()
+        self._thread: threading.Thread | None = None
+
+    def push(self, rep: dict, on_ready) -> None:
+        url = (rep.get("url") or "")[:400]
+        if not url.startswith(("http://", "https://")):
+            return
+        with self._lock:
+            self.q[url] = rep
+            if self._thread and self._thread.is_alive():
+                return
+            self._thread = threading.Thread(target=self._drain, args=(on_ready,),
+                                            name="media-size-prober", daemon=True)
+            self._thread.start()
+
+    def _drain(self, on_ready) -> None:
+        while True:
+            with self._lock:
+                if not self.q:
+                    self._thread = None
+                    return
+                url, rep = self.q.popitem()
+            try:
+                size = media_size.probe_size(
+                    rep.get("url") or url, rep.get("kind") or "media",
+                    referer=rep.get("page_url") or "",
+                    byte_hint=rep.get("byte_hint") or 0)
+                if size:
+                    on_ready(size, rep)
+            except Exception:
+                pass
+            time.sleep(self.INTERVAL)
+
+
+_size_probe = _SizeProbe()
+
+
 class Api:
     """Bridge exposed to JS as window.pywebview.api (both windows).
 
@@ -261,12 +313,28 @@ class Api:
                           level="debug", event="media_ignored_excluded", page=page_url[:200])
             return
         rep["first_seen"] = time.time()
+        rep.setdefault("size", rep.get("byte_hint") or 0)   # refined by the background probe
         if _APP.media.add(rep):
             _APP.logm.log("media found: %s (%s) via %s" % (rep["url"][:120], rep["kind"], rep["via"]),
                           event="media_found", url=rep["url"], kind=rep["kind"], via=rep["via"],
                           page=rep["page_url"][:200])
             _APP.push_browser("media_found", rep)
             _APP.push_control("media_found", rep)
+            _size_probe.push(rep, _media_size_ready)
+
+    # v1.9.19: background Content-Range/HEAD probe refines the estimated size
+    # (pushed straight into the stored item, live into both windows)
+    def _media_size_ready(self, size: int, rep: dict) -> None:
+        if size <= 0:
+            return
+        item = _APP.media.items.get(rep["url"][:400])
+        if not item or item.get("size") == size:
+            return
+        item["size"] = size
+        _APP.push_browser("media_updated", item)
+        _APP.push_control("media_updated", item)
+        _APP.logm.log("media size: %s -> %d bytes" % (rep["url"][:120], size),
+                      level="debug", event="media_size", url=rep["url"], size=size)
 
     # ------------------------------------------------------------- downloads
     def get_formats(self, url: str, referrer: str = "") -> dict:
@@ -699,6 +767,10 @@ class App:
         try:
             if event == "media_found":
                 self.browser.evaluate_js("window.__vgToolbar && window.__vgToolbar.media(%s); 1;"
+                                         % json.dumps(payload, ensure_ascii=False, default=str))
+            elif event == "media_updated":
+                # background size probe refined the item -> repaint its row
+                self.browser.evaluate_js("window.__vgToolbar && window.__vgToolbar.render(%s); 1;"
                                          % json.dumps(payload, ensure_ascii=False, default=str))
         except Exception as e:
             self.logm.log("push_browser failed: %r" % e, level="debug")

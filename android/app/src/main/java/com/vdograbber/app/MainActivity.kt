@@ -25,6 +25,7 @@ import android.webkit.WebViewClient
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -90,6 +91,8 @@ class MainActivity : AppCompatActivity() {
                     label = o.optString("label", ""),
                     page = o.optString("page", ""),
                     title = o.optString("title", ""),
+                    poster = Detector.posterOf(o),
+                    byteHint = Detector.byteHint(o),
                 )
                 if (added) {
                     FileLog.event("media_found", mapOf("url" to url, "kind" to o.optString("kind"), "via" to "js"))
@@ -277,6 +280,12 @@ class MainActivity : AppCompatActivity() {
                 val url = request.url.toString()
                 val ext = try { Downloader.extOf(url) } catch (_: Throwable) { "" }
                 if (ext.isEmpty()) return null
+                // v1.9.19: the exact Content-Length of the RESPONSE is not
+                // visible in shouldInterceptRequest (we only see the request
+                // and must return null to let the response stream through),
+                // so no byte hint from this path - the JS detector's resource
+                // timing carries it when the page itself downloaded a chunk.
+                val contentLength = -1L
                 // v1.3.5: WebView getters (web.url/web.title) must run on the
                 // main thread - this callback fires on a WebView thread-pool
                 // thread ("A WebView method was called on thread
@@ -286,7 +295,8 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val page = web.url ?: ""
                         val title = web.title ?: ""
-                        if (MediaStore.add(url, ext, "network request", page.substringBeforeLast('/'), title)) {
+                        if (MediaStore.add(url, ext, "network request", page.substringBeforeLast('/'), title,
+                                           byteHint = contentLength)) {
                             FileLog.event("media_found", mapOf("url" to url, "kind" to ext, "via" to "shouldInterceptRequest"))
                             updateChip()
                         }
@@ -666,11 +676,17 @@ class MainActivity : AppCompatActivity() {
         renderSheet()
     }
 
-    /** One row of the พบวิดีโอ tab (same behaviour as pre-v1.5.0). */
+    /** One row of the พบวิดีโอ tab (v1.9.19: + thumbnail + size estimate). */
     private fun bindMediaRow(m: MediaStore.Item): View {
         val row = layoutInflater.inflate(R.layout.item_media, sheetContainer, false)
         row.findViewById<TextView>(R.id.mLabel).text =
             "${m.label.ifEmpty { m.kind }}  ·  ${m.kind}"
+        val sizeLine = row.findViewById<TextView>(R.id.mSize)
+        if (m.byteHint > 0) {
+            sizeLine.text = "📦 ~${Downloader.humanSize(m.byteHint)}"
+            sizeLine.visibility = View.VISIBLE
+        }
+        loadThumb(row.findViewById<ImageView>(R.id.mThumb), row.findViewById<TextView>(R.id.mPosterLabel), m.poster)
         row.findViewById<TextView>(R.id.mUrl).text = m.url
         row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
         row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
@@ -690,6 +706,28 @@ class MainActivity : AppCompatActivity() {
             sheetDialog?.dismiss()
         }
         return row
+    }
+
+    /** v1.9.19: fill the sheet row's thumbnail from the poster URL the page
+     *  reported (og:image / video poster / site thumb). Plain HTTP GET -
+     *  poster images are public CDN assets, no auth headers involved. When
+     *  anything fails the 🎬 placeholder stays. */
+    private fun loadThumb(img: ImageView, placeholder: TextView, posterUrl: String) {
+        if (posterUrl.isEmpty()) return
+        thread(name = "thumb-load") {
+            try {
+                val c = java.net.URL(posterUrl).openConnection() as java.net.HttpURLConnection
+                c.connectTimeout = 6000; c.readTimeout = 6000
+                c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) VDOGrabber")
+                c.instanceFollowRedirects = true
+                if (c.responseCode !in 200..299) { c.disconnect(); return@thread }
+                val bmp = android.graphics.BitmapFactory.decodeStream(c.inputStream)
+                c.disconnect()
+                if (bmp != null) runOnUiThread {
+                    img.setImageBitmap(bmp); img.visibility = View.VISIBLE; placeholder.visibility = View.GONE
+                }
+            } catch (_: Throwable) { /* placeholder stays */ }
+        }
     }
 
     /** One row of the ดาวน์โหลดเสร็จแล้ว tab: file + ลบไฟล์ (v1.1.8 behaviour). */

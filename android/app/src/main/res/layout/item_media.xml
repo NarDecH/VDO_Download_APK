@@ -1,9 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- v1.9.19: rows gained a 16:9 video thumbnail (mThumb; mPosterLabel is
+     the 🎬 placeholder shown while the image loads) and a size line (mSize). -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical"
+    android:orientation="horizontal"
     android:paddingVertical="10dp">
+
+    <FrameLayout
+        android:id="@+id/mThumbWrap"
+        android:layout_width="96dp"
+        android:layout_height="60dp"
+        android:layout_marginEnd="10dp"
+        android:background="#0B1120">
+
+        <ImageView
+            android:id="@+id/mThumb"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@string/download"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/mPosterLabel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:text="🎬"
+            android:textSize="20sp"
+            android:textColor="#33477A" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
 
     <TextView
         android:id="@+id/mLabel"
@@ -12,6 +45,14 @@
         android:textColor="#FFC371"
         android:textStyle="bold"
         android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/mSize"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#7D8DB1"
+        android:textSize="11sp"
+        android:visibility="gone" />
 
     <TextView
         android:id="@+id/mUrl"
@@ -73,5 +114,6 @@
             android:text="@string/delete"
             android:textColor="#FCA5A5"
             android:visibility="gone" />
+    </LinearLayout>
     </LinearLayout>
 </LinearLayout>

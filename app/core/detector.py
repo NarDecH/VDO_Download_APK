@@ -72,7 +72,7 @@ DETECT_JS = r"""
       document.querySelectorAll('video, audio').forEach(function (v) {
         const src = v.currentSrc || v.src || (v.querySelector('source') && v.querySelector('source').src);
         if (src) report(src, null, { label: v.tagName.toLowerCase() + ' element', width: v.videoWidth, height: v.videoHeight,
-                                     duration: v.duration, poster: v.poster || '', live: !!v.duration });
+                                     duration: v.duration, poster: findPoster(v) || pagePoster() || '', live: !!v.duration });
       });
       document.querySelectorAll('video source, audio source').forEach(function (s) {
         if (s.src) report(s.src, null, { label: '<source>' });
@@ -129,7 +129,11 @@ DETECT_JS = r"""
   function scanResources() {
     try {
       performance.getEntriesByType('resource').forEach(function (r) {
-        if (MEDIA_RE.test(r.name)) report(r.name, null, { label: 'network (timing)' });
+        if (MEDIA_RE.test(r.name)) {
+          // same-origin (or CORS-exposed) responses carry real byte counts
+          const size = r.transferSize > 0 ? r.transferSize + r.encodedBodySize : 0;
+          report(r.name, null, { label: 'network (timing)', byte_hint: size || '' });
+        }
       });
     } catch (e) {}
   }
@@ -144,7 +148,7 @@ DETECT_JS = r"""
       document.querySelectorAll("iframe").forEach(function (f) {
         const src = f.src || "";
         if (src && !/^about:/i.test(src) && EMBED_RE.test(src)) {
-          report(src, "embed", "iframe player (yt-dlp สกัดให้)", "iframe scan");
+          report(src, "embed", { label: "iframe player (yt-dlp สกัดให้)", via: "iframe scan" });
         }
         let doc = null, win = null;
         try {
@@ -155,17 +159,21 @@ DETECT_JS = r"""
           try {
             doc.querySelectorAll("video, audio").forEach(function (v) {
               const s = v.currentSrc || v.src || (v.querySelector("source") && v.querySelector("source").src);
-              if (s) report(s, null, "iframe: video element" + (v.videoWidth ? " — " + v.videoWidth + "×" + v.videoHeight : ""), "iframe scan");
+              if (s) report(s, null, { label: "iframe: video element" + (v.videoWidth ? " — " + v.videoWidth + "×" + v.videoHeight : ""),
+                                       via: "iframe scan", poster: findPoster(v) || "", width: v.videoWidth || '', height: v.videoHeight || '', duration: v.duration || '' });
             });
             doc.querySelectorAll("video source, audio source").forEach(function (s) {
-              if (s.src) report(s.src, null, "iframe: <source>", "iframe scan");
+              if (s.src) report(s.src, null, { label: "iframe: <source>", via: "iframe scan" });
             });
             doc.querySelectorAll("a[href]").forEach(function (a) {
-              if (MEDIA_RE.test(a.href)) report(a.href, null, "iframe: link", "iframe scan");
+              if (MEDIA_RE.test(a.href)) report(a.href, null, { label: "iframe: link", via: "iframe scan" });
             });
             if (win && win.performance) {
               win.performance.getEntriesByType("resource").forEach(function (r) {
-                if (MEDIA_RE.test(r.name)) report(r.name, null, "iframe: network", "iframe scan");
+                if (MEDIA_RE.test(r.name)) {
+                  const size = r.transferSize > 0 ? r.transferSize + r.encodedBodySize : 0;
+                  report(r.name, null, { label: "iframe: network", via: "iframe scan", byte_hint: size || "" });
+                }
               });
             }
           } catch (e) {}
@@ -173,9 +181,45 @@ DETECT_JS = r"""
       });
       document.querySelectorAll("embed[src], object[data]").forEach(function (o) {
         const u = o.src || o.data;
-        if (u && EMBED_RE.test(u)) report(u, "embed", "<" + o.tagName.toLowerCase() + "> player", "iframe scan");
+        if (u && EMBED_RE.test(u)) report(u, "embed", { label: "<" + o.tagName.toLowerCase() + "> player", via: "iframe scan" });
       });
     } catch (e) {}
+  }
+
+  // ---- video thumbnails -------------------------------------------------
+  // 1. <video poster> (JS property) and <video poster> attributes
+  // 2. <img> inside the nearest player container (site thumbnail next to
+  //    the player, common on episode pages)
+  // 3. og:image / twitter:image / JSON-LD thumbnailUrl metas (site-wide)
+  // The posters are usually static CDN images with open CORS (crossorigin
+  // not needed - we only use them as an <img src>), so they render in the
+  // media panel/sheet without any server-side fetch.
+  function findPoster(videoEl) {
+    try {
+      if (videoEl.getAttribute && videoEl.getAttribute('poster')) return videoEl.getAttribute('poster');
+      if (videoEl.poster) return videoEl.poster;
+      let node = videoEl, hop = 0;
+      while (node && node !== document.body && hop++ < 4) {
+        const img = node.querySelector && node.querySelector('img[src]');
+        if (img && img.src && img.naturalWidth >= 100) return img.src;
+        node = node.parentElement; hop++;
+      }
+    } catch (e) {}
+    return null;
+  }
+  function pagePoster() {
+    try {
+      const m = document.querySelector('meta[property="og:image"], meta[name="og:image"],'
+        + ' meta[property="twitter:image"], meta[name="twitter:image"]');
+      if (m && m.content) return m.content;
+      const ld = document.querySelector('script[type="application/ld+json"]');
+      if (ld) {
+        const d = JSON.parse(ld.textContent);
+        const arr = Array.isArray(d) ? d : [d];
+        for (const x of arr) if (x && (x.thumbnailUrl || x.image)) return x.thumbnailUrl || x.image;
+      }
+    } catch (e) {}
+    return null;
   }
 
   // ---- orchestrator -----------------------------------------------------
@@ -222,7 +266,11 @@ TOOLBAR_JS = r"""
            background:#0f1729;border:1px solid #2a3a5c;border-radius:12px;box-shadow:0 12px 40px rgba(0,0,0,.5);color:#e8ecf4;
            font:13px/1.45 'Segoe UI',system-ui,sans-serif;padding:10px}
     .panel h4{margin:4px 6px 8px;font-size:13px;color:#93a4c3}
-    .item{border:1px solid #233152;border-radius:9px;padding:8px;margin-bottom:7px;background:#131c33}
+    .item{border:1px solid #233152;border-radius:9px;padding:8px;margin-bottom:7px;background:#131c33;display:flex;gap:8px;align-items:flex-start}
+    .item .thumb{width:74px;height:44px;flex:0 0 74px;border-radius:6px;overflow:hidden;background:#0b1120;
+                 display:flex;align-items:center;justify-content:center;font-size:20px;color:#33477a}
+    .item .thumb img{width:100%;height:44px;object-fit:cover;display:block}
+    .item .body{flex:1;min-width:0}
     .item b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#f1f5f9}
     .item small{color:#7d8db1;word-break:break-all}
     .row{display:flex;gap:6px;margin-top:6px;align-items:center;flex-wrap:wrap}
@@ -344,23 +392,38 @@ TOOLBAR_JS = r"""
 
   window.__vgToolbar = {
     sync: function () { urlbox.value = location.href; },
-    media: function (rep) {
-      badge.style.display = 'inline-block';
-      badge.textContent = String((window.__vgCount = (window.__vgCount || 0) + 1));
+    media: function (rep) { __vgToolbar.render(rep); window.__vgCount = (window.__vgCount || 0) + 1;
+      badge.style.display = 'inline-block'; badge.textContent = String(window.__vgCount); },
+    render: function (rep) {
       const empty = list.querySelector('.empty'); if (empty) empty.remove();
-      const div = document.createElement('div'); div.className = 'item';
+      const existing = list.querySelector('[data-key="' + CSS.escape(rep.url.slice(0, 200)) + '"]');
+      const div = existing || document.createElement('div');
+      div.className = 'item'; div.dataset.key = rep.url.slice(0, 200);
       const label = (rep.label || rep.kind || 'video');
       const q = rep.width && rep.height ? rep.width + '×' + rep.height : '';
-      div.innerHTML = '<b>' + label + (q ? ' — ' + q : '') + '</b><small>' + rep.url.slice(0, 160) + '</small>' +
+      const sizeTxt = rep.size ? ' · ~' + fmtMB(rep.size) : '';
+      const thumb = rep.poster
+        ? '<img src="' + escAttr(rep.poster.replace(/"/g, '%22')) + '" onerror="this.parentElement.textContent=\'🎬\'" alt="" referrerpolicy="no-referrer">'
+        : '🎬';
+      div.innerHTML = '<div class="thumb">' + thumb + '</div><div class="body">' +
+        '<b>' + label + (q ? ' — ' + q : '') + '</b><small>' + sizeTxt + (sizeTxt ? ' · ' : '') + rep.url.slice(0, 160) + '</small>' +
         '<div class="row">' +
         '<button class="dlbtn" data-url="' + encodeURIComponent(rep.url) + '" data-ref="' + encodeURIComponent(location.href) + '">⬇ ดาวน์โหลด</button>' +
         '<button class="fmtbtn" data-url="' + encodeURIComponent(rep.url) + '">รูปแบบ/คุณภาพ</button>' +
         (rep.kind === 'embed' ? '<button class="fmtbtn" data-open="' + encodeURIComponent(rep.url) + '" title="เปิดหน้า embed นี้เป็นหน้าหลัก แล้วสแกนวิดีโอต่อ">🌐 เปิดหน้า embed</button>' : '') +
         '</div>' +
-        '<div class="fmts"></div>';
+        '<div class="fmts"></div></div>';
       list.prepend(div);
     }
   };
+  function fmtMB(b) {
+    b = Number(b) || 0;
+    if (b >= 1073741824) return (b / 1073741824).toFixed(2) + ' GB';
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    if (b >= 1024) return Math.round(b / 1024) + ' KB';
+    return b + ' B';
+  }
+  function escAttr(s) { return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
   window.__vgToolbar.sync();
 })();
 """
@@ -464,12 +527,21 @@ def build_report(payload_json: str, page_url: str = "") -> dict | None:
         url = str(item.get("url") or "").strip()
         if not url or not url.startswith(("http", "blob")):
             return None
+        # poster/byte_hint are optional metadata for the thumbnail + size
+        # display (v1.9.19); absent on every legacy report path
+        poster = str(item.get("poster") or "").strip()
+        try:
+            byte_hint = int(item.get("byte_hint") or 0)
+        except (TypeError, ValueError):
+            byte_hint = 0
         return {
             "url": url,
             "kind": str(item.get("kind") or "media"),
             "label": str(item.get("label") or "")[:120],
             "width": item.get("width"), "height": item.get("height"),
             "duration": item.get("duration"),
+            "poster": poster[:600],
+            "byte_hint": byte_hint,
             "via": str(item.get("via") or item.get("label") or ""),
             "page_url": str(data.get("page") or page_url),
             "page_title": str(data.get("title") or "")[:200],
