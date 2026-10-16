@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.21] — 2026-10-16
+
+### การเปลี่ยนแปลง
+- เว็บโปรด (favorite websites): ปุ่ม ★บนแถบเครื่องมือบันทึกหน้าปัจจุบันคลิกเดียว (กดค้างเปิดรายการในหน้า) + แท็บเว็บโปรดใน Control Center
+- Android มี ★ชุดบน toolbar + แท็บเว็บโปรดใน sheet
+- แก้ selftest: _media_size_ready ขาด self. ทำ size probe ล้ม และ comment # หลุดใน TOOLBAR_JS ทำ toolbar ฉีดไม่สำเร็จ
+
+
 ## [1.9.20] — 2026-10-16
 
 ### การเปลี่ยนแปลง

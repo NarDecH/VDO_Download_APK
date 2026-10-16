@@ -112,7 +112,7 @@ class MainActivity : AppCompatActivity() {
         FileLog.init(applicationContext)
         PausedJobs.init(filesDir) // v1.7.0: หยุดพักไว้ registry (paused_jobs.tsv)
         FavoritesStore.init(filesDir) // v1.9.21: เว็บโปรด (favorites.tsv)
-        FileLog.app("INFO", "app", "VDO Grabber 1.9.20 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
+        FileLog.app("INFO", "app", "VDO Grabber 1.9.21 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
 
