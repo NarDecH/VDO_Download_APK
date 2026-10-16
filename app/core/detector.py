@@ -290,6 +290,7 @@ TOOLBAR_JS = r"""
     <button data-act="reload" title="Reload">⟳</button>
     <div class="urlbox"><input spellcheck="false" placeholder="ป้อน URL แล้วกด Enter"></div>
     <button data-act="clip" title="Go straight to the URL on the clipboard">📋</button>
+    <button data-act="fav" title="บันทึกหน้านี้เป็นเว็บโปรด (คลิกซ้ำเพื่ออัปเดตชื่อ) — กดค้างเพื่อดูรายการ">★ บันทึกเว็บ</button>
     <button data-act="detect" title="Scan this page for videos">🔍 ตรวจหาวิดีโอ</button>
     <button data-act="panel"  title="Videos found">🎬 วิดีโอ <span class="badge">0</span></button>
     <button data-act="ctrl"   title="Downloads / Logs / Settings">⚙️</button>
@@ -297,12 +298,68 @@ TOOLBAR_JS = r"""
   <div class="panel" id="vgp">
     <h4>🎬 วิดีโอที่ตรวจพบในหน้านี้</h4>
     <div id="vgl"><div class="empty">ยังไม่พบวิดีโอ — กด "ตรวจหาวิดีโอ" หรือเล่นวิดีโอก่อนสักครู่</div></div>
+  </div>
+  <!-- v1.9.21: favorites panel - opened by LONG-PRESS on ★ (click still saves) -->
+  <div class="panel" id="vgf">
+    <h4>★ เว็บโปรด</h4>
+    <div id="vgfl"><div class="empty">กำลังโหลด...</div></div>
   </div>`;
 
   document.documentElement.appendChild(host);
   const $ = (s) => shadow.querySelector(s);
   const badge = $('.badge'), panel = $('#vgp'), list = $('#vgl'), urlbox = $('input');
+  const favPanel = $('#vgf'), favBox = $('#vgfl');
   const pyapi = () => window.pywebview && window.pywebview.api;
+
+  // v1.9.21: long-press the ★ button -> open the favorites panel; a plain
+  // click still saves/refreshes. pointerdown+timer (450ms) so touch and
+  // mouse behave the same; the follow-up click event is swallowed.
+  const favBtn = $('button[data-act=fav]');
+  let favHold = false, favTimer = null;
+  const favReset = () => { if (favTimer) { window.clearTimeout(favTimer); favTimer = null; } };
+  favBtn.addEventListener('pointerdown', function () {
+    favHold = false;
+    favTimer = window.setTimeout(function () {
+      favHold = true;
+      panel.style.display = 'none';
+      favPanel.style.display = 'block';
+      renderFavs();
+    }, 450);
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { favBtn.addEventListener(ev, favReset); });
+
+  // v1.9.21: render the favorites list in-page (เปิด web / ลบ); data comes
+  // from the Python store so remove() keeps Control Center in sync via
+  // favorites_changed pushes
+  function renderFavs() {
+    const api = pyapi(); if (!api || !favBox) return;
+    api.favorite_list().then(function (res) {
+      const items = res || [];
+      if (!items.length) {
+        favBox.innerHTML = '<div class="empty">ยังไม่มีรายการ — เปิดเว็บที่ชอบแล้วกด ★ บันทึกเว็บ</div>';
+        return;
+      }
+      favBox.innerHTML = '';
+      items.slice(0, 50).forEach(function (f) {
+        const it = document.createElement('div'); it.className = 'item';
+        it.innerHTML = '<div class="body"><b></b><small></small><div class="row"></div></div>';
+        it.querySelector('b').textContent = f.title || f.url;
+        it.querySelector('small').textContent = f.url;
+        const row = it.querySelector('.row');
+        const open = document.createElement('button'); open.className = 'dlbtn'; open.textContent = '🌐 เปิด';
+        open.onclick = function () { favPanel.style.display = 'none'; location.href = f.url; };
+        const copy = document.createElement('button'); copy.className = 'fmtbtn'; copy.textContent = '📋 คัดลอก';
+        copy.onclick = function () { try { navigator.clipboard.writeText(f.url); } catch (e) {} };
+        const rm = document.createElement('button'); rm.className = 'fmtbtn'; rm.textContent = '🗑 ลบ';
+        rm.onclick = function () {
+          pyapi().favorite_remove(f.url).then(function () { renderFavs(); });
+        };
+        row.appendChild(open); row.appendChild(copy); row.appendChild(rm);
+        it.appendChild(row);
+        favBox.appendChild(it);
+      });
+    });
+  }
 
   shadow.addEventListener('click', function (e) {
     const b = e.target.closest('button'); if (!b) return;
@@ -332,6 +389,23 @@ TOOLBAR_JS = r"""
       return;
     }
     if (act === 'panel') { panel.style.display = panel.style.display === 'block' ? 'none' : 'block'; return; }
+    // v1.9.21: save this page as a favorite - url/title come from the page
+    // (location.href already carries any in-page#nav change), the Python
+    // side only stores/refreshes the entry; navigation-free action so it
+    // never races a pywebview return-value callback
+    if (act === 'fav') {
+      if (favHold) { favHold = false; return; }   // long-press already opened the panel
+      if (!pyapi()) return;
+      pyapi().favorite_add({ url: location.href, title: document.title || '' }).then(function (r) {
+        if (r && r.ok) {
+          badge.textContent = '★ ' + (r.total != null ? r.total : '');
+          window.setTimeout(function () { badge.textContent = window.__vgCount ? String(window.__vgCount) : ''; }, 2500);
+        } else {
+          badge.textContent = '★ ' + ((r && r.error) || 'ไม่สำเร็จ').slice(0, 14);
+        }
+      });
+      return;
+    }
     if (act === 'ctrl') { pyapi() && pyapi().show_control(); return; }
     // open an iframe embed page as the top-level page (in-page navigation)
     if (b.hasAttribute('data-open')) {

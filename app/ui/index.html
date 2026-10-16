@@ -66,6 +66,7 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
   <nav>
     <button data-tab="downloads" class="on">⬇ ดาวน์โหลด <span id="nDl"></span></button>
     <button data-tab="media">🎬 วิดีโอที่ตรวจพบ</button>
+    <button data-tab="favorites">★ เว็บโปรด</button>
     <button data-tab="sieve">🕸 Scrape (Sieve)</button>
     <button data-tab="logs">📜 Logs</button>
     <button data-tab="settings">⚙ ตั้งค่า</button>
@@ -95,6 +96,16 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
     <span class="hint" style="align-self:center">รายการวิดีโอที่ตรวจพบจากทุกหน้าเว็บในเซสชันนี้</span>
   </div>
   <div id="mediaList"><div class="empty">ยังไม่มีข้อมูล — เปิดเว็บในหน้าต่างเบราว์เซอร์ แล้วเล่น/สแกนวิดีโอ</div></div>
+</section>
+
+<section class="tab" id="tab-favorites">
+  <div style="display:flex;gap:8px;margin-bottom:10px">
+    <input type="text" id="favInput" placeholder="วาง URL เว็บที่ชอบ (เว้นว่างเพื่อบันทึกหน้าปัจจุบันจากแถบเครื่องมือ)" style="flex:1">
+    <button class="act grn" style="flex:0" onclick="favAdd()">+ บันทึก</button>
+    <button class="act" style="flex:0" onclick="renderFavorites()">⟳</button>
+    <span class="hint" style="align-self:center">หนึ่งรายการ = เว็บที่เปิดใหม่ได้ในคลิกเดียวจากแถบเครื่องมือบนหน้าเว็บหรือที่นี่</span>
+  </div>
+  <div id="favList"><div class="empty">ยังไม่มีรายการ — กดปุ่ม ★ บนแถบเครื่องมือของหน้าเว็บที่ชอบ</div></div>
 </section>
 
 <section class="tab" id="tab-sieve">
@@ -259,6 +270,9 @@ const demoApi = {
   exclusion_import: async () => ({ ok:true, added:0, total:2 }),
   exclusion_cloud_status: async () => ({ ok:true, has_token:true, gist_id:'demo123', total:2 }),
   exclusion_cloud_push: async () => ({ ok:true, total:2 }), exclusion_cloud_pull: async () => ({ ok:true, added:0, total:2 }),
+  favorite_list: async () => ([ {url:'https://example.com/travel', title:'Travel Blog', added:'2026-10-16T09:00:00'} ]),
+  favorite_add: async () => ({ ok:true, added:true, total:2 }), favorite_remove: async () => ({ ok:true, removed:1, total:1 }),
+  navigate(){},
   sieve_status: async () => ({ ok:true, configured:true, runs:[
     {id:'s1', session_id:'sc_demo1', instruction:'Extract the text and author of each quote', status:'done', created:1759120300, files:[{name:'quotes.csv',size:2048,ext:'csv',url:'/api/scrapes/sc_demo1/files/quotes.csv'}], schema_conformance:{status:'pass'}, error:''} ] }),
   sieve_login_start: async () => ({ ok:true, user_code:'WDJB-MJHT', verification_uri_complete:'https://scrape.usesieve.com/device?code=WDJB-MJHT', expires_in:600, interval:5 }),
@@ -373,7 +387,7 @@ async function refresh(){
   state.settings = st.settings; state.version = st.version;
   renderDownloads(st.downloads || []); renderMedia(st.media || []);
   renderSettings(st.settings || {}); fillAbout(st);
-  renderExclusions(); renderCloudStatus(); refreshSieve();
+  renderExclusions(); renderCloudStatus(); refreshSieve(); renderFavorites();
 }
 async function tailLogs(){
   try { document.getElementById('logBox').textContent = await py().get_log_tail(curLog, 400); }
@@ -440,6 +454,51 @@ function clearMedia(){
   });
 }
 function pickDir(){ py().choose_download_dir().then(r => { if(r && r.ok) document.getElementById('sDownDir').value = r.path; }); }
+
+// ---------- favorite websites (v1.9.21) ----------------------------------
+async function renderFavorites(){
+  try {
+    const list = await py().favorite_list();
+    state.favorites = list || [];
+    const el = document.getElementById('favList');
+    if (!list.length){
+      el.innerHTML = '<div class="empty">ยังไม่มีรายการ — กดปุ่ม ★ บนแถบเครื่องมือของหน้าเว็บที่ชอบ</div>'; return;
+    }
+    el.innerHTML = list.map((f, i) => `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline">
+        <b style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(f.title || f.url)}</b>
+        <span class="hint">${esc((f.added||'').slice(0,10))}</span>
+      </div>
+      <div class="url mono">${esc(f.url)}</div>
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="act grn" style="padding:5px 12px" onclick="favOpen(${i})">🌐 เปิดเว็บ</button>
+        <button class="act" style="padding:5px 12px" onclick="navigator.clipboard && navigator.clipboard.writeText('${esc(f.url).replace(/'/g, "\\'")}')">📋 คัดลอก</button>
+        <button class="act red" style="padding:5px 12px" onclick="favRemove('${esc(f.url).replace(/'/g, "\\'")}')">🗑 ลบ</button>
+      </div>
+    </div>`).join('');
+  } catch(e){ /* demo/backend not ready */ }
+}
+function navTo(u){
+  if (/^blob:/i.test(u)){ status('blob: URL มีอยู่แค่ในหน้าเว็บ — ใช้ลิงก์สตรอม .m3u8/.mpd แทน'); return; }
+  py().navigate(u);
+}
+function favOpen(i){
+  const f = (state.favorites||[])[i]; if (!f) return;
+  navTo(f.url);
+}
+function favAdd(){
+  const v = document.getElementById('favInput').value.trim();
+  if (!v) return;
+  Promise.resolve(py().favorite_add({ url: v, title: '' })).then(r => {
+    if (r && r.ok){ document.getElementById('favInput').value = ''; renderFavorites(); status('บันทึกเว็บโปรดแล้ว: ' + v); }
+    else status('บันทึกไม่สำเร็จ: ' + ((r && r.error) || '?'));
+  });
+}
+function favRemove(u){
+  Promise.resolve(py().favorite_remove(u)).then(() => { renderFavorites(); status('ลบรายการเว็บโปรดแล้ว: ' + u); });
+}
+document.getElementById('favInput').addEventListener('keydown', e => { if (e.key === 'Enter') favAdd(); });
 
 // ---------- site exclusions (v1.2.0) -------------------------------------
 async function renderExclusions(){
@@ -677,6 +736,7 @@ window.__onEvent = function (event, payload) {
     const g = document.getElementById('updGo'); if (g) g.style.display = 'none';
   }
   else if (event === 'sieve_run_update') { refreshSieve(); }
+  else if (event === 'favorites_changed') { renderFavorites(); status('รายการเว็บโปรดอัปเดตแล้ว (' + ((payload&&payload.total)||0) + ' รายการ)'); }
   else if (event === 'sieve_login') {
     const s = payload && payload.status;
     status(s === 'ok' ? 'เชื่อมต่อ Sieve สำเร็จ ✓' : s === 'denied' ? 'คุณปฏิเสธการอนุมัติ' : s === 'expired' ? 'โค้ดหมดอายุ — ลองใหม่' : ('เชื่อมต่อไม่สำเร็จ: ' + ((payload&&payload.error)||'')));

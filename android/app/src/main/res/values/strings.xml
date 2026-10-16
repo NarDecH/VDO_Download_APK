@@ -51,6 +51,14 @@
     <!-- v1.5.0: media sheet tabs (พบวิดีโอ / กำลังดาวน์โหลด / ดาวน์โหลดเสร็จแล้ว) -->
     <string name="sheet_title">สื่อและดาวน์โหลด</string>
     <string name="tab_found">พบวิดีโอ (%1$d)</string>
+    <string name="tab_fav">เว็บโปรด (%1$d)</string>
+
+    <!-- v1.9.21: favorites -->
+    <string name="fav_saved_toast">บันทึกเว็บโปรดแล้ว (มี %1$d รายการ)</string>
+    <string name="fav_removed_toast">ลบรายการเว็บโปรดแล้ว</string>
+    <string name="empty_fav">ยังไม่มีเว็บโปรด — กดปุ่ม ★ ด้านบนเพื่อบันทึกหน้าปัจจุบัน (กดค้างเพื่อเปิดรายการ)</string>
+    <string name="fav_go">🌐 เปิด</string>
+    <string name="favorites">เว็บโปรด</string>
     <string name="tab_downloading">กำลังดาวน์โหลด (%1$d)</string>
     <string name="tab_done">ดาวน์โหลดเสร็จแล้ว (%1$d)</string>
     <string name="empty_found">ยังไม่พบวิดีโอในหน้านี้ — เล่นวิดีโอรอสักครู่</string>

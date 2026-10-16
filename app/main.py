@@ -29,6 +29,7 @@ import webview  # noqa: E402
 
 from core.detector import DETECT_JS, TOOLBAR_JS, build_report, check_pair_sync  # noqa: E402
 from core.downloader import DownloadManager, is_usable_download_url  # noqa: E402
+from core.favorites import FavoritesStore  # noqa: E402
 from core.logger import APP_NAME, APP_VERSION, LogManager, default_data_dir, set_event_origin  # noqa: E402
 from core import media_size  # noqa: E402
 from core.settings import SECRET_KEYS, Settings, merge_exclusion_patterns, norm_exclusion, url_excluded  # noqa: E402
@@ -320,7 +321,7 @@ class Api:
                           page=rep["page_url"][:200])
             _APP.push_browser("media_found", rep)
             _APP.push_control("media_found", rep)
-            _size_probe.push(rep, _media_size_ready)
+            _size_probe.push(rep, self._media_size_ready)
 
     # v1.9.19: background Content-Range/HEAD probe refines the estimated size
     # (pushed straight into the stored item, live into both windows)
@@ -420,6 +421,28 @@ class Api:
     def media_list(self) -> list[dict]:
         return _APP.media.list()
 
+    # ------------------------------------------- favorite websites (v1.9.21)
+    # One-click bookmarks of the pages the user keeps coming back to.
+    # Opening one reuses navigate() so the toolbar/watchdog state behaves
+    # exactly like every other navigation.
+    def favorite_list(self) -> list[dict]:
+        return _APP.favorites.list()
+
+    def favorite_add(self, spec: dict) -> dict:
+        s = spec if isinstance(spec, dict) else {}
+        url = str(s.get("url") or "").strip()
+        title = str(s.get("title") or "").strip()
+        r = _APP.favorites.add(url, title)
+        if r.get("ok"):
+            _APP.push_control("favorites_changed", {"total": r["total"]})
+        return r
+
+    def favorite_remove(self, url: str) -> dict:
+        r = _APP.favorites.remove(url)
+        if r.get("ok"):
+            _APP.push_control("favorites_changed", {"total": r["total"]})
+        return r
+
     # ----------------------------------------------------------- control UI
     def show_control(self) -> None:
         _APP.show_control()
@@ -433,6 +456,7 @@ class Api:
             "has_ffmpeg": bool(_APP.engines.ffmpeg_path()),
             "downloads": _APP.downloads.list(),
             "media": _APP.media.list(),
+            "favorites": _APP.favorites.list(),
             "platform": sys.platform,
             "frozen": bool(getattr(sys, "frozen", False)),
         }
@@ -731,6 +755,7 @@ class App:
         self.logm.set_level(self.settings.get("log_level"))
         self.engines = EngineManager(self.data_dir, self.logm)
         self.media = MediaStore(self.logm)
+        self.favorites = FavoritesStore(self.data_dir, self.logm)   # v1.9.21
         self.downloads = DownloadManager(self.settings, self.engines, self.logm, push_ui=self._push)
         self.sieve = SieveManager(self.settings, self.logm, self.data_dir, push_ui=self._push)
         self.updater = Updater(self.data_dir, self.settings, self.logm, push_ui=self._push)

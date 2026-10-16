@@ -884,6 +884,26 @@ def test_toolbar_has_clipboard_button_parity() -> bool:
     return True
 
 
+def test_toolbar_has_favorites_button() -> bool:
+    """v1.9.21: the toolbar ★ button saves/refreshes a favorite on click and
+    opens the in-page favorites panel on LONG-POINTER (pointerdown timer);
+    the panel lists entries from Api.favorite_list and removes through
+    Api.favorite_remove."""
+    sys.path.insert(0, os.path.join(ROOT, "app", "core"))
+    import detector
+    assert 'data-act="fav"' in detector.TOOLBAR_JS, "favorites button rendered"
+    assert "favorite_add({ url: location.href" in detector.TOOLBAR_JS, "click saves the page"
+    assert "favorite_list()" in detector.TOOLBAR_JS, "panel reads the store"
+    assert "favorite_remove(f.url)" in detector.TOOLBAR_JS, "panel can remove"
+    assert 'id="vgf"' in detector.TOOLBAR_JS and 'id="vgfl"' in detector.TOOLBAR_JS, "favorites panel ids"
+    assert "pointerdown" in detector.TOOLBAR_JS and "450" in detector.TOOLBAR_JS, "long-press timer"
+    # the follow-up click after a long-press must be swallowed - it must not
+    # also ADD the current page as a new favorite
+    line = next(l for l in detector.TOOLBAR_JS.splitlines() if "favHold" in l and "return" in l)
+    assert "favHold = false" in line
+    return True
+
+
 # ------------------------------------------------- self-update (v1.9.12)
 def test_updater_version_compare() -> bool:
     """Component-wise version compare powering the desktop self-update"""
@@ -1129,6 +1149,7 @@ def main() -> int:
         "analyze_events_zip_without_events": test_analyze_events_zip_without_events,
         "clipboard_url_rules": test_clipboard_url_rules,
         "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
+        "toolbar_favorites_button": test_toolbar_has_favorites_button,
         "updater_version_compare": test_updater_version_compare,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
         "updater_swap_choreography": test_updater_swap_choreography_sandbox,

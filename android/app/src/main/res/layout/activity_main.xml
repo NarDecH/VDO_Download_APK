@@ -87,6 +87,15 @@
             app:tint="#E8ECF4" />
 
         <ImageButton
+            android:id="@+id/btnFav"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/favorites"
+            android:src="@android:drawable/btn_star_big_off"
+            app:tint="#FFC371" />
+
+        <ImageButton
             android:id="@+id/btnLogs"
             android:layout_width="40dp"
             android:layout_height="40dp"

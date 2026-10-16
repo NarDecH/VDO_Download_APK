@@ -111,6 +111,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         FileLog.init(applicationContext)
         PausedJobs.init(filesDir) // v1.7.0: หยุดพักไว้ registry (paused_jobs.tsv)
+        FavoritesStore.init(filesDir) // v1.9.21: เว็บโปรด (favorites.tsv)
         FileLog.app("INFO", "app", "VDO Grabber 1.9.20 starting (Android ${Build.VERSION.RELEASE}, ${Build.MODEL})")
         FileLog.event("app_start", mapOf("device" to Build.MODEL, "api" to Build.VERSION.SDK_INT))
         setContentView(R.layout.activity_main)
@@ -197,6 +198,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<ImageButton>(R.id.btnLogs).setOnClickListener { startActivity(Intent(this, LogsActivity::class.java)) }
         startProgressTicker() // v1.4.0: live download percent on the chip
         findViewById<ImageButton>(R.id.btnPaste).setOnClickListener { openFromClipboard() }
+        findViewById<ImageButton>(R.id.btnFav).apply { // v1.9.21: ★ บันทึกหน้าปัจจุบันเป็นเว็บโปรด
+            setOnClickListener { saveFavorite() }
+            setOnLongClickListener { showFavoritesSheet(); true }
+        }
         chipMedia.setOnClickListener { showMediaSheet() }
         urlBox.setOnEditorActionListener { _, _, event ->
             if (event == null || event.action == KeyEvent.ACTION_DOWN) {
@@ -409,6 +414,48 @@ class MainActivity : AppCompatActivity() {
         chipMedia.visibility = if (n > 0) View.VISIBLE else View.GONE
     }
 
+    // -------------------------------------------------- favorite websites (v1.9.21)
+    /** ★ tap: บันทึกหน้าปัจจุบันเป็นเว็บโปรด (url + title จาก WebView). Repeat
+     *  taps refresh the title/no-op duplicate; long-press opens the list. */
+    private fun saveFavorite() {
+        //setOnClickListener always fires on the main thread - WebView getters
+        // are safe here (see the v1.3.5 note in shouldInterceptRequest)
+        val url = web.url ?: ""
+        if (url.isBlank()) {
+            Toast.makeText(this, R.string.clipboard_empty, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val title = web.title ?: ""
+        val isNew = try {
+            FavoritesStore.add(url, title)
+        } catch (t: Throwable) {
+            FileLog.app("ERROR", "ui", "favorite add failed: $t")
+            false
+        }
+        FileLog.event(if (isNew) "favorite_added" else "favorite_used",
+            mapOf("url" to url.take(300), "total" to FavoritesStore.count()))
+        FileLog.app("INFO", "ui",
+            if (isNew) "favorite added: $url" else "favorite already saved (refreshed): $url")
+        Toast.makeText(this, getString(R.string.fav_saved_toast, FavoritesStore.count()), Toast.LENGTH_SHORT).show()
+    }
+
+    /** ★ long-press: open the media sheet directly on the เว็บโปรด tab. */
+    private fun showFavoritesSheet() {
+        if (FavoritesStore.count() == 0) {
+            Toast.makeText(this, R.string.empty_fav, Toast.LENGTH_SHORT).show()
+            return
+        }
+        showMediaSheet()
+        if (sheetDialog?.isShowing == true) {
+            sheetTab = TAB_FAV
+            renderSheet()
+        }
+    }
+
+    /** v1.9.21: the เว็บโปรด tab inside the media sheet - tap ไปยังหน้านี้
+     *  navigates the WebView (dismisses the sheet), 📋 copies the URL and
+     *  ลบ forgets the bookmark. Long empty lists collapse to 15 rows. */
+
     /** v1.4.0: 500ms ticker - while the stream engine reports a percent the
      *  chip shows "⬇ กำลังดาวน์โหลด 42%"; otherwise it falls back to updateChip. */
     private fun startProgressTicker() {
@@ -471,7 +518,8 @@ class MainActivity : AppCompatActivity() {
         val items = MediaStore.list()
         val dls = DownloadCleaner.systemList(this)
         val active = StreamDownloadService.activeJobs()
-        if (items.isEmpty() && dls.isEmpty() && active.isEmpty()) {
+        val favs = FavoritesStore.all() // v1.9.21
+        if (items.isEmpty() && dls.isEmpty() && active.isEmpty() && favs.isEmpty()) {
             Toast.makeText(this, R.string.no_media, Toast.LENGTH_SHORT).show()
             return
         }
@@ -484,7 +532,7 @@ class MainActivity : AppCompatActivity() {
             gravity = android.view.Gravity.CENTER
         }
         val tabButtons = linkedMapOf<Int, TextView>()
-        for (tab in intArrayOf(TAB_FOUND, TAB_DL, TAB_DONE)) {
+        for (tab in intArrayOf(TAB_FOUND, TAB_DL, TAB_DONE, TAB_FAV)) {
             val b = TextView(this).apply {
                 textSize = 13f
                 setPadding(26, 12, 26, 12)
@@ -538,6 +586,7 @@ class MainActivity : AppCompatActivity() {
         val dls = DownloadCleaner.systemList(this)
         val active = StreamDownloadService.activeJobs()
         val paused = PausedJobs.all() // v1.7.0: หยุดพักไว้ (persisted)
+        val favs = FavoritesStore.all() // v1.9.21: เว็บโปรด
         sheetFoundCount = items.size
         sheetLastActive = active.size
         sheetShown.clear()
@@ -546,6 +595,7 @@ class MainActivity : AppCompatActivity() {
             when (tab) {
                 TAB_FOUND -> R.string.tab_found
                 TAB_DL -> R.string.tab_downloading
+                TAB_FAV -> R.string.tab_fav
                 else -> R.string.tab_done
             },
             n,
@@ -554,6 +604,7 @@ class MainActivity : AppCompatActivity() {
             val n = when (tab) {
                 TAB_FOUND -> items.size
                 TAB_DL -> active.size + paused.size
+                TAB_FAV -> favs.size
                 else -> dls.size
             }
             b.text = tabLabel(tab, n)
@@ -592,6 +643,10 @@ class MainActivity : AppCompatActivity() {
                 }
                 // v1.7.0: หยุดพักไว้ - kept .part files, ดาวน์โหลดต่อ resumes
                 for (p in paused.take(10)) container.addView(bindPausedRow(p))
+            }
+            TAB_FAV -> {
+                if (favs.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_fav)))
+                for (f in favs.take(15)) container.addView(bindFavoriteRow(f))
             }
             else -> {
                 if (dls.isEmpty()) container.addView(sheetEmptyBox(getString(R.string.empty_done)))
@@ -704,6 +759,41 @@ class MainActivity : AppCompatActivity() {
             FileLog.app("INFO", "nav", "open embed page: ${m.url}")
             navigate(m.url)
             sheetDialog?.dismiss()
+        }
+        return row
+    }
+
+    /** v1.9.21: one row of the เว็บโปรด tab - ไป navigates the WebView to the
+     *  bookmark, 📋 copies and ลบ forgets it (item_media layout reuse - the
+     *  media tab's own rows use the same ids with different visibility). */
+    private fun bindFavoriteRow(f: FavoritesStore.Entry): View {
+        val row = layoutInflater.inflate(R.layout.item_media, sheetContainer, false)
+        row.findViewById<TextView>(R.id.mLabel).text = f.title.ifEmpty { Downloader.urlStem(f.url) }
+        row.findViewById<TextView>(R.id.mUrl).text = f.url
+        row.findViewById<TextView>(R.id.mDl).text = getString(R.string.fav_go)
+        row.findViewById<TextView>(R.id.mDl).setOnClickListener {
+            FileLog.event("favorite_open", mapOf("url" to f.url.take(300)))
+            FileLog.app("INFO", "nav", "open favorite: ${f.url}")
+            navigate(f.url)
+            sheetDialog?.dismiss()
+        }
+        row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
+            val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            cm.setPrimaryClip(ClipData.newPlainText("url", f.url))
+            Toast.makeText(this, R.string.copied, Toast.LENGTH_SHORT).show()
+        }
+        row.findViewById<TextView>(R.id.mOpen).visibility = View.GONE
+        row.findViewById<ImageView>(R.id.mThumb)?.visibility = View.GONE
+        row.findViewById<TextView>(R.id.mPosterLabel)?.visibility = View.VISIBLE
+        row.findViewById<TextView>(R.id.mSize).visibility = View.GONE
+        val del = row.findViewById<TextView>(R.id.mDel)
+        del.visibility = View.VISIBLE
+        del.setOnClickListener {
+            val removed = try { FavoritesStore.remove(f.url) } catch (_: Throwable) { false }
+            FileLog.event("favorite_removed", mapOf("url" to f.url.take(300), "removed" to removed))
+            FileLog.app("INFO", "ui", "favorite removed: ${f.url}")
+            Toast.makeText(this, R.string.fav_removed_toast, Toast.LENGTH_SHORT).show()
+            renderSheet()
         }
         return row
     }
@@ -894,10 +984,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        // v1.5.0: media sheet tabs
+        // v1.5.0: media sheet tabs (v1.9.21: +tab favorites / เว็บโปรด)
         private const val TAB_FOUND = 0
         private const val TAB_DL = 1
         private const val TAB_DONE = 2
+        private const val TAB_FAV = 3
 
         /** v1.6.0: tag of the ล้างทั้งหมด chip inside the sheet container. */
         private const val TAG_CLEAR_ALL = "clear_all_chip"

@@ -11,6 +11,8 @@
   เพื่อจับ m3u8/mpd/mp4 ที่ไหลผ่าน network และอ่าน resource-timing (อ้างอิงเทคนิคจาก
   ส่วนขยาย Video Download Helper — ดู [RESEARCH](research.md))
 - ⬇ **ปุ่มดาวน์โหลดในหน้าเว็บ** — เลือกได้ทั้ง "ดาวน์โหลดอัตโนมัติ" หรือเลือกรูปแบบ/คุณภาพ (ได้จาก yt-dlp)
+- ⭐ **เว็บโปรด (v1.9.21)** — ปุ่ม ★บนแถบเครื่องมือบันทึกหน้าปัจจุบันคลิกเดียว (กดค้างเพื่อเปิดรายการในหน้า),
+  Android มี ★ชุดบน toolbar; จัดการทั้งหมดในแท็บ "★ เว็บโปรด" ของ Control Center (เปิดเว็บ/คัดลอก/ลบ)
 - 🚀 **เอนจิน yt-dlp + ffmpeg** — รองรับ mp4, webm, HLS (m3u8), DASH (mpd) และหน้าเว็บอย่าง YouTube
 - 📜 **ระบบ log ละเอียด 3 ชั้น** — `app.log` (หมุนเวียน), `downloads.log` (output ของ yt-dlp ทุกบรรทัด),
   `events.jsonl` (structured events) + ดูย้อนหลังในแอป และ Export diagnostics เป็น zip
