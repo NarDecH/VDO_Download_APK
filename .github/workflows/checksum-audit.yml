@@ -18,7 +18,7 @@ jobs:
   audit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4   # workspace must exist for the docs/ snapshot commit
+      - uses: actions/checkout@v7   # workspace must exist for the docs/ snapshot commit
 
       - name: Audit every release's checksums.txt
         env:
