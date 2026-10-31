@@ -1,0 +1,485 @@
+{
+ "generated": "2026-10-31T08:26:50.630097Z",
+ "releases": {
+  "v1.9.21": {
+   "rows": {
+    "VDOGrabber-1.9.21-android-arm64.apk": "595a8fe0ca157daefd2e3f6352a80b7adc3bb85098f509d985bc8b77d899b699",
+    "VDOGrabber-1.9.21-android-armv7.apk": "d9fcf4beb8dd5af3efbe024697e5c7f629581bb03fb541f939dea505e4c73d52",
+    "VDOGrabber-1.9.21-android-universal.apk": "86c862c1c0eef4d9d85046e45876fc7e6ab8458b8fc53b897aff6fc796624cde",
+    "VDOGrabber-1.9.21-android-x86_64.apk": "5e1cd2301fe7f268a2f56ea4816d0b65449fb4130b973cab441bc059d182988b",
+    "VDOGrabber-1.9.21-windows-x64.exe": "cb1b7c12a3ce8d9efe038c57ba23d24a3fa7f641f69adba0dfb49a0fae4e4654"
+   },
+   "truth": {
+    "VDOGrabber-1.9.21-android-arm64.apk": "595a8fe0ca157daefd2e3f6352a80b7adc3bb85098f509d985bc8b77d899b699",
+    "VDOGrabber-1.9.21-android-armv7.apk": "d9fcf4beb8dd5af3efbe024697e5c7f629581bb03fb541f939dea505e4c73d52",
+    "VDOGrabber-1.9.21-android-universal.apk": "86c862c1c0eef4d9d85046e45876fc7e6ab8458b8fc53b897aff6fc796624cde",
+    "VDOGrabber-1.9.21-android-x86_64.apk": "5e1cd2301fe7f268a2f56ea4816d0b65449fb4130b973cab441bc059d182988b",
+    "VDOGrabber-1.9.21-windows-x64.exe": "cb1b7c12a3ce8d9efe038c57ba23d24a3fa7f641f69adba0dfb49a0fae4e4654"
+   }
+  },
+  "v1.9.20": {
+   "rows": {
+    "VDOGrabber-1.9.20-android-arm64.apk": "f22a60cff1aad8347d3312de268aeece522dfbbccf1762a5ff2f8f908845f32a",
+    "VDOGrabber-1.9.20-android-armv7.apk": "6201bab9e1bdcd8978713b0efbe45fc7e3e5465f4267db19206230efdf708912",
+    "VDOGrabber-1.9.20-android-universal.apk": "8a2d5cb4e647ffdd0c98c9f409bd5a3c6d98e82278b3dc27d35c18053563608c",
+    "VDOGrabber-1.9.20-android-x86_64.apk": "1f1e50d1a0c3a9ca92eb978345ae5974c5238b4e4805275c84fcf6d9c54ef583",
+    "VDOGrabber-1.9.20-windows-x64.exe": "d17e06a8b1ecd5a90e3753a1574dad8ae29aa906bc0fb16b5fd0e61302a28d66"
+   },
+   "truth": {
+    "VDOGrabber-1.9.20-android-arm64.apk": "f22a60cff1aad8347d3312de268aeece522dfbbccf1762a5ff2f8f908845f32a",
+    "VDOGrabber-1.9.20-android-armv7.apk": "6201bab9e1bdcd8978713b0efbe45fc7e3e5465f4267db19206230efdf708912",
+    "VDOGrabber-1.9.20-android-universal.apk": "8a2d5cb4e647ffdd0c98c9f409bd5a3c6d98e82278b3dc27d35c18053563608c",
+    "VDOGrabber-1.9.20-android-x86_64.apk": "1f1e50d1a0c3a9ca92eb978345ae5974c5238b4e4805275c84fcf6d9c54ef583",
+    "VDOGrabber-1.9.20-windows-x64.exe": "d17e06a8b1ecd5a90e3753a1574dad8ae29aa906bc0fb16b5fd0e61302a28d66"
+   }
+  },
+  "v1.9.19": {
+   "rows": {
+    "VDOGrabber-1.9.19-android-arm64.apk": "fdf19308504fb9a3003f326532b688d637f245758da00f874016320e2680a23a",
+    "VDOGrabber-1.9.19-android-armv7.apk": "7bad99b4538aad2c5c026f80ef93313e6ce934daf89ee6c9791b45b35146f888",
+    "VDOGrabber-1.9.19-android-universal.apk": "771436d08e63ab02c4914d53ecace4d7ffcf7dc05a39b6d0d3970df20e11ad03",
+    "VDOGrabber-1.9.19-android-x86_64.apk": "61191fe13ca1386982656aad0dac5abebb96131b631affdb086ba3c0ba8e6c0a",
+    "VDOGrabber-1.9.19-windows-x64.exe": "c4b710f6430d90e8678a654b64bf4a1cdf432b766681a8d7f9dd0503066be043"
+   },
+   "truth": {
+    "VDOGrabber-1.9.19-android-arm64.apk": "fdf19308504fb9a3003f326532b688d637f245758da00f874016320e2680a23a",
+    "VDOGrabber-1.9.19-android-armv7.apk": "7bad99b4538aad2c5c026f80ef93313e6ce934daf89ee6c9791b45b35146f888",
+    "VDOGrabber-1.9.19-android-universal.apk": "771436d08e63ab02c4914d53ecace4d7ffcf7dc05a39b6d0d3970df20e11ad03",
+    "VDOGrabber-1.9.19-android-x86_64.apk": "61191fe13ca1386982656aad0dac5abebb96131b631affdb086ba3c0ba8e6c0a",
+    "VDOGrabber-1.9.19-windows-x64.exe": "c4b710f6430d90e8678a654b64bf4a1cdf432b766681a8d7f9dd0503066be043"
+   }
+  },
+  "v1.9.18": {
+   "rows": {
+    "VDOGrabber-1.9.18-android-arm64.apk": "4108cbb01f3204f238c0345d3c24efe200f55f0f67e86e04dc29a293a1a11cf9",
+    "VDOGrabber-1.9.18-android-armv7.apk": "d709281c551659081840e5b621c8db5534523b0344108d09979f09ae28a4d3a0",
+    "VDOGrabber-1.9.18-android-universal.apk": "9bd3d5196378fcb0b4b4766556cefd5e400e8c555886dbc7ab12ad2661bd1781",
+    "VDOGrabber-1.9.18-android-x86_64.apk": "ea7fb2cf2562961521628bd5b9d119389d6c8cde9651ce1a52bf62538727fed5",
+    "VDOGrabber-1.9.18-windows-x64.exe": "48186d5a87da837efc71b6f0e4bb57b3a7ad78d8105d6e564e928708f967aa55"
+   },
+   "truth": {
+    "VDOGrabber-1.9.18-android-arm64.apk": "4108cbb01f3204f238c0345d3c24efe200f55f0f67e86e04dc29a293a1a11cf9",
+    "VDOGrabber-1.9.18-android-armv7.apk": "d709281c551659081840e5b621c8db5534523b0344108d09979f09ae28a4d3a0",
+    "VDOGrabber-1.9.18-android-universal.apk": "9bd3d5196378fcb0b4b4766556cefd5e400e8c555886dbc7ab12ad2661bd1781",
+    "VDOGrabber-1.9.18-android-x86_64.apk": "ea7fb2cf2562961521628bd5b9d119389d6c8cde9651ce1a52bf62538727fed5",
+    "VDOGrabber-1.9.18-windows-x64.exe": "48186d5a87da837efc71b6f0e4bb57b3a7ad78d8105d6e564e928708f967aa55"
+   }
+  },
+  "v1.9.17": {
+   "rows": {
+    "VDOGrabber-1.9.17-android-arm64.apk": "4ca58ac90674372e036ca9b8b68284405f4ff4a1d6c1fcefd0d18f0ae25c3863",
+    "VDOGrabber-1.9.17-android-armv7.apk": "691e8cf5a3350e82521d7bf2c78f8614ab37d0f4810561d440ef848b2efe0bcf",
+    "VDOGrabber-1.9.17-android-universal.apk": "01444c21105e478fde5593d7a76c2e877790efcfe50b0798b165f34ae78d384c",
+    "VDOGrabber-1.9.17-android-x86_64.apk": "44ea7b2d4d98442d8dfd87f291dcbd8ad482d894b8eb1a086043e7ad8d956757",
+    "VDOGrabber-1.9.17-windows-x64.exe": "cbd4b6a1becbf4edd96b96c962c1602a8b41b846195c0830bdaf35de13c21259"
+   },
+   "truth": {
+    "VDOGrabber-1.9.17-android-arm64.apk": "4ca58ac90674372e036ca9b8b68284405f4ff4a1d6c1fcefd0d18f0ae25c3863",
+    "VDOGrabber-1.9.17-android-armv7.apk": "691e8cf5a3350e82521d7bf2c78f8614ab37d0f4810561d440ef848b2efe0bcf",
+    "VDOGrabber-1.9.17-android-universal.apk": "01444c21105e478fde5593d7a76c2e877790efcfe50b0798b165f34ae78d384c",
+    "VDOGrabber-1.9.17-android-x86_64.apk": "44ea7b2d4d98442d8dfd87f291dcbd8ad482d894b8eb1a086043e7ad8d956757",
+    "VDOGrabber-1.9.17-windows-x64.exe": "cbd4b6a1becbf4edd96b96c962c1602a8b41b846195c0830bdaf35de13c21259"
+   }
+  },
+  "v1.9.16": {
+   "rows": {
+    "VDOGrabber-1.9.16-android-arm64.apk": "d13b1d93b3e13a5effc9b819b95406c8bd56bb18c3b767244fd4f47914dad4f7",
+    "VDOGrabber-1.9.16-android-armv7.apk": "a2eb2f7709226b3be9f3bf1c63f6ed1aaca88dbdea36b82bfe86728893a72815",
+    "VDOGrabber-1.9.16-android-universal.apk": "ac9dd2e9442759384a1c91ac701c18b1f757a08b4255bfa047af8035e9b42ae3",
+    "VDOGrabber-1.9.16-android-x86_64.apk": "d2879584bcbc712070ae4d2a9e223148f24f32b889378dae3aae4c6a80cdb19c",
+    "VDOGrabber-1.9.16-windows-x64.exe": "2ba5c81ceee4a9d1bea628c5e622412b52b83f56f29edef0aa30ce0da8d1d119"
+   },
+   "truth": {
+    "VDOGrabber-1.9.16-android-arm64.apk": "d13b1d93b3e13a5effc9b819b95406c8bd56bb18c3b767244fd4f47914dad4f7",
+    "VDOGrabber-1.9.16-android-armv7.apk": "a2eb2f7709226b3be9f3bf1c63f6ed1aaca88dbdea36b82bfe86728893a72815",
+    "VDOGrabber-1.9.16-android-universal.apk": "ac9dd2e9442759384a1c91ac701c18b1f757a08b4255bfa047af8035e9b42ae3",
+    "VDOGrabber-1.9.16-android-x86_64.apk": "d2879584bcbc712070ae4d2a9e223148f24f32b889378dae3aae4c6a80cdb19c",
+    "VDOGrabber-1.9.16-windows-x64.exe": "2ba5c81ceee4a9d1bea628c5e622412b52b83f56f29edef0aa30ce0da8d1d119"
+   }
+  },
+  "v1.9.15": {
+   "rows": {
+    "VDOGrabber-1.9.15-android-arm64.apk": "ffe46b6affd84f04295ade6b31207932958ca6b39e936c98add2f26e1d47b17e",
+    "VDOGrabber-1.9.15-android-armv7.apk": "877da497438ad84868e0b635df24a65c46ebbcebb5be7e7f30276a4eb7256358",
+    "VDOGrabber-1.9.15-android-universal.apk": "2128bbfd1b4b64b057fd96af9f4c844d063051662d9bddab9495bfd122012050",
+    "VDOGrabber-1.9.15-android-x86_64.apk": "98505057507f557b2e877d030f912179499429a6b1fa4464cf26642c21c11c51",
+    "VDOGrabber-1.9.15-windows-x64.exe": "02c979de2090226476688e22e39b3838508059dd59c10dca24803aa932e654c4"
+   },
+   "truth": {
+    "VDOGrabber-1.9.15-android-arm64.apk": "ffe46b6affd84f04295ade6b31207932958ca6b39e936c98add2f26e1d47b17e",
+    "VDOGrabber-1.9.15-android-armv7.apk": "877da497438ad84868e0b635df24a65c46ebbcebb5be7e7f30276a4eb7256358",
+    "VDOGrabber-1.9.15-android-universal.apk": "2128bbfd1b4b64b057fd96af9f4c844d063051662d9bddab9495bfd122012050",
+    "VDOGrabber-1.9.15-android-x86_64.apk": "98505057507f557b2e877d030f912179499429a6b1fa4464cf26642c21c11c51",
+    "VDOGrabber-1.9.15-windows-x64.exe": "02c979de2090226476688e22e39b3838508059dd59c10dca24803aa932e654c4"
+   }
+  },
+  "v1.9.14": {
+   "rows": {
+    "VDOGrabber-1.9.14-android-arm64.apk": "08b1cdb8a69becee3c8853fed6554a22d195bb38cac1f14e5b2c687e37a3df86",
+    "VDOGrabber-1.9.14-android-armv7.apk": "a86408543f6c08631baf6e225eb13e652b972a7da338b8f6553e88225ae0e177",
+    "VDOGrabber-1.9.14-android-universal.apk": "e5fb08cea4f6fec1deb5d957eea531140c0c9f884aacc5be6590bb37f807277c",
+    "VDOGrabber-1.9.14-android-x86_64.apk": "d225be667bc1406622b0568e9b201bd68840f72ce83e050075d0fa642c49fa1a",
+    "VDOGrabber-1.9.14-windows-x64.exe": "c02ed2bb15dafdb0cdcd28ed86c71cf75d1f0a9345bf4d086d4cd074dbf18e81"
+   },
+   "truth": {
+    "VDOGrabber-1.9.14-android-arm64.apk": "08b1cdb8a69becee3c8853fed6554a22d195bb38cac1f14e5b2c687e37a3df86",
+    "VDOGrabber-1.9.14-android-armv7.apk": "a86408543f6c08631baf6e225eb13e652b972a7da338b8f6553e88225ae0e177",
+    "VDOGrabber-1.9.14-android-universal.apk": "e5fb08cea4f6fec1deb5d957eea531140c0c9f884aacc5be6590bb37f807277c",
+    "VDOGrabber-1.9.14-android-x86_64.apk": "d225be667bc1406622b0568e9b201bd68840f72ce83e050075d0fa642c49fa1a",
+    "VDOGrabber-1.9.14-windows-x64.exe": "c02ed2bb15dafdb0cdcd28ed86c71cf75d1f0a9345bf4d086d4cd074dbf18e81"
+   }
+  },
+  "v1.9.13": {
+   "rows": {
+    "VDOGrabber-1.9.13-android-arm64.apk": "57b5a08284b6e121392fd2b629b9e66b07480e3806396e29c224a4515d1570ab",
+    "VDOGrabber-1.9.13-android-armv7.apk": "2c5bee284c47bb028f76e3fda4364e52f34c9b0a17323f6073767902f59ad85f",
+    "VDOGrabber-1.9.13-android-universal.apk": "04d29937e960dddec0054d9a7892b8e947d4e08fc2e62540f069a5051987186c",
+    "VDOGrabber-1.9.13-android-x86_64.apk": "c4657db533c74e430e17ddd550d0b0eae7261e623d4ccc4e02cf8c4d6b6733fc",
+    "VDOGrabber-1.9.13-windows-x64.exe": "70905b28488f5b9aed0f18dcdeee14e48e0c0f4ed85447a723692b46d205475d"
+   },
+   "truth": {
+    "VDOGrabber-1.9.13-android-arm64.apk": "57b5a08284b6e121392fd2b629b9e66b07480e3806396e29c224a4515d1570ab",
+    "VDOGrabber-1.9.13-android-armv7.apk": "2c5bee284c47bb028f76e3fda4364e52f34c9b0a17323f6073767902f59ad85f",
+    "VDOGrabber-1.9.13-android-universal.apk": "04d29937e960dddec0054d9a7892b8e947d4e08fc2e62540f069a5051987186c",
+    "VDOGrabber-1.9.13-android-x86_64.apk": "c4657db533c74e430e17ddd550d0b0eae7261e623d4ccc4e02cf8c4d6b6733fc",
+    "VDOGrabber-1.9.13-windows-x64.exe": "70905b28488f5b9aed0f18dcdeee14e48e0c0f4ed85447a723692b46d205475d"
+   }
+  },
+  "v1.9.12": {
+   "rows": {
+    "VDOGrabber-1.9.12-android-arm64.apk": "c1694752964903f5ac4d7153247831a3ca21fe8e24e7516827e4060f5af7f4c4",
+    "VDOGrabber-1.9.12-android-armv7.apk": "db5654ca7c232dd7ed6fccff3b880aef823ba52b5c77edcaab681c1c53a2ec07",
+    "VDOGrabber-1.9.12-android-universal.apk": "81ecaf6f4fddf9f1fdc0230f948b846bfa8f5ee30a51177b410736c4758c1ac2",
+    "VDOGrabber-1.9.12-android-x86_64.apk": "99af15208228348ba963afaaee18d4289ed0d9149530219221cdb7c2924c2c03",
+    "VDOGrabber-1.9.12-windows-x64.exe": "11a39a47809da00c03068e03b71b39fc2558efc8af9636b7be24823f94b5ed39"
+   },
+   "truth": {
+    "VDOGrabber-1.9.12-android-arm64.apk": "c1694752964903f5ac4d7153247831a3ca21fe8e24e7516827e4060f5af7f4c4",
+    "VDOGrabber-1.9.12-android-armv7.apk": "db5654ca7c232dd7ed6fccff3b880aef823ba52b5c77edcaab681c1c53a2ec07",
+    "VDOGrabber-1.9.12-android-universal.apk": "81ecaf6f4fddf9f1fdc0230f948b846bfa8f5ee30a51177b410736c4758c1ac2",
+    "VDOGrabber-1.9.12-android-x86_64.apk": "99af15208228348ba963afaaee18d4289ed0d9149530219221cdb7c2924c2c03",
+    "VDOGrabber-1.9.12-windows-x64.exe": "11a39a47809da00c03068e03b71b39fc2558efc8af9636b7be24823f94b5ed39"
+   }
+  },
+  "v1.9.11": {
+   "rows": {
+    "VDOGrabber-1.9.11-android-arm64.apk": "35b4399509ba093981ff0a93f24decc6b81976a5766ab4fc68c54fe7c08368c5",
+    "VDOGrabber-1.9.11-android-armv7.apk": "0c90711682d12880bdd40c453f7d72607b64c3b4f9f51235d5ac0c37063a8cda",
+    "VDOGrabber-1.9.11-android-universal.apk": "a5fec1ff6ffeae517537a53ed8feac7429219b872cd5f4144f883d2cd84c3fa1",
+    "VDOGrabber-1.9.11-android-x86_64.apk": "6db2dd7598f0951f186a3a7fc9dbe1ffe0fb1f8ba30e673916a208582046bfb7",
+    "VDOGrabber-1.9.11-windows-x64.exe": "90b54a2109b09fb5461eb492bb9b70b87b56fd5edfa4a06bf27c325ada841b0d"
+   },
+   "truth": {
+    "VDOGrabber-1.9.11-android-arm64.apk": "35b4399509ba093981ff0a93f24decc6b81976a5766ab4fc68c54fe7c08368c5",
+    "VDOGrabber-1.9.11-android-armv7.apk": "0c90711682d12880bdd40c453f7d72607b64c3b4f9f51235d5ac0c37063a8cda",
+    "VDOGrabber-1.9.11-android-universal.apk": "a5fec1ff6ffeae517537a53ed8feac7429219b872cd5f4144f883d2cd84c3fa1",
+    "VDOGrabber-1.9.11-android-x86_64.apk": "6db2dd7598f0951f186a3a7fc9dbe1ffe0fb1f8ba30e673916a208582046bfb7",
+    "VDOGrabber-1.9.11-windows-x64.exe": "90b54a2109b09fb5461eb492bb9b70b87b56fd5edfa4a06bf27c325ada841b0d"
+   }
+  },
+  "v1.9.10": {
+   "rows": {
+    "VDOGrabber-1.9.10-android-arm64.apk": "4571f2578cf08c98245892ffe38a11e97d36e3fb39ff4491712e88cf1dd8d053",
+    "VDOGrabber-1.9.10-android-armv7.apk": "63924d866162a223570b27bfee717a7871c78ff6356c4ea59baf2f5fab448a6d",
+    "VDOGrabber-1.9.10-android-universal.apk": "c6ac7351a94b65b24bfdbc279fd3153ce6db8be3196594757592c2c7ca3a9f06",
+    "VDOGrabber-1.9.10-android-x86_64.apk": "029cc90c145740fce080786459e1cdc7796ec93746b3561268f5751f70e4411c",
+    "VDOGrabber-1.9.10-windows-x64.exe": "b3f845c2bbee185970209306ae1d5e05f398d3013522e2dcbce7fb003db5819b"
+   },
+   "truth": {
+    "VDOGrabber-1.9.10-android-arm64.apk": "4571f2578cf08c98245892ffe38a11e97d36e3fb39ff4491712e88cf1dd8d053",
+    "VDOGrabber-1.9.10-android-armv7.apk": "63924d866162a223570b27bfee717a7871c78ff6356c4ea59baf2f5fab448a6d",
+    "VDOGrabber-1.9.10-android-universal.apk": "c6ac7351a94b65b24bfdbc279fd3153ce6db8be3196594757592c2c7ca3a9f06",
+    "VDOGrabber-1.9.10-android-x86_64.apk": "029cc90c145740fce080786459e1cdc7796ec93746b3561268f5751f70e4411c",
+    "VDOGrabber-1.9.10-windows-x64.exe": "b3f845c2bbee185970209306ae1d5e05f398d3013522e2dcbce7fb003db5819b"
+   }
+  },
+  "v1.9.9": {
+   "rows": {
+    "VDOGrabber-1.9.9-android-arm64.apk": "6191186d9e6032c47502800cbf620837b2be4bf9aa06ad9ec44f6d971479c1af",
+    "VDOGrabber-1.9.9-android-armv7.apk": "05c3831f6fe61871eda17409b6935994bb79ecabaa158fedec6942a17eb22823",
+    "VDOGrabber-1.9.9-android-universal.apk": "d3cf14b31eaafbd04ebd38510a909e829ec0032b6bf33f83f6ea9366b141ef73",
+    "VDOGrabber-1.9.9-android-x86_64.apk": "2b3d89bb17e8f5bd93044ad94c1d5efd134026795bfd5916c2af7a4c28e729f1",
+    "VDOGrabber-1.9.9-windows-x64.exe": "37a57395592128943888dffac7d9177ef8d7e4d632709c6860ae3f0ad5845650"
+   },
+   "truth": {
+    "VDOGrabber-1.9.9-android-arm64.apk": "6191186d9e6032c47502800cbf620837b2be4bf9aa06ad9ec44f6d971479c1af",
+    "VDOGrabber-1.9.9-android-armv7.apk": "05c3831f6fe61871eda17409b6935994bb79ecabaa158fedec6942a17eb22823",
+    "VDOGrabber-1.9.9-android-universal.apk": "d3cf14b31eaafbd04ebd38510a909e829ec0032b6bf33f83f6ea9366b141ef73",
+    "VDOGrabber-1.9.9-android-x86_64.apk": "2b3d89bb17e8f5bd93044ad94c1d5efd134026795bfd5916c2af7a4c28e729f1",
+    "VDOGrabber-1.9.9-windows-x64.exe": "37a57395592128943888dffac7d9177ef8d7e4d632709c6860ae3f0ad5845650"
+   }
+  },
+  "v1.9.8": {
+   "rows": {
+    "VDOGrabber-1.9.8-android-arm64.apk": "14390fe16ddaca45ea3e59864efe73a8d7072b01cb54cc0f5017d9a888583dbe",
+    "VDOGrabber-1.9.8-android-armv7.apk": "5bc61ef7e39c810d1ea3a5dc0c869ac5d95fe7f216eb81f39fe9bbd2baa9a1f5",
+    "VDOGrabber-1.9.8-android-universal.apk": "3985cedd4adceb878a3666af535f2c0f57e85383ab4283101e5195b8e2363ad7",
+    "VDOGrabber-1.9.8-android-x86_64.apk": "b561f1aa076d363d81965967650261728d6cfb3417b5492d82aaabeb1a12f9b8",
+    "VDOGrabber-1.9.8-windows-x64.exe": "f9f9b64e590b2bc02ba13565a5468452df54a29987650c16a28d235b3cf7e373"
+   },
+   "truth": {
+    "VDOGrabber-1.9.8-android-arm64.apk": "14390fe16ddaca45ea3e59864efe73a8d7072b01cb54cc0f5017d9a888583dbe",
+    "VDOGrabber-1.9.8-android-armv7.apk": "5bc61ef7e39c810d1ea3a5dc0c869ac5d95fe7f216eb81f39fe9bbd2baa9a1f5",
+    "VDOGrabber-1.9.8-android-universal.apk": "3985cedd4adceb878a3666af535f2c0f57e85383ab4283101e5195b8e2363ad7",
+    "VDOGrabber-1.9.8-android-x86_64.apk": "b561f1aa076d363d81965967650261728d6cfb3417b5492d82aaabeb1a12f9b8",
+    "VDOGrabber-1.9.8-windows-x64.exe": "f9f9b64e590b2bc02ba13565a5468452df54a29987650c16a28d235b3cf7e373"
+   }
+  },
+  "v1.9.7": {
+   "rows": {
+    "VDOGrabber-1.9.7-android-arm64.apk": "abc01ed3f1f9b229073392cceb1e72ed5879021e0f7d982478d984b0b6874470",
+    "VDOGrabber-1.9.7-android-armv7.apk": "2e78b7d220de634ce1ee8059e6705c1850da91e3bb482e4eb8a809089ca44299",
+    "VDOGrabber-1.9.7-android-universal.apk": "45b95d014bf1cac70eb59368a0840a55725416474a8282c8af7454868d5b4b15",
+    "VDOGrabber-1.9.7-android-x86_64.apk": "76621826d3d8513a35a107fadd5a63478345592aa776d40df3947b8af6858cf3",
+    "VDOGrabber-1.9.7-windows-x64.exe": "7ac9e17536b807b39adc68b6a2f433880dfde9d3703445a3047048c66ae76658"
+   },
+   "truth": {
+    "VDOGrabber-1.9.7-android-arm64.apk": "abc01ed3f1f9b229073392cceb1e72ed5879021e0f7d982478d984b0b6874470",
+    "VDOGrabber-1.9.7-android-armv7.apk": "2e78b7d220de634ce1ee8059e6705c1850da91e3bb482e4eb8a809089ca44299",
+    "VDOGrabber-1.9.7-android-universal.apk": "45b95d014bf1cac70eb59368a0840a55725416474a8282c8af7454868d5b4b15",
+    "VDOGrabber-1.9.7-android-x86_64.apk": "76621826d3d8513a35a107fadd5a63478345592aa776d40df3947b8af6858cf3",
+    "VDOGrabber-1.9.7-windows-x64.exe": "7ac9e17536b807b39adc68b6a2f433880dfde9d3703445a3047048c66ae76658"
+   }
+  },
+  "v1.9.6": {
+   "rows": {
+    "VDOGrabber-1.9.6-android-arm64.apk": "5af4fa742b32a0e20f7e2474b36dcdc3b3511ea24be94067a8b9c49f473fd4bc",
+    "VDOGrabber-1.9.6-android-armv7.apk": "3c725a4e029c4f59d135977e9f3f6b4f69144be293c06bcdf179d4fc98ee12c7",
+    "VDOGrabber-1.9.6-android-universal.apk": "e02d43dc24ec8cfc72287f601cb625e468aac14afd5da75216fd2252408193ec",
+    "VDOGrabber-1.9.6-android-x86_64.apk": "acdef652a543a0ac49296203b64b05ee79dfa3e8d05c333ae7491085bc16232a",
+    "VDOGrabber-1.9.6-windows-x64.exe": "3deddc46d6d23f39268a67a0ee1cae4da00e9c715509c7015424b68311938eaa"
+   },
+   "truth": {
+    "VDOGrabber-1.9.6-android-arm64.apk": "5af4fa742b32a0e20f7e2474b36dcdc3b3511ea24be94067a8b9c49f473fd4bc",
+    "VDOGrabber-1.9.6-android-armv7.apk": "3c725a4e029c4f59d135977e9f3f6b4f69144be293c06bcdf179d4fc98ee12c7",
+    "VDOGrabber-1.9.6-android-universal.apk": "e02d43dc24ec8cfc72287f601cb625e468aac14afd5da75216fd2252408193ec",
+    "VDOGrabber-1.9.6-android-x86_64.apk": "acdef652a543a0ac49296203b64b05ee79dfa3e8d05c333ae7491085bc16232a",
+    "VDOGrabber-1.9.6-windows-x64.exe": "3deddc46d6d23f39268a67a0ee1cae4da00e9c715509c7015424b68311938eaa"
+   }
+  },
+  "v1.9.5": {
+   "rows": {
+    "VDOGrabber-1.9.5-android-arm64.apk": "f8365170d5c883fc16757756c8c1ce31d4e091a8927b2337183969a0daa9f5b5",
+    "VDOGrabber-1.9.5-android-armv7.apk": "3800c6f3049331b6151adc5415edbf83ee04da7bc84a5844e418bde8c1033f3a",
+    "VDOGrabber-1.9.5-android-universal.apk": "a257f39758fbeb5a0bcac22380ca60c490eec4c095bb8fc4f86063ff2a5b5aea",
+    "VDOGrabber-1.9.5-android-x86_64.apk": "d9aaf561032d0ba3738b8158dd513b67494209462280792e4d35a79c2423c328",
+    "VDOGrabber-1.9.5-windows-x64.exe": "5495a83e4f6085d32f2b1190af9220d95ff93e2d0d1ee9617d1d2ba3228eab4e"
+   },
+   "truth": {
+    "VDOGrabber-1.9.5-android-arm64.apk": "f8365170d5c883fc16757756c8c1ce31d4e091a8927b2337183969a0daa9f5b5",
+    "VDOGrabber-1.9.5-android-armv7.apk": "3800c6f3049331b6151adc5415edbf83ee04da7bc84a5844e418bde8c1033f3a",
+    "VDOGrabber-1.9.5-android-universal.apk": "a257f39758fbeb5a0bcac22380ca60c490eec4c095bb8fc4f86063ff2a5b5aea",
+    "VDOGrabber-1.9.5-android-x86_64.apk": "d9aaf561032d0ba3738b8158dd513b67494209462280792e4d35a79c2423c328",
+    "VDOGrabber-1.9.5-windows-x64.exe": "5495a83e4f6085d32f2b1190af9220d95ff93e2d0d1ee9617d1d2ba3228eab4e"
+   }
+  },
+  "v1.9.4": {
+   "rows": {
+    "VDOGrabber-1.9.4-android-arm64.apk": "dc7632c41773373f21a6e230bec8f5d34119c96d16c339a2198880bed4c77256",
+    "VDOGrabber-1.9.4-android-armv7.apk": "0c49ffbb5f20955c8240896f8fa93dc5aecf6cc2671c0a51c2b9b3fecc711210",
+    "VDOGrabber-1.9.4-android-universal.apk": "efbf0787373a9e6b9ee5f64aa89e5c5d1c0e53531148f92de34da233f4cf5f03",
+    "VDOGrabber-1.9.4-android-x86_64.apk": "a4be587a9e9b835003dae0159b245ff044d90fc95c9798427e9985d0c5805f07",
+    "VDOGrabber-1.9.4-windows-x64.exe": "0b761616a54c8533e0e00419aa2e4cc40e89c50cb6dc1d152da1594cddc5a19a"
+   },
+   "truth": {
+    "VDOGrabber-1.9.4-android-arm64.apk": "dc7632c41773373f21a6e230bec8f5d34119c96d16c339a2198880bed4c77256",
+    "VDOGrabber-1.9.4-android-armv7.apk": "0c49ffbb5f20955c8240896f8fa93dc5aecf6cc2671c0a51c2b9b3fecc711210",
+    "VDOGrabber-1.9.4-android-universal.apk": "efbf0787373a9e6b9ee5f64aa89e5c5d1c0e53531148f92de34da233f4cf5f03",
+    "VDOGrabber-1.9.4-android-x86_64.apk": "a4be587a9e9b835003dae0159b245ff044d90fc95c9798427e9985d0c5805f07",
+    "VDOGrabber-1.9.4-windows-x64.exe": "0b761616a54c8533e0e00419aa2e4cc40e89c50cb6dc1d152da1594cddc5a19a"
+   }
+  },
+  "v1.9.3": {
+   "rows": {
+    "VDOGrabber-1.9.3-android-arm64.apk": "122ef21a61a3b8ecd146806974333641446281840bb135ba4ac60575fc3fe9f1",
+    "VDOGrabber-1.9.3-android-armv7.apk": "dc58e1de0e6d7f24b27810e98d6b2f887653ca37e0a9a06487979ad8ee8e07df",
+    "VDOGrabber-1.9.3-android-universal.apk": "4bc2fc110f575c97a733620076ca469485e4790a9ccba7d68619d84b85cd7f07",
+    "VDOGrabber-1.9.3-android-x86_64.apk": "991d64447f96730fa3107d7c0bfd5b476a00b1a56962175994bcc111644e3590",
+    "VDOGrabber-1.9.3-windows-x64.exe": "bf3104d24b4df9710d5719abf0989b14ab49ceeedb827313f09998ee78c22999"
+   },
+   "truth": {
+    "VDOGrabber-1.9.3-android-arm64.apk": "122ef21a61a3b8ecd146806974333641446281840bb135ba4ac60575fc3fe9f1",
+    "VDOGrabber-1.9.3-android-armv7.apk": "dc58e1de0e6d7f24b27810e98d6b2f887653ca37e0a9a06487979ad8ee8e07df",
+    "VDOGrabber-1.9.3-android-universal.apk": "4bc2fc110f575c97a733620076ca469485e4790a9ccba7d68619d84b85cd7f07",
+    "VDOGrabber-1.9.3-android-x86_64.apk": "991d64447f96730fa3107d7c0bfd5b476a00b1a56962175994bcc111644e3590",
+    "VDOGrabber-1.9.3-windows-x64.exe": "bf3104d24b4df9710d5719abf0989b14ab49ceeedb827313f09998ee78c22999"
+   }
+  },
+  "v1.9.2": {
+   "rows": {
+    "VDOGrabber-1.9.2-android-arm64.apk": "25fbbb9d11b73d11c156c8e6c3e7c74f1742d49c673d261ade9e136917077d0c",
+    "VDOGrabber-1.9.2-android-armv7.apk": "81c530bfa6dbd3f842fd244f66e6210bd967b7a7cab78a1101c41abcefe18471",
+    "VDOGrabber-1.9.2-android-universal.apk": "0351930d9907ba47e71704b627f51ad46c2e25e03e144df75fa059c115a9572f",
+    "VDOGrabber-1.9.2-android-x86_64.apk": "1b077f24cbd2ebbd3f08715c3c2100f85a1a3fe723e51dfd1587b2b2d1b02464",
+    "VDOGrabber-1.9.2-windows-x64.exe": "34755eeb42ae7c93b83411cec353412fd21ddd3b91d510e4362b3327d3442535"
+   },
+   "truth": {
+    "VDOGrabber-1.9.2-android-arm64.apk": "25fbbb9d11b73d11c156c8e6c3e7c74f1742d49c673d261ade9e136917077d0c",
+    "VDOGrabber-1.9.2-android-armv7.apk": "81c530bfa6dbd3f842fd244f66e6210bd967b7a7cab78a1101c41abcefe18471",
+    "VDOGrabber-1.9.2-android-universal.apk": "0351930d9907ba47e71704b627f51ad46c2e25e03e144df75fa059c115a9572f",
+    "VDOGrabber-1.9.2-android-x86_64.apk": "1b077f24cbd2ebbd3f08715c3c2100f85a1a3fe723e51dfd1587b2b2d1b02464",
+    "VDOGrabber-1.9.2-windows-x64.exe": "34755eeb42ae7c93b83411cec353412fd21ddd3b91d510e4362b3327d3442535"
+   }
+  },
+  "v1.9.1": {
+   "rows": {
+    "VDOGrabber-1.9.1-android-arm64.apk": "b9cc20542a8041bf67445789ba74571e7d97ebe1199d733b86deec8d21215d85",
+    "VDOGrabber-1.9.1-android-armv7.apk": "18c428aed81ec7439ccb55f1319c8fa17df4b7dd20efc1219db4f16d902391d7",
+    "VDOGrabber-1.9.1-android-universal.apk": "cc8bc0ba2e7e38bcad09b7d1850b29855ee9d22e3d5b9d0be7685622078a4652",
+    "VDOGrabber-1.9.1-android-x86_64.apk": "0b0e2eaf72f0fc0a183d16286a910ca63183be70fcc3adf278e34cc8aae50b72",
+    "VDOGrabber-1.9.1-windows-x64.exe": "e1dfed370e4f9035d4a500300571f008b7e4251e23868330517d6cf785a13af0"
+   },
+   "truth": {
+    "VDOGrabber-1.9.1-android-arm64.apk": "b9cc20542a8041bf67445789ba74571e7d97ebe1199d733b86deec8d21215d85",
+    "VDOGrabber-1.9.1-android-armv7.apk": "18c428aed81ec7439ccb55f1319c8fa17df4b7dd20efc1219db4f16d902391d7",
+    "VDOGrabber-1.9.1-android-universal.apk": "cc8bc0ba2e7e38bcad09b7d1850b29855ee9d22e3d5b9d0be7685622078a4652",
+    "VDOGrabber-1.9.1-android-x86_64.apk": "0b0e2eaf72f0fc0a183d16286a910ca63183be70fcc3adf278e34cc8aae50b72",
+    "VDOGrabber-1.9.1-windows-x64.exe": "e1dfed370e4f9035d4a500300571f008b7e4251e23868330517d6cf785a13af0"
+   }
+  },
+  "v1.9.0": {
+   "rows": {
+    "VDOGrabber-1.9.0-android-arm64.apk": "46add1c5a42d57658d24b78fd3de7e8bdf2f7f3b633613c61184e865bc323b41",
+    "VDOGrabber-1.9.0-android-armv7.apk": "d7815ffc586be4f951f64bbedac0a51510b172fa05e8528c49ea5ee2c49f0539",
+    "VDOGrabber-1.9.0-android-universal.apk": "2cc31ea3e30944a482b3b17abefd003f402910086b484d0d795c44b92b9aec84",
+    "VDOGrabber-1.9.0-android-x86_64.apk": "696277cdc6a231d788e594f4e2ca56248e8ff60a567de2f99abb261185cf9551",
+    "VDOGrabber-1.9.0-windows-x64.exe": "d4739390c538ce93166eece41087417e45f268a5286cde944f31ed23fd1b2318"
+   },
+   "truth": {
+    "VDOGrabber-1.9.0-android-arm64.apk": "46add1c5a42d57658d24b78fd3de7e8bdf2f7f3b633613c61184e865bc323b41",
+    "VDOGrabber-1.9.0-android-armv7.apk": "d7815ffc586be4f951f64bbedac0a51510b172fa05e8528c49ea5ee2c49f0539",
+    "VDOGrabber-1.9.0-android-universal.apk": "2cc31ea3e30944a482b3b17abefd003f402910086b484d0d795c44b92b9aec84",
+    "VDOGrabber-1.9.0-android-x86_64.apk": "696277cdc6a231d788e594f4e2ca56248e8ff60a567de2f99abb261185cf9551",
+    "VDOGrabber-1.9.0-windows-x64.exe": "d4739390c538ce93166eece41087417e45f268a5286cde944f31ed23fd1b2318"
+   }
+  },
+  "v1.8.0": {
+   "rows": {
+    "VDOGrabber-1.8.0-android-arm64.apk": "e0f28d9d3b0ab3a87a82ea57e8f04859e0e62bd2c807b4a9ce8b781e4850e1c0",
+    "VDOGrabber-1.8.0-android-armv7.apk": "5fe8f18ed48a2a8ed3196103d5387d04c97b6d1f877e4cc59beb4181d999c388",
+    "VDOGrabber-1.8.0-android-universal.apk": "39c5db9c34a809cb37d63d7411a567a74278e24daf8d7fdd75b5ae311e133110",
+    "VDOGrabber-1.8.0-android-x86_64.apk": "c98b2b0e42f4fbc1438a82e0515d704ac90e44481001aad611143958b3dcd81d",
+    "VDOGrabber-1.8.0-windows-x64.exe": "8e59e8a3e9e20e29c848e19923262ff25808255ff11e749896c044843fb179d1"
+   },
+   "truth": {
+    "VDOGrabber-1.8.0-android-arm64.apk": "e0f28d9d3b0ab3a87a82ea57e8f04859e0e62bd2c807b4a9ce8b781e4850e1c0",
+    "VDOGrabber-1.8.0-android-armv7.apk": "5fe8f18ed48a2a8ed3196103d5387d04c97b6d1f877e4cc59beb4181d999c388",
+    "VDOGrabber-1.8.0-android-universal.apk": "39c5db9c34a809cb37d63d7411a567a74278e24daf8d7fdd75b5ae311e133110",
+    "VDOGrabber-1.8.0-android-x86_64.apk": "c98b2b0e42f4fbc1438a82e0515d704ac90e44481001aad611143958b3dcd81d",
+    "VDOGrabber-1.8.0-windows-x64.exe": "8e59e8a3e9e20e29c848e19923262ff25808255ff11e749896c044843fb179d1"
+   }
+  },
+  "v1.7.0": {
+   "rows": {
+    "VDOGrabber-1.7.0-android-arm64.apk": "694bccf5becbb51ea09d767bd28a3b122c0ff04ef981c6ef8ecedb0d7d41c602",
+    "VDOGrabber-1.7.0-android-armv7.apk": "175111c82d8d4771b1dcb3c6278fb3c0b6bd04f2b6459a92c5d926211324756b",
+    "VDOGrabber-1.7.0-android-universal.apk": "4c95745ae9758ab8175cce029e82dae379b1c47f6df6d941113ba1d846d75e34",
+    "VDOGrabber-1.7.0-android-x86_64.apk": "05c4e14b18ec0769489e38d5210a951135c10b1e4e3da1766212b7d335d45a8e",
+    "VDOGrabber-1.7.0-windows-x64.exe": "043b3aec3b73750889bfa211ee7dc8dcbdb65be66cdf563091fc73de8107921a"
+   },
+   "truth": {
+    "VDOGrabber-1.7.0-android-arm64.apk": "694bccf5becbb51ea09d767bd28a3b122c0ff04ef981c6ef8ecedb0d7d41c602",
+    "VDOGrabber-1.7.0-android-armv7.apk": "175111c82d8d4771b1dcb3c6278fb3c0b6bd04f2b6459a92c5d926211324756b",
+    "VDOGrabber-1.7.0-android-universal.apk": "4c95745ae9758ab8175cce029e82dae379b1c47f6df6d941113ba1d846d75e34",
+    "VDOGrabber-1.7.0-android-x86_64.apk": "05c4e14b18ec0769489e38d5210a951135c10b1e4e3da1766212b7d335d45a8e",
+    "VDOGrabber-1.7.0-windows-x64.exe": "043b3aec3b73750889bfa211ee7dc8dcbdb65be66cdf563091fc73de8107921a"
+   }
+  },
+  "v1.6.1": {
+   "rows": {
+    "VDOGrabber-1.6.1-android-arm64.apk": "aabe903680d6b14d839cdcae79226e5641b210521aa483fd3a22f8d0d5b90571",
+    "VDOGrabber-1.6.1-android-armv7.apk": "f6a2025935aea07e045eb9af06b4b64fc8e93fb3a7f2ee284e3fd121a14a8545",
+    "VDOGrabber-1.6.1-android-universal.apk": "4c5d198413fab7750c4ac33a55ca6f0fdc516ffd30f4311087f787da0ddc8d35",
+    "VDOGrabber-1.6.1-android-x86_64.apk": "8a46501437cfe513b123449b0799c859764d9ada9253f97d2af39683cfb7e4e3",
+    "VDOGrabber-1.6.1-windows-x64.exe": "84e5bd9a0524247531e1700dd6f4a20b884cd61c9bb902bb78e2d26738c48bba"
+   },
+   "truth": {
+    "VDOGrabber-1.6.1-android-arm64.apk": "aabe903680d6b14d839cdcae79226e5641b210521aa483fd3a22f8d0d5b90571",
+    "VDOGrabber-1.6.1-android-armv7.apk": "f6a2025935aea07e045eb9af06b4b64fc8e93fb3a7f2ee284e3fd121a14a8545",
+    "VDOGrabber-1.6.1-android-universal.apk": "4c5d198413fab7750c4ac33a55ca6f0fdc516ffd30f4311087f787da0ddc8d35",
+    "VDOGrabber-1.6.1-android-x86_64.apk": "8a46501437cfe513b123449b0799c859764d9ada9253f97d2af39683cfb7e4e3",
+    "VDOGrabber-1.6.1-windows-x64.exe": "84e5bd9a0524247531e1700dd6f4a20b884cd61c9bb902bb78e2d26738c48bba"
+   }
+  },
+  "v1.6.0": {
+   "rows": {
+    "VDOGrabber-1.6.0-android-arm64.apk": "0279317b75a2d4e359de18d4d384136868258842b70d805e4361c1af8302383e",
+    "VDOGrabber-1.6.0-android-armv7.apk": "2130499ac6404da6a1d6700be04ab8599f84408c8bd6c2a7e6407566b73b6da0",
+    "VDOGrabber-1.6.0-android-universal.apk": "10c3a4526483ee81193abf32054cdfbba47fc3a65f2e78894faabba155aeac3b",
+    "VDOGrabber-1.6.0-android-x86_64.apk": "0c2d50e5ebc0d17a2680724bf9a731a3ee7004fdf84ccb5e3db81c177c9016cd",
+    "VDOGrabber-1.6.0-windows-x64.exe": "9cb6be511c253ef0765ae7761423a85ce803a96092f75154945a436d5d5d1348"
+   },
+   "truth": {
+    "VDOGrabber-1.6.0-android-arm64.apk": "0279317b75a2d4e359de18d4d384136868258842b70d805e4361c1af8302383e",
+    "VDOGrabber-1.6.0-android-armv7.apk": "2130499ac6404da6a1d6700be04ab8599f84408c8bd6c2a7e6407566b73b6da0",
+    "VDOGrabber-1.6.0-android-universal.apk": "10c3a4526483ee81193abf32054cdfbba47fc3a65f2e78894faabba155aeac3b",
+    "VDOGrabber-1.6.0-android-x86_64.apk": "0c2d50e5ebc0d17a2680724bf9a731a3ee7004fdf84ccb5e3db81c177c9016cd",
+    "VDOGrabber-1.6.0-windows-x64.exe": "9cb6be511c253ef0765ae7761423a85ce803a96092f75154945a436d5d5d1348"
+   }
+  },
+  "v1.5.0": {
+   "rows": {
+    "VDOGrabber-1.5.0-android-arm64.apk": "4f46d5296e38d3708f91deb6a1f82bcd03b9b07e42e8e86215df957edf6b1ef8",
+    "VDOGrabber-1.5.0-android-armv7.apk": "f8d230f77fcca0761313589da9fa9299ad01c7035847a13b113742580394e89f",
+    "VDOGrabber-1.5.0-android-universal.apk": "2bab78e0504d06b51f63f5636ced5db96c0c8590c14b17198cc965be63f55077",
+    "VDOGrabber-1.5.0-android-x86_64.apk": "4750699474e581cadbde784250dd8ae24545d31e383e0b8f5c74fb87b012f7d5",
+    "VDOGrabber-1.5.0-windows-x64.exe": "a5f69041200d34890bd2f1c82a311a8571f97ccc509fc65080ee853c4f434baf"
+   },
+   "truth": {
+    "VDOGrabber-1.5.0-android-arm64.apk": "4f46d5296e38d3708f91deb6a1f82bcd03b9b07e42e8e86215df957edf6b1ef8",
+    "VDOGrabber-1.5.0-android-armv7.apk": "f8d230f77fcca0761313589da9fa9299ad01c7035847a13b113742580394e89f",
+    "VDOGrabber-1.5.0-android-universal.apk": "2bab78e0504d06b51f63f5636ced5db96c0c8590c14b17198cc965be63f55077",
+    "VDOGrabber-1.5.0-android-x86_64.apk": "4750699474e581cadbde784250dd8ae24545d31e383e0b8f5c74fb87b012f7d5",
+    "VDOGrabber-1.5.0-windows-x64.exe": "a5f69041200d34890bd2f1c82a311a8571f97ccc509fc65080ee853c4f434baf"
+   }
+  },
+  "v1.4.0": {
+   "rows": {
+    "VDOGrabber-1.4.0-android-arm64.apk": "2966c61541060e3b852990457c4952f10289f63730c343d1f53558541cafb337",
+    "VDOGrabber-1.4.0-android-armv7.apk": "779b7edb3e05ea344092a3330469bb82306e7c8cbb503b304b1029ed7506540f",
+    "VDOGrabber-1.4.0-android-universal.apk": "2f8822c1b66f9f54820e26bde5a49fb5b4d51475b4217719d49e29ef1567900a",
+    "VDOGrabber-1.4.0-android-x86_64.apk": "fd5721cb403758d25abaa49e4c48a186196faff7a6211565dbaad5b3332200f3",
+    "VDOGrabber-1.4.0-windows-x64.exe": "899dacf4025cc3f1ce1fe1a57c4971b24962b94047999fa51c6e58c9142a82cb"
+   },
+   "truth": {
+    "VDOGrabber-1.4.0-android-arm64.apk": "2966c61541060e3b852990457c4952f10289f63730c343d1f53558541cafb337",
+    "VDOGrabber-1.4.0-android-armv7.apk": "779b7edb3e05ea344092a3330469bb82306e7c8cbb503b304b1029ed7506540f",
+    "VDOGrabber-1.4.0-android-universal.apk": "2f8822c1b66f9f54820e26bde5a49fb5b4d51475b4217719d49e29ef1567900a",
+    "VDOGrabber-1.4.0-android-x86_64.apk": "fd5721cb403758d25abaa49e4c48a186196faff7a6211565dbaad5b3332200f3",
+    "VDOGrabber-1.4.0-windows-x64.exe": "899dacf4025cc3f1ce1fe1a57c4971b24962b94047999fa51c6e58c9142a82cb"
+   }
+  },
+  "v1.3.6": {
+   "rows": {
+    "VDOGrabber-1.3.6-android-arm64.apk": "b583fff9ccdab549ee168614909c9162b77adcb28a752f1edd078af229d67c63",
+    "VDOGrabber-1.3.6-android-armv7.apk": "fb6c65b546a2a5943f2bb219d98c75704d03d954cabd78f7e9bf0abd77cbf605",
+    "VDOGrabber-1.3.6-android-universal.apk": "ca3608f5d7548e82528e8c1a7801d5f992bdf5dece012daad45b963f13e1f680",
+    "VDOGrabber-1.3.6-android-x86_64.apk": "3f8a9b2597a095011f6f71e0528a635d5915dc6055e2e932f50ca75481004272",
+    "VDOGrabber-1.3.6-windows-x64.exe": "e3b276bcc127b4996c6dca94d95a114263ec9259073e5b2da58c180fd80e9005"
+   },
+   "truth": {
+    "VDOGrabber-1.3.6-android-arm64.apk": "b583fff9ccdab549ee168614909c9162b77adcb28a752f1edd078af229d67c63",
+    "VDOGrabber-1.3.6-android-armv7.apk": "fb6c65b546a2a5943f2bb219d98c75704d03d954cabd78f7e9bf0abd77cbf605",
+    "VDOGrabber-1.3.6-android-universal.apk": "ca3608f5d7548e82528e8c1a7801d5f992bdf5dece012daad45b963f13e1f680",
+    "VDOGrabber-1.3.6-android-x86_64.apk": "3f8a9b2597a095011f6f71e0528a635d5915dc6055e2e932f50ca75481004272",
+    "VDOGrabber-1.3.6-windows-x64.exe": "e3b276bcc127b4996c6dca94d95a114263ec9259073e5b2da58c180fd80e9005"
+   }
+  },
+  "v1.3.5": {
+   "rows": {
+    "VDOGrabber-1.3.5-android-arm64.apk": "a57e79c93b45e84816b8b7a46f4369d1aba658de7ff379b2032b66022091fc18",
+    "VDOGrabber-1.3.5-android-armv7.apk": "0b1eddee36ec132fea923d8c2aaf725eb88487411ff4c6352ebe9fb4d3533bb6",
+    "VDOGrabber-1.3.5-android-universal.apk": "ed488a97a5860cd4d673ce96f99b8d37f5b56234433f2078fb5249c659516b9a",
+    "VDOGrabber-1.3.5-android-x86_64.apk": "1e82a44f07a3009a4f39dd70f69371e2793f69914d9e29c1db0123cc12598a6c",
+    "VDOGrabber-1.3.5-windows-x64.exe": "c849e0ba831d273ee646fe33f621cf3a1c923addc884d79ef3cb2ebbb8ae9a54"
+   },
+   "truth": {
+    "VDOGrabber-1.3.5-android-arm64.apk": "a57e79c93b45e84816b8b7a46f4369d1aba658de7ff379b2032b66022091fc18",
+    "VDOGrabber-1.3.5-android-armv7.apk": "0b1eddee36ec132fea923d8c2aaf725eb88487411ff4c6352ebe9fb4d3533bb6",
+    "VDOGrabber-1.3.5-android-universal.apk": "ed488a97a5860cd4d673ce96f99b8d37f5b56234433f2078fb5249c659516b9a",
+    "VDOGrabber-1.3.5-android-x86_64.apk": "1e82a44f07a3009a4f39dd70f69371e2793f69914d9e29c1db0123cc12598a6c",
+    "VDOGrabber-1.3.5-windows-x64.exe": "c849e0ba831d273ee646fe33f621cf3a1c923addc884d79ef3cb2ebbb8ae9a54"
+   }
+  }
+ }
+}
