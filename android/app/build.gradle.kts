@@ -53,10 +53,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("com.google.android.material:material:1.14.0")
-    // yt-dlp engine on-device (HLS/DASH + every yt-dlp-supported site);
-    // version pinned to the same line Seal uses - verified on Maven Central
-    implementation("io.github.junkfood02.youtubedl-android:library:0.17.3")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.3")
+    // yt-dlp engine on-device (HLS/DASH + every yt-dlp-supported site).
+    // v1.9.22: 0.17.3 -> 0.17.4 - field log 2026-11-03 still reported the
+    // 2024.09.27 binary, so "Unsupported URL"/403 on ordinary sites could not
+    // be fixed by extractor updates; 0.17.4 also kills the whole engine
+    // process tree on pause/cancel. 0.18.x is still a pre-release.
+    implementation("io.github.junkfood02.youtubedl-android:library:0.17.4")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.4")
     testImplementation("junit:junit:4.13.2")
     // v1.9.9: the real org.json classes for JVM tests - the android.jar stub
     // throws "not mocked" (TelemetryParityTest needs JSONObject/put/get for

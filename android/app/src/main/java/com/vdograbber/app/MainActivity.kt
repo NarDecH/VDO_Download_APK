@@ -158,7 +158,12 @@ class MainActivity : AppCompatActivity() {
                         ).show()
                         Downloader.forget(id)
                         StreamDownloadService.start(this@MainActivity, pending.first, pending.second)
+                        return@onReceive
                     }
+                    // v1.9.22: every queued direct download now reports its
+                    // outcome (the 2026-10-23 field log had six download_queued
+                    // events and zero follow-ups)
+                    logDirectOutcome(id, pending.first)
                 } catch (t: Throwable) {
                     FileLog.app("ERROR", "dl", "download-complete check failed: $t")
                 }
@@ -315,8 +320,11 @@ class MainActivity : AppCompatActivity() {
 
             override fun onPageFinished(view: WebView, url: String) {
                 renderGoneCount = 0 // successful load -> crash-loop guard reset
-                FileLog.event("page_loaded", mapOf("url" to url))
-                FileLog.app("INFO", "nav", "page loaded: $url")
+                // v1.9.22: one navigation fires onPageFinished 3-5x (redirect
+                // chains / SPA commits) - log it once per short window
+                if (FileLog.eventOnce("page_loaded", url)) {
+                    FileLog.app("INFO", "nav", "page loaded: $url")
+                }
                 view.evaluateJavascript(Detector.INJECT_JS, null)
                 urlBox.setText(url)
                 // v1.4.0: the injected detector re-scans the NEW page here -
@@ -582,7 +590,8 @@ class MainActivity : AppCompatActivity() {
     private fun renderSheet() {
         val container = sheetContainer ?: return
         while (container.childCount > 1) container.removeViewAt(1) // keep the tab strip
-        val items = MediaStore.list()
+        // v1.9.22: master playlist first, SD last, embed players after files
+        val items = MediaStore.ordered(MediaStore.list())
         val dls = DownloadCleaner.systemList(this)
         val active = StreamDownloadService.activeJobs()
         val paused = PausedJobs.all() // v1.7.0: หยุดพักไว้ (persisted)
@@ -743,7 +752,15 @@ class MainActivity : AppCompatActivity() {
         }
         loadThumb(row.findViewById<ImageView>(R.id.mThumb), row.findViewById<TextView>(R.id.mPosterLabel), m.poster)
         row.findViewById<TextView>(R.id.mUrl).text = m.url
-        row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
+        // v1.9.22: an embed row is a PLAYER PAGE, not a file - the download
+        // button sent it to yt-dlp, which answered "Unsupported URL" before
+        // the user opened the page and found the real m3u8 (2/2 clips in the
+        // 2026-11-03 field log). Keep เปิด only; no doomed job.
+        val isEmbed = m.kind == "embed"
+        row.findViewById<TextView>(R.id.mDl).visibility = if (isEmbed) View.GONE else View.VISIBLE
+        if (!isEmbed) {
+            row.findViewById<TextView>(R.id.mDl).setOnClickListener { tryDownload(m.url, m.title) }
+        }
         row.findViewById<TextView>(R.id.mCopy).setOnClickListener {
             val cm = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
             cm.setPrimaryClip(ClipData.newPlainText("url", m.url))
@@ -752,8 +769,7 @@ class MainActivity : AppCompatActivity() {
         // embed players: opening the embed page as the top page lets the
         // detector find the real video URLs inside it (same idea as the
         // desktop toolbar's "เปิดหน้า embed" button)
-        row.findViewById<TextView>(R.id.mOpen).visibility =
-            if (m.kind == "embed") View.VISIBLE else View.GONE
+        row.findViewById<TextView>(R.id.mOpen).visibility = if (isEmbed) View.VISIBLE else View.GONE
         row.findViewById<TextView>(R.id.mOpen).setOnClickListener {
             FileLog.event("embed_open", mapOf("url" to m.url))
             FileLog.app("INFO", "nav", "open embed page: ${m.url}")
@@ -940,6 +956,30 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    /**
+     * v1.9.22: close the loop for a DownloadManager job - done with its byte
+     * count, or failed with the DM reason code - and drop it from the pending
+     * registry so the stuck-jobs watchdog cannot report a finished job.
+     */
+    private fun logDirectOutcome(id: Long, url: String) {
+        val r = Downloader.resultOf(this, id) ?: return
+        if (r.ok) {
+            FileLog.event("download_done", mapOf(
+                "url" to url.take(300), "engine" to "downloadmanager",
+                "file" to r.name.take(120), "bytes" to r.bytes,
+            ))
+            FileLog.download("done #$id ${r.name} (${r.bytes} bytes)")
+            FileLog.app("INFO", "dl", "direct download done: ${r.name}")
+        } else {
+            FileLog.event("download_failed", mapOf(
+                "url" to url.take(300), "engine" to "downloadmanager",
+                "reason" to r.reason, "bytes" to r.bytes, "total" to r.total,
+            ))
+            FileLog.app("WARN", "dl", "direct download failed #$id (reason ${r.reason})")
+        }
+        Downloader.forget(id)
+    }
+
     private fun tryDownload(url: String, title: String) {
         // v1.3.5: blob: URLs exist only inside the page (MSE players) - yt-dlp
         // cannot reach them ("[Blob] A blob URL exists only locally in your
@@ -960,12 +1000,19 @@ class MainActivity : AppCompatActivity() {
             // path) go to the yt-dlp engine too - DownloadManager would just
             // save the HTML of the player page as "title.mp4" (the reported
             // ".mp4 that is really HTML" bug).
+            var started = true
             when (Downloader.routeOf(url)) {
-                Downloader.Route.DIRECT_FILE -> Downloader.enqueue(this, url, title)
+                Downloader.Route.DIRECT_FILE -> {
+                    if (Downloader.enqueue(this, url, title) == Downloader.DUPLICATE_ID) started = false
+                }
                 Downloader.Route.STREAM, Downloader.Route.PAGE -> StreamDownloadService.start(this, url, title)
                 null -> FileLog.app("INFO", "dl", "unusable URL - not downloaded: $url")
             }
-            Toast.makeText(this, R.string.download_started, Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                this,
+                if (started) R.string.download_started else R.string.download_already_queued,
+                Toast.LENGTH_SHORT,
+            ).show()
         } catch (e: Exception) {
             FileLog.app("ERROR", "dl", "download failed: $e")
             Toast.makeText(this, getString(R.string.download_failed, e.message), Toast.LENGTH_LONG).show()

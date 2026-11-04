@@ -198,4 +198,19 @@ object StreamArgs {
      *  history - field log 2026-10-07 showed 11k lines / 1.2 MB per session. */
     fun progressLogDue(lastFireMs: Long, nowMs: Long, gapMs: Long = PROGRESS_LOG_GAP_MS): Boolean =
         nowMs - lastFireMs >= gapMs
+
+    /** v1.9.22: download_progress events went out ~1/s and even repeated or
+     *  REGRESSED (the HLS size estimate moves while fragments download) - one
+     *  9-minute job wrote ~550 records in the 2026-11-03 field log. Keep one
+     *  event per [PROGRESS_EVENT_GAP_MS], only when the percent advanced, and
+     *  normally only in [PROGRESS_EVENT_MIN_DELTA] steps. */
+    const val PROGRESS_EVENT_GAP_MS = 2000L
+    const val PROGRESS_EVENT_MIN_DELTA = 5
+
+    fun shouldLogProgress(lastPercent: Int, lastFireMs: Long, percent: Int, nowMs: Long): Boolean {
+        if (percent <= lastPercent) return false            // duplicate or regression
+        if (lastPercent < 0) return true                    // first report always passes
+        if (nowMs - lastFireMs < PROGRESS_EVENT_GAP_MS) return false
+        return percent - lastPercent >= PROGRESS_EVENT_MIN_DELTA || percent >= 99
+    }
 }

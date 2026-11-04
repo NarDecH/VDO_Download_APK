@@ -88,4 +88,35 @@ class DownloaderTest {
         // direct manifest URL keeps its file name + media extension
         assertEquals("index.m3u8", Downloader.displayName("https://c/v/index.m3u8", ""))
     }
+
+    // ------------------------------ v1.9.22 destination collisions (field log)
+
+    @Test
+    fun `uniqueDisplayName keeps the plain name when it is free`() {
+        assertEquals(
+            "Travel Blog.mp4",
+            Downloader.uniqueDisplayName("https://c/a.mp4", "Travel Blog", emptySet()),
+        )
+    }
+
+    @Test
+    fun `uniqueDisplayName separates qualities of one page`() {
+        val a = Downloader.uniqueDisplayName("https://c/720.mp4?x=1", "Reel", emptySet())
+        val b = Downloader.uniqueDisplayName("https://c/360.mp4?x=2", "Reel", setOf(a))
+        val c = Downloader.uniqueDisplayName("https://c/1080.mp4", "Reel", setOf(a, b))
+        assertEquals("Reel.mp4", a)
+        assertTrue("second name must differ: $b", b != a && b.startsWith("Reel - ") && b.endsWith(".mp4"))
+        assertTrue("third name must differ too: $c", c != a && c != b)
+        // deterministic: the same URL always gets the same suffix
+        assertEquals(b, Downloader.uniqueDisplayName("https://c/360.mp4?x=2", "Reel", setOf(a)))
+    }
+
+    @Test
+    fun `uniqueDisplayName falls back to a counter when the hash is taken`() {
+        val first = Downloader.uniqueDisplayName("https://c/a.mp4", "Clip", emptySet())
+        val second = Downloader.uniqueDisplayName("https://c/b.mp4", "Clip", setOf(first))
+        val again = Downloader.uniqueDisplayName("https://c/b.mp4", "Clip", setOf(first, second))
+        assertTrue(second.startsWith("Clip - "))
+        assertTrue("counter suffix expected: $again", again.endsWith(" (2).mp4"))
+    }
 }

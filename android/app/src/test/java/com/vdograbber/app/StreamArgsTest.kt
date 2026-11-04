@@ -172,6 +172,21 @@ class StreamArgsTest {
         assertTrue(!StreamArgs.progressLogDue(5L, 6L, gapMs = 3L))
     }
 
+    @Test
+    fun `progress events are throttled, monotonic and in 5 percent steps`() {
+        // first report always passes
+        assertTrue(StreamArgs.shouldLogProgress(-1, 0L, 0, 10_000L))
+        // same percent / regression never logs
+        assertTrue(!StreamArgs.shouldLogProgress(41, 20_000L, 41, 30_000L))
+        assertTrue(!StreamArgs.shouldLogProgress(41, 20_000L, 40, 30_000L))
+        // needs both a 5-point step and the 2s gap
+        assertTrue(!StreamArgs.shouldLogProgress(41, 20_000L, 45, 30_000L))
+        assertTrue(!StreamArgs.shouldLogProgress(41, 20_000L, 46, 20_500L))
+        assertTrue(StreamArgs.shouldLogProgress(41, 20_000L, 46, 22_000L))
+        // the final 99 always gets through once the gap passed
+        assertTrue(StreamArgs.shouldLogProgress(96, 20_000L, 99, 22_000L))
+    }
+
     // ---- v1.7.0: partial files of a paused download (หยุดพัก / ลบ) ----
 
     @Test

@@ -81,4 +81,28 @@ object MediaStore {
         val default = (scheme == "https" && port == "443") || (scheme == "http" && port == "80")
         return if (port.isEmpty() || default) "$scheme://$host" else "$scheme://$host:$port"
     }
+
+    // -------------------------------------- v1.9.22 media sheet ordering
+
+    private val MASTER_RE = Regex("master", RegexOption.IGNORE_CASE)
+    private val LOWQ_RE = Regex("""(^|[-_/.])(sd|360p?|480p?)([-_./]|${'$'})""", RegexOption.IGNORE_CASE)
+
+    private fun sortRank(item: Item): Int = when {
+        item.kind == "embed" -> 90                        // a page to open, not a file
+        item.kind == "m3u8" || item.kind == "mpd" -> when {
+            MASTER_RE.containsMatchIn(item.url) -> 0      // master resolves the best variant
+            LOWQ_RE.containsMatchIn(item.url) -> 2        // explicit SD/360p/480p variant
+            else -> 1
+        }
+        else -> 10                                        // direct file
+    }
+
+    /**
+     * v1.9.22 (field log 2026-11-03): the sheet listed `-SD.m3u8` next to the
+     * master playlist and the user downloaded the 9-minute SD file while HD
+     * was already detected. Master playlists first, low-quality variants last
+     * among the streams, embed player pages after every real file. Stable
+     * inside each group, so discovery order still decides ties.
+     */
+    fun ordered(list: List<Item>): List<Item> = list.sortedBy { sortRank(it) }
 }

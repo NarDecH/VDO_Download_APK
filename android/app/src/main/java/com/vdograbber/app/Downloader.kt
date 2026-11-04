@@ -5,6 +5,7 @@ import android.content.Context
 import android.net.Uri
 import android.os.Environment
 import android.webkit.CookieManager
+import java.io.File
 
 /**
  * Queue direct-file downloads through the platform DownloadManager (writes
@@ -26,6 +27,9 @@ import android.webkit.CookieManager
 object Downloader {
 
     val STREAM_EXT = setOf("m3u8", "mpd")
+
+    /** v1.9.22: enqueue() answer when this exact URL is already queued. */
+    const val DUPLICATE_ID = -2L
 
     private val EXT_RE = Regex(
         """\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|3gp)([?#].*)?${'$'}""",
@@ -94,12 +98,17 @@ object Downloader {
      * v1.9.2: the second element also tracks enqueue timestamps for the
      * field-log "queued but never started" watchdog (watchStaleJobs).
      */
-    private val pendingDm = object : LinkedHashMap<Long, Triple<String, String, Long>>(16, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Triple<String, String, Long>>?): Boolean = size > 32
+    /** v1.9.22: one queued direct download. [fileName] is the destination
+     *  reserved at enqueue time, so a second tap can be rejected and the log
+     *  can name the exact file that was written. */
+    private class Pending(val url: String, val title: String, val queuedAt: Long, val fileName: String)
+
+    private val pendingDm = object : LinkedHashMap<Long, Pending>(16, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<Long, Pending>?): Boolean = size > 32
     }
 
     fun pendingFor(id: Long): Pair<String, String>? = synchronized(pendingDm) {
-        pendingDm[id]?.let { it.first to it.second }
+        pendingDm[id]?.let { it.url to it.title }
     }
 
     fun forget(id: Long) { synchronized(pendingDm) { pendingDm.remove(id) } }
@@ -133,8 +142,8 @@ object Downloader {
             val it = pendingDm.entries.iterator()
             while (it.hasNext()) {
                 val e = it.next()
-                if (nowMs - e.value.third > thresholdMs) {
-                    out.add(e.key to e.value.first)
+                if (nowMs - e.value.queuedAt > thresholdMs) {
+                    out.add(e.key to e.value.url)
                     it.remove()
                 }
             }
@@ -145,7 +154,7 @@ object Downloader {
     /** Test hook: seed the pending map like enqueue() does (E2E).
      * v1.9.2: an optional timestamp for the stale-jobs watchdog tests. */
     fun putPending(id: Long, pair: Pair<String, String>, queuedAtMs: Long = System.currentTimeMillis()) {
-        synchronized(pendingDm) { pendingDm[id] = Triple(pair.first, pair.second, queuedAtMs) }
+        synchronized(pendingDm) { pendingDm[id] = Pending(pair.first, pair.second, queuedAtMs, displayName(pair.first, pair.second)) }
     }
 
     /**
@@ -193,6 +202,34 @@ object Downloader {
         return false
     }
 
+    /** v1.9.22: what a finished DownloadManager job actually did. The field log
+     *  had six download_queued lines and no outcome for any of them, so
+     *  neither the user nor a log reader could tell whether a file landed. */
+    class DirectResult(
+        val ok: Boolean,
+        val bytes: Long,
+        val total: Long,
+        val reason: Int,
+        val name: String,
+    )
+
+    fun resultOf(ctx: Context, id: Long): DirectResult? = try {
+        val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+        dm.query(DownloadManager.Query().setFilterById(id))?.use { c ->
+            if (!c.moveToFirst()) null else DirectResult(
+                ok = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) ==
+                    DownloadManager.STATUS_SUCCESSFUL,
+                bytes = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)),
+                reason = c.getInt(c.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)),
+                name = c.getString(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TITLE)).orEmpty(),
+            )
+        }
+    } catch (e: Exception) {
+        FileLog.app("ERROR", "dl", "download status query failed: $e")
+        null
+    }
+
     /** Human-readable size, e.g. 1234567 -> "1.2 MB" (v1.1.8). */
     fun humanSize(b: Long): String = when {
         b >= 1L shl 30 -> String.format(java.util.Locale.US, "%.1f GB", b / 1073741824.0)
@@ -218,6 +255,47 @@ object Downloader {
         return if (name.contains('.')) name else "$name.$ext"
     }
 
+    /**
+     * v1.9.22 field log (2026-10-23): six taps on the qualities of ONE page
+     * produced six jobs pointing at the SAME destination - DownloadManager
+     * then keeps one file and silently drops the rest. When the plain
+     * title-based name is taken, tag it with a short hash of the URL
+     * (deterministic, so a re-download of the same URL is recognisable) and
+     * only then fall back to `(2)`, `(3)`, ...
+     */
+    fun uniqueDisplayName(url: String, title: String, taken: Set<String>): String {
+        val base = displayName(url, title)
+        if (base !in taken) return base
+        val dot = base.lastIndexOf('.')
+        val stem = if (dot > 0) base.substring(0, dot) else base
+        val ext = if (dot > 0) base.substring(dot) else ""
+        val tag = Integer.toHexString(url.hashCode())
+        val candidate = "$stem - $tag$ext"
+        if (candidate !in taken) return candidate
+        var n = 2
+        while ("$stem - $tag ($n)$ext" in taken) n++
+        return "$stem - $tag ($n)$ext"
+    }
+
+    /**
+     * v1.9.22: names already in use - the queued jobs plus (best effort) the
+     * files sitting in Downloads/VDOGrabber. Public-dir File access can be
+     * denied under scoped storage, and enqueue must never fail because of a
+     * name check, so errors simply leave the set incomplete.
+     */
+    fun takenNames(): MutableSet<String> {
+        val out = mutableSetOf<String>()
+        try {
+            val dir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                "VDOGrabber",
+            )
+            dir.listFiles()?.forEach { out.add(it.name) }
+        } catch (_: Exception) {}
+        synchronized(pendingDm) { pendingDm.values.forEach { out.add(it.fileName) } }
+        return out
+    }
+
     fun enqueue(ctx: Context, url: String, title: String): Long {
         // v1.3.5 + v1.3.4 guards: blob: URLs are unusable (lives only inside
         // the page) and page URLs would come back as an HTML player saved as
@@ -231,7 +309,16 @@ object Downloader {
             StreamDownloadService.start(ctx, url, title)
             return -1L
         }
-        val fileName = displayName(url, title)
+        // v1.9.22: the same URL tapped twice while it is still pending gets no
+        // second job (field log: #3175/#3177 and #3174/#3178 were exact
+        // repeats of the same two URLs)
+        val dupId = synchronized(pendingDm) { pendingDm.entries.firstOrNull { it.value.url == url }?.key }
+        if (dupId != null) {
+            FileLog.event("download_duplicate", mapOf("url" to url.take(300), "id" to dupId))
+            FileLog.app("INFO", "dl", "already queued as #$dupId - duplicate tap ignored: ${url.take(120)}")
+            return DUPLICATE_ID
+        }
+        val fileName = uniqueDisplayName(url, title, takenNames())
 
         val req = DownloadManager.Request(Uri.parse(url)).apply {
             setTitle(fileName)
@@ -245,7 +332,8 @@ object Downloader {
         }
         val dm = ctx.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val id = dm.enqueue(req)
-        synchronized(pendingDm) { pendingDm[id] = Triple(url, title, System.currentTimeMillis()) } // HTML-check re-route + v1.9.2 watchdog
+        // HTML-check re-route + v1.9.2 watchdog + v1.9.22 name reservation
+        synchronized(pendingDm) { pendingDm[id] = Pending(url, title, System.currentTimeMillis(), fileName) }
         FileLog.download("enqueue #$id url=$url -> Downloads/VDOGrabber/$fileName")
         FileLog.event("download_queued", mapOf("id" to id, "url" to url, "file" to fileName))
         return id

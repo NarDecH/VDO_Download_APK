@@ -73,6 +73,25 @@ object FileLog {
         write("events.jsonl", buildEvent(type, data).toString(), rotate = false)
     }
 
+    /** v1.9.22: collapses a burst of identical events. WebView fires
+     *  onPageFinished several times for ONE navigation (redirect chains, SPA
+     *  commits) - the 2026-11-03 field log had the same page_loaded up to 5x
+     *  inside 300ms. Returns true when the event was written. */
+    private val recentEvents = HashMap<String, Long>()
+
+    fun eventOnce(type: String, key: String, windowMs: Long = 1500L,
+                  data: Map<String, Any?> = emptyMap()): Boolean {
+        val now = System.currentTimeMillis()
+        synchronized(recentEvents) {
+            val last = recentEvents["$type|$key"]
+            if (last != null && now - last < windowMs) return false
+            if (recentEvents.size > 64) recentEvents.clear() // bounded
+            recentEvents["$type|$key"] = now
+        }
+        event(type, data)
+        return true
+    }
+
     /** Test hook (JVM tests cannot read filesDir): return the exact record
      * event() would append, without touching the disk. */
     fun captureEvent(type: String, data: Map<String, Any?> = emptyMap()): JSONObject =
