@@ -2,6 +2,16 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.22] — 2026-11-04
+
+### การเปลี่ยนแปลง
+- แก้ชื่อไฟล์ดาวน์โหลดตรงชนกัน (เติม hash ของ URL) และไม่สร้างคิวซ้ำระหว่างที่ลิงก์เดิมยังรออยู่
+- เพิ่ม log ผลจบของ DownloadManager (download_done/download_failed พร้อมขนาดและ reason code)
+- ลด log noise — download_progress ทุก 2 วิ/ขั้น 5% และ page_loaded ที่ซ้ำ 3-5 ครั้งต่อการโหลด
+- แท็บพบวิดีโอเรียง master/HD ก่อน SD และแถว embed เปิดหน้าเว็บแทนการส่ง yt-dlp
+- อัปเดต youtubedl-android 0.17.3 เป็น 0.17.4 (yt-dlp ใหม่กว่า)
+
+
 ## [1.9.21] — 2026-10-16
 
 ### การเปลี่ยนแปลง
