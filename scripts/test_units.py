@@ -269,6 +269,56 @@ def test_unique_stem() -> bool:
     return True
 
 
+# ------------------------------------ stale engine warning (v1.9.23)
+def test_engine_version_age() -> bool:
+    import datetime as _dt
+    import tempfile
+
+    from core.ytdlp_mgr import ENGINE_STALE_DAYS, EngineManager, is_engine_stale, version_age_days
+
+    now = _dt.datetime(2026, 11, 9, 12, 0, tzinfo=_dt.timezone.utc).timestamp()
+    assert version_age_days("2026.11.09", now) == 0
+    assert version_age_days("2026.08.19", now) == 82
+    assert version_age_days("2026.11.10", now) == 0, "future dates clamp to 0"
+    assert version_age_days("2026.11.08.1", now) == 1
+    assert version_age_days("nightly", now) == -1
+    assert version_age_days("", now) == -1
+    assert version_age_days(None, now) == -1
+    assert version_age_days("2026.13.40", now) == -1
+
+    # boundary: exactly ENGINE_STALE_DAYS is still fresh, one day more is stale
+    today = _dt.date(2026, 11, 9)
+    fresh = today - _dt.timedelta(days=ENGINE_STALE_DAYS)
+    stale = today - _dt.timedelta(days=ENGINE_STALE_DAYS + 1)
+    fresh_v = "%04d.%02d.%02d" % (fresh.year, fresh.month, fresh.day)
+    stale_v = "%04d.%02d.%02d" % (stale.year, stale.month, stale.day)
+    assert not is_engine_stale(fresh_v, now), fresh_v
+    assert is_engine_stale(stale_v, now), stale_v
+    assert not is_engine_stale("nightly", now), "unknown version never warns"
+
+    # the manager refreshes the flags and emits engine_outdated exactly then
+    class _Log:
+        def __init__(self):
+            self.events = []
+
+        def log(self, msg, **kw):
+            self.events.append((msg, kw))
+
+        def exception(self, *a):
+            pass
+
+    eng = EngineManager(tempfile.mkdtemp(prefix="vg-engine-"), _Log())
+    eng.ytdlp_version = stale_v
+    eng._note_engine_age()
+    assert eng.ytdlp_stale and eng.ytdlp_age_days == ENGINE_STALE_DAYS + 1
+    assert any(kw.get("event") == "engine_outdated" for _, kw in eng.log.events)
+    eng.ytdlp_version = fresh_v
+    eng._note_engine_age()
+    assert not eng.ytdlp_stale
+    assert sum(1 for _, kw in eng.log.events if kw.get("event") == "engine_outdated") == 1
+    return True
+
+
 def test_title_base_policy() -> bool:
     """Page/URL titles name media+manifests; site pages keep yt-dlp's title."""
     from core.downloader import DownloadManager
@@ -1134,6 +1184,7 @@ def main() -> int:
         "page_fallback_obfuscated": test_page_fallback_obfuscated,
         "sanitize_filename": test_sanitize_filename,
         "unique_stem": test_unique_stem,
+        "engine_version_age": test_engine_version_age,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,

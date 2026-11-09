@@ -104,7 +104,10 @@ class LogsActivity : AppCompatActivity() {
                 val v = YoutubeDL.getInstance().version(this)
                 FileLog.event("engine_check", mapOf("engine" to "yt-dlp", "version" to v))
                 runOnUiThread {
-                    box.text = getString(R.string.engine_version, v)
+                    val age = StreamArgs.versionAgeDays(v, System.currentTimeMillis())
+                    box.text = getString(R.string.engine_version, v) +
+                        if (StreamArgs.isEngineStale(v, System.currentTimeMillis()))
+                            "\n" + getString(R.string.engine_stale_hint, age) else ""
                 }
             } catch (e: Exception) {
                 FileLog.app("ERROR", "engine", "version check failed: $e")

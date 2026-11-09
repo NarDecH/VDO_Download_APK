@@ -453,6 +453,8 @@ class Api:
             "app_name": APP_NAME,
             "settings": public_settings(),
             "ytdlp_version": _APP.engines.ytdlp_version,
+            "ytdlp_age_days": _APP.engines.ytdlp_age_days,
+            "ytdlp_stale": _APP.engines.ytdlp_stale,
             "has_ffmpeg": bool(_APP.engines.ffmpeg_path()),
             "downloads": _APP.downloads.list(),
             "media": _APP.media.list(),

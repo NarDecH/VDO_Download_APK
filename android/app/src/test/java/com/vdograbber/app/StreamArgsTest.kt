@@ -187,6 +187,32 @@ class StreamArgsTest {
         assertTrue(StreamArgs.shouldLogProgress(96, 20_000L, 99, 22_000L))
     }
 
+    // ---- v1.9.23: stale engine warning (bundled extractors age with the APK) ----
+
+    @Test
+    fun `engine age comes from the calver date`() {
+        val now = java.time.Instant.parse("2026-11-09T12:00:00Z").toEpochMilli()
+        assertEquals(0, StreamArgs.versionAgeDays("2026.11.09", now))
+        assertEquals(82, StreamArgs.versionAgeDays("2026.08.19", now))
+        assertEquals(1, StreamArgs.versionAgeDays("2026.11.08.1", now))
+        assertEquals(0, StreamArgs.versionAgeDays("2026.11.10", now)) // clock skew clamps
+        assertEquals(-1, StreamArgs.versionAgeDays("nightly", now))
+        assertEquals(-1, StreamArgs.versionAgeDays("", now))
+        assertEquals(-1, StreamArgs.versionAgeDays(null, now))
+        assertEquals(-1, StreamArgs.versionAgeDays("2026.13.40", now))
+    }
+
+    @Test
+    fun `stale engine warns only past the threshold`() {
+        val now = java.time.Instant.parse("2026-11-09T12:00:00Z").toEpochMilli()
+        val today = java.time.LocalDate.of(2026, 11, 9)
+        fun calver(daysAgo: Long) = today.minusDays(daysAgo).toString().replace('-', '.')
+        assertTrue(!StreamArgs.isEngineStale(calver(StreamArgs.ENGINE_STALE_DAYS.toLong()), now))
+        assertTrue(StreamArgs.isEngineStale(calver(StreamArgs.ENGINE_STALE_DAYS + 1L), now))
+        assertTrue(StreamArgs.isEngineStale("2026.01.01", now))
+        assertTrue(!StreamArgs.isEngineStale("nightly", now))
+    }
+
     // ---- v1.7.0: partial files of a paused download (หยุดพัก / ลบ) ----
 
     @Test

@@ -185,6 +185,14 @@ class MainActivity : AppCompatActivity() {
                     .version(applicationContext) ?: runEngineVersionProbe()
                 FileLog.event("engine_ready", mapOf("engine" to "yt-dlp", "version" to v))
                 FileLog.app("INFO", "engine", "yt-dlp ready (v$v)")
+                // v1.9.23: the bundled engine ages with the APK - flag a stale
+                // extractor so an "Unsupported URL" session has a cause
+                val age = StreamArgs.versionAgeDays(v, System.currentTimeMillis())
+                if (StreamArgs.isEngineStale(v, System.currentTimeMillis())) {
+                    FileLog.event("engine_outdated",
+                        mapOf("engine" to "yt-dlp", "version" to v, "age_days" to age))
+                    FileLog.app("WARN", "engine", "yt-dlp is $age days old (v$v) - update recommended")
+                }
             } catch (e: Exception) {
                 FileLog.app("ERROR", "engine", "init failed: $e")
                 FileLog.event("engine_init_error", mapOf("error" to (e.message ?: "unknown")))

@@ -34,6 +34,8 @@
     <string name="engine_check">check engine version</string>
     <string name="engine_update">update engine</string>
     <string name="engine_version">yt-dlp version: %1$s</string>
+    <!-- v1.9.23: shown when the bundled engine is older than 120 days -->
+    <string name="engine_stale_hint">⚠ เอนจินเก่า %1$d วัน — แนะนำกดอัปเดตเอนจิน</string>
     <string name="engine_updated">updated: %1$s</string>
     <string name="engine_uptodate">engine is up to date (%1$s)</string>
     <string name="engine_error">error: %1$s</string>
