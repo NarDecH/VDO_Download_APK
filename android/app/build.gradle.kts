@@ -59,7 +59,7 @@ dependencies {
     // be fixed by extractor updates; 0.17.4 also kills the whole engine
     // process tree on pause/cancel. 0.18.x is still a pre-release.
     implementation("io.github.junkfood02.youtubedl-android:library:0.17.4")
-    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.17.4")
+    implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
     testImplementation("junit:junit:4.13.2")
     // v1.9.9: the real org.json classes for JVM tests - the android.jar stub
     // throws "not mocked" (TelemetryParityTest needs JSONObject/put/get for
