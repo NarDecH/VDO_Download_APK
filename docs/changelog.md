@@ -2,6 +2,13 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.23] — 2026-11-09
+
+### การเปลี่ยนแปลง
+- เตือนเมื่อเอนจิน yt-dlp เก่าเกิน 120 วัน ทั้งฝั่ง desktop (แผง About) และ Android (หน้าต่างเช็กเวอร์ชัน) พร้อม event engine_outdated ใน log
+- analyze_events.py คำนวณอายุเอนจินจากเลข calver เอง จึงจับได้แม้ใน log รุ่นเก่าที่ไม่มี event ใหม่ และรายงานเป็น finding แรก
+
+
 ## [1.9.22] — 2026-11-04
 
 ### การเปลี่ยนแปลง
