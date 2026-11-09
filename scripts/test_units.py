@@ -731,6 +731,47 @@ def test_analyze_events_clean_log_has_no_known_problem() -> bool:
     return True
 
 
+def test_analyze_events_engine_age() -> bool:
+    """v1.9.23: the analyzer flags a stale engine both from the engine_outdated
+    event and - for logs from v1.9.22 and older - from the calver itself."""
+    import datetime as _dt
+
+    import analyze_events
+    from core.ytdlp_mgr import ENGINE_STALE_DAYS as DESKTOP_STALE
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assert analyze_events.ENGINE_STALE_DAYS == DESKTOP_STALE, "analyzer threshold drifted"
+    kotlin = open(os.path.join(
+        root, "android/app/src/main/java/com/vdograbber/app/StreamArgs.kt"),
+        encoding="utf-8").read()
+    assert ("ENGINE_STALE_DAYS = %d" % DESKTOP_STALE) in kotlin, "Android copy drifted"
+
+    today = _dt.date.today()
+    old_v = "%04d.%02d.%02d" % (today.year - 1, today.month, today.day)
+    fresh_v = "%04d.%02d.%02d" % (today.year, today.month, today.day)
+
+    def run(records):
+        s = analyze_events.summarize(records)
+        return s, "\n".join(analyze_events.diagnose(s, records))
+
+    s, text = run([{"ts": 1, "event": "engine_ready", "version": old_v}])
+    assert s["engine_age_days"] >= 365 and s["engine_stale"] is True, s
+    assert "เก่า" in text and "อัปเดต" in text, text
+
+    s, text = run([{"ts": 1, "event": "engine_ready", "version": fresh_v}])
+    assert s["engine_age_days"] == 0 and s["engine_stale"] is False, s
+    assert "เก่า" not in text, text
+
+    # engine_outdated alone (no engine_ready to read a version from)
+    s, text = run([{"ts": 1, "event": "engine_outdated", "version": "2024.09.27",
+                    "age_days": DESKTOP_STALE + 5}])
+    assert s["engine_stale"] is True and s["engine_age_days"] == DESKTOP_STALE + 5, s
+    assert "2024.09.27" in text, text
+    out = analyze_events.render_text(s, [], ["x"], [])
+    assert "(เก่า %d วัน)" % (DESKTOP_STALE + 5) in out, out
+    return True
+
+
 def test_analyze_events_origin_split_and_filter() -> bool:
     """v1.9.8: selftest vs real-user split - origin tag on events + the
     --origin CLI filter (legacy rows without the field count as app)."""
@@ -1185,6 +1226,7 @@ def main() -> int:
         "sanitize_filename": test_sanitize_filename,
         "unique_stem": test_unique_stem,
         "engine_version_age": test_engine_version_age,
+        "analyze_events_engine_age": test_analyze_events_engine_age,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,

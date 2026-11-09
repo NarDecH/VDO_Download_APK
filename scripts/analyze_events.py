@@ -28,12 +28,17 @@ import argparse
 import datetime
 import json
 import os
+import re
 import sys
 import zipfile
 
+# v1.9.23: mirrors core.ytdlp_mgr.ENGINE_STALE_DAYS (and the Kotlin copy) -
+# the analyzer is standalone, so test_units.py guards the three-way sync.
+ENGINE_STALE_DAYS = 120
+
 # The debugging funnel, in the order a healthy download flows through it.
 KNOWN_EVENTS = [
-    "app_start", "engine_ready", "page_loaded", "media_found",
+    "app_start", "engine_ready", "engine_outdated", "page_loaded", "media_found",
     "download_queued", "download_start", "download_rerouted",
     "download_skipped_blob", "download_not_media", "download_no_file",
     "download_no_file_probe", "download_done", "download_error",
@@ -48,7 +53,20 @@ PROBLEM_EVENTS = {
     "download_no_file": "engine exited 0 but wrote no file",
     "download_error": "engine/download error (see the reason column)",
     "download_stuck": "direct download queued but never started - watchdog gave up",
+    "engine_outdated": "yt-dlp engine older than 120 days - extractors may be stale",
 }
+
+
+def calver_age_days(version, today=None) -> int:
+    """Age of a yyyy.MM.dd engine version in days, -1 when not a calver."""
+    m = re.match(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})", str(version or ""))
+    if not m:
+        return -1
+    try:
+        then = datetime.date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return -1
+    return max(0, ((today or datetime.date.today()) - then).days)
 
 
 def default_log_path() -> str:
@@ -141,6 +159,18 @@ def summarize(records: list[dict]) -> dict:
     engine_ready = [r for r in records if r.get("event") == "engine_ready"]
     engine_version = engine_ready[-1].get("version") if engine_ready else None
 
+    # v1.9.23: flag a stale bundled engine. Logs from v1.9.22 and older have
+    # no engine_outdated row, so derive the age from the calver itself - that
+    # is how the 2024.09.27 engine in the 2026-11 field log becomes visible.
+    outdated = [r for r in records if r.get("event") == "engine_outdated"]
+    engine_age_days = calver_age_days(engine_version) if engine_version else -1
+    if engine_age_days < 0 and outdated:
+        try:
+            engine_age_days = int(outdated[-1].get("age_days"))
+        except (TypeError, ValueError):
+            engine_age_days = -1
+        engine_version = outdated[-1].get("version") or engine_version
+
     return {
         "total": len(records),
         "counts": counts,
@@ -148,6 +178,9 @@ def summarize(records: list[dict]) -> dict:
         "blob_urls": blob_urls,
         "engine_ready_seen": bool(engine_ready),
         "engine_version": engine_version,
+        "engine_age_days": engine_age_days,
+        "engine_stale": engine_age_days > ENGINE_STALE_DAYS,
+        "engine_outdated_count": len(outdated),
         "first_ts": next((t for t in (_ts(r) for r in records) if t is not None), None),
         "last_ts": next((t for t in (_ts(r) for r in reversed(records)) if t is not None), None),
     }
@@ -158,6 +191,10 @@ def diagnose(summary: dict, records: list[dict]) -> list[str]:
     out: list[str] = []
     counts = summary["counts"]
 
+    if summary.get("engine_stale"):
+        out.append("เอนจิน yt-dlp เก่า %d วัน (v%s) - extractor อาจล้ำสมัย "
+                   "ควรกดอัปเดตเอนจินก่อนสรุปว่าเว็บไม่รองรับ (Unsupported URL)"
+                   % (summary["engine_age_days"], summary["engine_version"] or "?"))
     if summary["blob_urls"]:
         out.append("พบ blob: URL %d รายการ - เอนจินเข้าถึงไม่ได้ตามธรรมชาติ "
                    "(มีอยู่แค่ในหน้าเว็บ) ต้องใช้ลิงก์ไฟล์/ลิงก์สตรีมแทน" % len(summary["blob_urls"]))
@@ -208,8 +245,11 @@ def render_text(summary: dict, records: list[dict], findings: list[str],
     for ev in KNOWN_EVENTS + sorted(set(counts) - set(KNOWN_EVENTS)):
         if counts.get(ev):
             lines.append("%5d  %-28s %s" % (counts[ev], ev, PROBLEM_EVENTS.get(ev, "")))
-    if summary["engine_ready_seen"]:
-        lines.append("engine: yt-dlp %s" % (summary["engine_version"] or "(version unknown!)"))
+    if summary["engine_ready_seen"] or summary.get("engine_age_days", -1) >= 0:
+        age = summary.get("engine_age_days", -1)
+        lines.append("engine: yt-dlp %s%s" % (
+            summary["engine_version"] or "(version unknown!)",
+            "   (เก่า %d วัน)" % age if age > ENGINE_STALE_DAYS else ""))
     lines.append("")
     lines.append("-- findings --")
     for f in findings:
