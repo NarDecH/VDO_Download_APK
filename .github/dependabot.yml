@@ -24,6 +24,18 @@ updates:
       # Re-enable once 0.18 is stable and a real-device download passes.
       - dependency-name: "io.github.junkfood02.youtubedl-android*"
         versions: [">= 0.18.0"]
+      # v1.9.23: AGP 9 needs Gradle >= 9.6 while the wrapper is pinned below
+      # 9.6 (AGP 8.x on Gradle 9.6+ was the PR #14 incident) - the pair must
+      # move in one hand-made migration, not as two independent weekly bumps
+      # (PR #25 closed: "Minimum supported Gradle version is 9.6.0").
+      - dependency-name: "com.android.application"
+        versions: [">= 9"]
+      # v1.9.23: Kotlin 2.4 makes the deprecated `kotlinOptions { jvmTarget }`
+      # DSL a hard error (PR #22 closed) - first migrate app/build.gradle.kts
+      # to `kotlin { compilerOptions { jvmTarget } }` in a dedicated change
+      # with a full gradle test run, then drop this ignore.
+      - dependency-name: "org.jetbrains.kotlin.android"
+        versions: [">= 2.4"]
 
   # GitHub Actions themselves (checkout, setup-python, setup-java, ...)
   - package-ecosystem: "github-actions"
