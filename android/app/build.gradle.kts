@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -38,14 +40,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
     packaging {
         resources.excludes += "META-INF/*"
         // youtubedl-android exec()s the python/ffmpeg binaries it ships, so
         // they must be extracted to disk (nativeLibraryDir) - same as Seal
         jniLibs.useLegacyPackaging = true
+    }
+}
+
+// v1.9.23: the old `android { kotlinOptions { jvmTarget } }` DSL is a hard
+// error on Kotlin 2.4 - the project-level compilerOptions DSL replaces it
+// (import JvmTarget at the top of this file).
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 

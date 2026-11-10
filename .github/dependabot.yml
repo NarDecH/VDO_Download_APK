@@ -30,12 +30,6 @@ updates:
       # (PR #25 closed: "Minimum supported Gradle version is 9.6.0").
       - dependency-name: "com.android.application"
         versions: [">= 9"]
-      # v1.9.23: Kotlin 2.4 makes the deprecated `kotlinOptions { jvmTarget }`
-      # DSL a hard error (PR #22 closed) - first migrate app/build.gradle.kts
-      # to `kotlin { compilerOptions { jvmTarget } }` in a dedicated change
-      # with a full gradle test run, then drop this ignore.
-      - dependency-name: "org.jetbrains.kotlin.android"
-        versions: [">= 2.4"]
 
   # GitHub Actions themselves (checkout, setup-python, setup-java, ...)
   - package-ecosystem: "github-actions"
