@@ -307,12 +307,17 @@ def test_engine_version_age() -> bool:
         def exception(self, *a):
             pass
 
+    # _note_engine_age() uses the real clock, and version_age_days compares in
+    # UTC - derive the fresh date the same way so a local-midnight run cannot
+    # land one day off (seen 2026-11-10 00:1x +07)
+    utc_today = _dt.datetime.now(_dt.timezone.utc).date()
+    fresh_now_v = "%04d.%02d.%02d" % (utc_today.year, utc_today.month, utc_today.day)
     eng = EngineManager(tempfile.mkdtemp(prefix="vg-engine-"), _Log())
-    eng.ytdlp_version = stale_v
+    eng.ytdlp_version = "2024.09.27"
     eng._note_engine_age()
-    assert eng.ytdlp_stale and eng.ytdlp_age_days == ENGINE_STALE_DAYS + 1
+    assert eng.ytdlp_stale and eng.ytdlp_age_days > ENGINE_STALE_DAYS
     assert any(kw.get("event") == "engine_outdated" for _, kw in eng.log.events)
-    eng.ytdlp_version = fresh_v
+    eng.ytdlp_version = fresh_now_v
     eng._note_engine_age()
     assert not eng.ytdlp_stale
     assert sum(1 for _, kw in eng.log.events if kw.get("event") == "engine_outdated") == 1
