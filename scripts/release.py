@@ -85,12 +85,14 @@ def bump_version(new: str, notes: list[str]) -> int:
     write("app/core/logger.py", logger.replace(f'APP_VERSION = "{old}"', f'APP_VERSION = "{new}"'))
 
     vi = read("scripts/version_info.txt")
-    trio = ",".join(new.split(".") + ["0"])
+    trio = ", ".join(new.split(".") + ["0"])
+    # v1.9.24: match the tuples by shape, not by the old version string. The
+    # old-value replace silently did nothing once filevers/prodvers drifted
+    # (they sat at 1.9.16 while the strings moved to 1.9.23), so the exe
+    # reported a stale resource version and verify_bump could not see it.
+    vi = re.sub(r"filevers=\(\d+, \d+, \d+, 0\)", f"filevers=({trio})", vi)
+    vi = re.sub(r"prodvers=\(\d+, \d+, \d+, 0\)", f"prodvers=({trio})", vi)
     vi = vi.replace(
-        "filevers=(%s)" % ",".join(old.split(".") + ["0"]),
-        "filevers=(%s)" % trio).replace(
-        "prodvers=(%s)" % ",".join(old.split(".") + ["0"]),
-        "prodvers=(%s)" % trio).replace(
         "'FileVersion', '%s.0'" % old, "'FileVersion', '%s.0'" % new).replace(
         "'ProductVersion', '%s.0'" % old, "'ProductVersion', '%s.0'" % new)
     write("scripts/version_info.txt", vi)
@@ -124,6 +126,8 @@ def verify_bump(new: str, vc: int) -> None:
         (f"VDO Grabber {new} starting") in read("android/app/src/main/java/com/vdograbber/app/MainActivity.kt"),
         ("## [%s]" % new) in read("docs/changelog.md"),
         ("'%s.0'" % new) in read("scripts/version_info.txt"),
+        ("filevers=(%s)" % ", ".join(new.split(".") + ["0"])) in read("scripts/version_info.txt"),
+        ("prodvers=(%s)" % ", ".join(new.split(".") + ["0"])) in read("scripts/version_info.txt"),
     ]
     if not all(checks):
         die(f"bump incomplete: {checks}")
