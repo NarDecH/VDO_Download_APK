@@ -1022,6 +1022,25 @@ def test_updater_version_compare() -> bool:
     return True
 
 
+# ------------------------------------------- release metadata (v1.9.24)
+def test_version_info_matches_app_version() -> bool:
+    """Windows resource tuples must equal APP_VERSION.
+
+    1.9.17-1.9.23 shipped exes whose numeric File/Product version stayed at
+    1.9.16 while the strings tracked the release: release.py replaced the old
+    tuple by literal text, which became a silent no-op once they diverged.
+    """
+    from core.logger import APP_VERSION
+
+    text = open(os.path.join(ROOT, "scripts", "version_info.txt"), encoding="utf-8").read()
+    trio = ", ".join(APP_VERSION.split(".") + ["0"])
+    assert f"filevers=({trio})" in text, f"filevers tuple is not ({trio})"
+    assert f"prodvers=({trio})" in text, f"prodvers tuple is not ({trio})"
+    assert f"'FileVersion', '{APP_VERSION}.0'" in text
+    assert f"'ProductVersion', '{APP_VERSION}.0'" in text
+    return True
+
+
 def test_updater_asset_selection_and_swap_bat() -> bool:
     """The updater targets the same asset name CI attaches and writes a swap
     .bat that replaces the frozen exe then restarts it."""
@@ -1249,6 +1268,7 @@ def main() -> int:
         "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
         "toolbar_favorites_button": test_toolbar_has_favorites_button,
         "updater_version_compare": test_updater_version_compare,
+        "version_info_matches_app": test_version_info_matches_app_version,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
         "updater_swap_choreography": test_updater_swap_choreography_sandbox,
         "updater_mock_flow": test_updater_mock_flow,
