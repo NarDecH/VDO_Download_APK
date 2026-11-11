@@ -2,6 +2,12 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.24] — 2026-11-11
+
+### การเปลี่ยนแปลง
+- อัปเดต Kotlin เป็น 2.4.21 และย้ายการตั้งค่า jvmTarget ไปใช้ DSL ใหม่ (compilerOptions) แทน kotlinOptions ที่ถูกถอดใน Kotlin 2.4
+
+
 ## [1.9.23] — 2026-11-09
 
 ### การเปลี่ยนแปลง
