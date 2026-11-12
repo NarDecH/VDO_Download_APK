@@ -5,6 +5,7 @@ Encodes the release checklist that used to live in AGENTS.md as code:
 
   python scripts/release.py 1.4.0 --yes \
       --notes "หัวข้อ A; หัวข้อ B"        # bump + checks + commit + tag + push
+      --notes-file notes.txt              # or one bullet per line, shell-safe
   python scripts/release.py 1.4.0 --verify-only
                                       # wait for CI, check assets/checksums/APK
 
@@ -307,6 +308,8 @@ def main() -> int:
     ap.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     ap.add_argument("--notes", action="append", default=[],
                     help="changelog bullet (repeat; 'a; b' splits into two)")
+    ap.add_argument("--notes-file", action="append", default=[],
+                    help="UTF-8 file with one changelog bullet per line (repeatable)")
     ap.add_argument("--skip-gradle", action="store_true")
     ap.add_argument("--bump-only", action="store_true")
     ap.add_argument("--verify-only", action="store_true")
@@ -318,6 +321,14 @@ def main() -> int:
         die("version must look like 1.4.0")
 
     notes = [n for chunk in args.notes for n in chunk.split(";")]
+    # v1.9.24: a ';' outside the quotes in a shell turned the rest of a --notes
+    # argument into a command and the bullet vanished silently - a file keeps
+    # multi-line Thai notes intact.
+    for notes_path in args.notes_file:
+        for line in read(notes_path).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                notes.append(line[1:].strip() if line.startswith("-") else line)
     if args.verify_only:
         verify_release(version, wait=True)
         print("RELEASE VERIFIED")

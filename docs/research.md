@@ -180,6 +180,22 @@ log Android ชุด 2026-11 (v1.9.19, 23113RKC6G / Android 16): งานท�
 
 บทเรียน: อาการ "ทุกเว็บพร้อมกัน" คือสัญญาณของเอนจินเก่า ไม่ใช่เว็บพัง
 
+## 9. Known issue: exe 1.9.17–1.9.23 มี numeric version ค้าง (แก้ใน v1.9.24)
+
+`release.py` เดิม bump `filevers`/`prodvers` ใน `scripts/version_info.txt` ด้วยการ
+แทนที่ tuple ของเวอร์ชันเก่าแบบข้อความตรงตัว เมื่อค่าจริงในไฟล์ไม่ตรงกับ
+`APP_VERSION` อีก (ค้างที่ `(1, 9, 16, 0)` ตั้งแต่ v1.9.16) การแทนที่จึงกลายเป็น
+no-op เงียบ ๆ ทุกครั้ง ส่วน string `FileVersion`/`ProductVersion` ยังอัปเดตปกติ
+ทำให้ `verify_bump` มองไม่เห็นความคลาดเคลื่อนนี้
+
+ตรวจจาก asset จริง: `VDOGrabber-1.9.23-windows-x64.exe` รายงาน `str=1.9.23.0`
+แต่ `numeric=1.9.16.0` · ผลกระทบจำกัดอยู่ที่ตัวเลข tuple ที่โปรแกรมอ่าน
+(Explorer/Task Manager ใช้ string) จึง **ไม่แก้ย้อนหลัง** เพราะการ rebuild ทับ
+asset ที่ปล่อยแล้วจะทำให้ `checksums.txt` และหน้า Integrity ขัดกัน
+
+v1.9.24 แก้โดยจับ tuple ตามรูปแบบ (regex) แทนค่าเก่า เพิ่มทั้งสองช่องเข้า
+`verify_bump` และมี unit test `version_info_matches_app` กันการถอยกลับ
+
 ---
 
 *วิเคราะห์เชิงโครงสร้างจากซอร์สที่ถูก minify โดยค้นหาสตริง/ชื่อฟังก์ชันอ้างอิง เช่น `$f()`, `RS()`, `zf()`,
