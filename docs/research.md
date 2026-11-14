@@ -152,6 +152,50 @@ exception นี้เพราะ `consumePaused/consumeCancelled` เป็น
    (`StreamArgs.isProgressLine` + `progressLogDue`) เหลือ Destination/Merger/Deleting/100%
    /Got-error ผ่าน verbatim · event `download_progress` ก็จำกัด 1 ครั้ง/วิ/งาน เช่นกัน
 
+## 8. บทเรียนจาก field log: เอนจินเก่าและ "Unsupported URL" (v1.9.22 → v1.9.23)
+
+log Android ชุด 2026-11 (v1.9.19, 23113RKC6G / Android 16): งานที่ยิงลิงก์ embed
+ล้มเหลวด้วย `download_no_file` (เอนจิน exit 0 แต่ไม่มีไฟล์) และหน้าเว็บขึ้น
+**"Unsupported URL"** ทั้งที่เปิด URL ในเบราว์เซอร์ได้ — ตัว Detector และ MediaStore
+ทำงานถูกต้อง สาเหตุจริงคือ **เอนจิน yt-dlp ที่ bundle มากับ APK เก่า 773 วัน**
+(`2024.09.27`): extractor ของเว็บเปลี่ยนไปแล้ว และไม่มีจุดใดในแอปบอกผู้ใช้
+
+สิ่งที่เพิ่มใน v1.9.23:
+
+- **`ENGINE_STALE_DAYS = 120`** — เทียบกับ calver `yyyy.MM.dd` ของเอนจิน ทั้ง
+  `app/core/ytdlp_mgr.py` (desktop) และ `StreamArgs.kt` (Android) · เกินเกณฑ์ →
+  event `engine_outdated` พร้อม `age_days` + ข้อความในแผง About (desktop) และ
+  หน้าต่างเช็กเวอร์ชัน (Android) · เวอร์ชันที่ไม่ใช่ calver (`nightly`, ว่าง,
+  วันที่ผิดรูป) ไม่เตือน และวันที่อนาคต (clock skew) นับเป็น 0
+- **`scripts/analyze_events.py`** — คำนวณอายุจาก `engine_ready.version` เอง
+  จึงจับ log รุ่นเก่าที่ไม่มี event ใหม่ได้ และรายงานเป็น **finding แรก** ก่อน
+  สรุปว่าเว็บไม่รองรับ · และแสดง `engine: yt-dlp 2024.09.27 (เก่า 773 วัน)`
+
+**ลำดับ triage เมื่อผู้ใช้บอกว่า "ดาวน์โหลดไม่ได้/Unsupported URL"**
+
+1. `python scripts/analyze_events.py <log>.zip` → ดูอายุเอนจินใน findings
+2. เก่าเกิน 120 วัน → กดอัปเดตเอนจินก่อน (desktop: ปุ่มในแผง About · Android:
+   หน้าต่างเช็กเวอร์ชัน) แล้วทดลองซ้ำ
+3. ยังล้ม → ค่อยไล่ URL/DRM/geo ต่อ (blob:, HTML ปลอม, no-file probe)
+
+บทเรียน: อาการ "ทุกเว็บพร้อมกัน" คือสัญญาณของเอนจินเก่า ไม่ใช่เว็บพัง
+
+## 9. Known issue: exe 1.9.17–1.9.23 มี numeric version ค้าง (แก้ใน v1.9.24)
+
+`release.py` เดิม bump `filevers`/`prodvers` ใน `scripts/version_info.txt` ด้วยการ
+แทนที่ tuple ของเวอร์ชันเก่าแบบข้อความตรงตัว เมื่อค่าจริงในไฟล์ไม่ตรงกับ
+`APP_VERSION` อีก (ค้างที่ `(1, 9, 16, 0)` ตั้งแต่ v1.9.16) การแทนที่จึงกลายเป็น
+no-op เงียบ ๆ ทุกครั้ง ส่วน string `FileVersion`/`ProductVersion` ยังอัปเดตปกติ
+ทำให้ `verify_bump` มองไม่เห็นความคลาดเคลื่อนนี้
+
+ตรวจจาก asset จริง: `VDOGrabber-1.9.23-windows-x64.exe` รายงาน `str=1.9.23.0`
+แต่ `numeric=1.9.16.0` · ผลกระทบจำกัดอยู่ที่ตัวเลข tuple ที่โปรแกรมอ่าน
+(Explorer/Task Manager ใช้ string) จึง **ไม่แก้ย้อนหลัง** เพราะการ rebuild ทับ
+asset ที่ปล่อยแล้วจะทำให้ `checksums.txt` และหน้า Integrity ขัดกัน
+
+v1.9.24 แก้โดยจับ tuple ตามรูปแบบ (regex) แทนค่าเก่า เพิ่มทั้งสองช่องเข้า
+`verify_bump` และมี unit test `version_info_matches_app` กันการถอยกลับ
+
 ---
 
 *วิเคราะห์เชิงโครงสร้างจากซอร์สที่ถูก minify โดยค้นหาสตริง/ชื่อฟังก์ชันอ้างอิง เช่น `$f()`, `RS()`, `zf()`,

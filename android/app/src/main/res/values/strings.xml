@@ -17,6 +17,8 @@
     <string name="open_embed">🌐 เปิดหน้า embed</string>
     <string name="copied">คัดลอกลิงก์แล้ว</string>
     <string name="download_started">เริ่มดาวน์โหลดแล้ว — ดูความคืบหน้าในแถบแจ้งเตือน</string>
+    <!-- v1.9.22: a repeated tap on an already-queued URL is ignored -->
+    <string name="download_already_queued">รายการนี้อยู่ในคิวดาวน์โหลดแล้ว — รอให้เสร็จก่อน</string>
     <string name="download_failed">ดาวน์โหลดไม่สำเร็จ: %1$s</string>
     <string name="not_media_rerouted">ลิงก์นี้ไม่ใช่ไฟล์วิดีโอตรง — สลับไปใช้เอนจิน yt-dlp ให้แล้ว รอสักครู่จนดาวน์โหลดเสร็จ</string>
     <string name="blob_unsupported">ลิงก์ blob: ใช้ได้เฉพาะภายในหน้าเว็บ — ใช้ลิงก์วิดีโออื่นในรายการ 🎬 แทน</string>
@@ -32,6 +34,8 @@
     <string name="engine_check">check engine version</string>
     <string name="engine_update">update engine</string>
     <string name="engine_version">yt-dlp version: %1$s</string>
+    <!-- v1.9.23: shown when the bundled engine is older than 120 days -->
+    <string name="engine_stale_hint">⚠ เอนจินเก่า %1$d วัน — แนะนำกดอัปเดตเอนจิน</string>
     <string name="engine_updated">updated: %1$s</string>
     <string name="engine_uptodate">engine is up to date (%1$s)</string>
     <string name="engine_error">error: %1$s</string>

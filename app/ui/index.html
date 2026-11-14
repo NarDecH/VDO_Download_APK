@@ -375,7 +375,11 @@ function renderSettings(s){
 
 function fillAbout(st){
   document.getElementById('abVer').textContent = 'v' + st.version + ' (Windows)';
-  document.getElementById('abYtdlp').textContent = st.ytdlp_version || '?';
+  // v1.9.23: warn when the engine is older than ENGINE_STALE_DAYS
+  const ytdlp = st.ytdlp_version || '?';
+  document.getElementById('abYtdlp').textContent = st.ytdlp_stale
+    ? `${ytdlp} · เก่า ${st.ytdlp_age_days} วัน — แนะนำกดอัปเดต`
+    : ytdlp;
   document.getElementById('abFf').textContent = st.has_ffmpeg ? 'พร้อมใช้' : 'ยังไม่ติดตั้ง (จะดาวน์โหลดอัตโนมัติเมื่อจำเป็น)';
   document.getElementById('abMode').textContent = st.frozen ? 'frozen exe (PyInstaller)' : 'Python source';
   document.getElementById('ftVer').textContent = 'v' + st.version;

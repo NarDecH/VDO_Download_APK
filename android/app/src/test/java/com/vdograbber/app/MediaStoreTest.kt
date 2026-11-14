@@ -93,4 +93,23 @@ class MediaStoreTest {
         assertEquals(2, MediaStore.list().size)
         MediaStore.clear()
     }
+
+    // ------------------------------ v1.9.22 media sheet ordering (field log)
+
+    @Test
+    fun `ordered puts master first, sd last, embed after every file`() {
+        MediaStore.clear()
+        MediaStore.add("https://cdn/p-SD.m3u8", "m3u8", "sd", "p", "T")
+        MediaStore.add("https://cdn/p-master.m3u8", "m3u8", "master", "p", "T")
+        MediaStore.add("https://cdn/p-HD.m3u8", "m3u8", "hd", "p", "T")
+        MediaStore.add("https://cdn/clip.mp4", "mp4", "file", "p", "T")
+        MediaStore.add("https://site/player/1/", "embed", "embed", "p", "T")
+        val urls = MediaStore.ordered(MediaStore.list()).map { it.url }
+        assertEquals("https://cdn/p-master.m3u8", urls[0])
+        assertEquals("https://cdn/p-HD.m3u8", urls[1])
+        assertEquals("https://cdn/p-SD.m3u8", urls[2])
+        assertEquals("https://cdn/clip.mp4", urls[3])
+        assertEquals("https://site/player/1/", urls[4])
+        MediaStore.clear()
+    }
 }

@@ -113,6 +113,10 @@ jobs:
       - name: E2E on emulator (attempt 2 - fresh emulator after infra flake)
         id: e2e2
         if: steps.e2e1.outcome == 'failure'
+        # v1.9.23: attempt 1 already had continue-on-error, attempt 2 did not,
+        # so a flaked second emulator (API level=1 half-boot, run 42745522015)
+        # aborted the job before the third fresh attempt could run
+        continue-on-error: true
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29

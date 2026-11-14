@@ -18,6 +18,18 @@ updates:
     ignore:
       - dependency-name: "gradle-wrapper"
         versions: [">= 9.6"]
+      # v1.9.23: youtubedl-android 0.18.x is a pre-release line we have not
+      # device-tested yet; 0.17.4 is the version whose bundled yt-dlp calver
+      # the engine-stale warning was verified against (PR #21 closed).
+      # Re-enable once 0.18 is stable and a real-device download passes.
+      - dependency-name: "io.github.junkfood02.youtubedl-android*"
+        versions: [">= 0.18.0"]
+      # v1.9.23: AGP 9 needs Gradle >= 9.6 while the wrapper is pinned below
+      # 9.6 (AGP 8.x on Gradle 9.6+ was the PR #14 incident) - the pair must
+      # move in one hand-made migration, not as two independent weekly bumps
+      # (PR #25 closed: "Minimum supported Gradle version is 9.6.0").
+      - dependency-name: "com.android.application"
+        versions: [">= 9"]
 
   # GitHub Actions themselves (checkout, setup-python, setup-java, ...)
   - package-ecosystem: "github-actions"

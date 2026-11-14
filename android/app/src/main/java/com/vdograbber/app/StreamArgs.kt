@@ -198,4 +198,44 @@ object StreamArgs {
      *  history - field log 2026-10-07 showed 11k lines / 1.2 MB per session. */
     fun progressLogDue(lastFireMs: Long, nowMs: Long, gapMs: Long = PROGRESS_LOG_GAP_MS): Boolean =
         nowMs - lastFireMs >= gapMs
+
+    /** v1.9.22: download_progress events went out ~1/s and even repeated or
+     *  REGRESSED (the HLS size estimate moves while fragments download) - one
+     *  9-minute job wrote ~550 records in the 2026-11-03 field log. Keep one
+     *  event per [PROGRESS_EVENT_GAP_MS], only when the percent advanced, and
+     *  normally only in [PROGRESS_EVENT_MIN_DELTA] steps. */
+    const val PROGRESS_EVENT_GAP_MS = 2000L
+    const val PROGRESS_EVENT_MIN_DELTA = 5
+
+    fun shouldLogProgress(lastPercent: Int, lastFireMs: Long, percent: Int, nowMs: Long): Boolean {
+        if (percent <= lastPercent) return false            // duplicate or regression
+        if (lastPercent < 0) return true                    // first report always passes
+        if (nowMs - lastFireMs < PROGRESS_EVENT_GAP_MS) return false
+        return percent - lastPercent >= PROGRESS_EVENT_MIN_DELTA || percent >= 99
+    }
+
+    /** v1.9.23: the bundled engine ages with the APK - yt-dlp extractors break
+     *  within weeks of a site change, so a 120+ day old calver is a strong
+     *  hint to run อัปเดตเอนจิน (field log 2026-11: a 2024.09.27 engine was
+     *  still in use and every embed URL answered "Unsupported URL"). */
+    const val ENGINE_STALE_DAYS = 120
+
+    /** Days between the calver date in [version] and [nowMs]; -1 when the
+     *  version is not a yyyy.MM.dd calver ("nightly", empty, ...). A future
+     *  date (clock skew) counts as 0, never negative. */
+    fun versionAgeDays(version: String?, nowMs: Long): Int {
+        val m = Regex("(\\d{4})\\.(\\d{1,2})\\.(\\d{1,2})").find(version.orEmpty()) ?: return -1
+        return try {
+            val day = java.time.LocalDate.of(
+                m.groupValues[1].toInt(), m.groupValues[2].toInt(), m.groupValues[3].toInt())
+            val today = java.time.Instant.ofEpochMilli(nowMs)
+                .atZone(java.time.ZoneOffset.UTC).toLocalDate()
+            maxOf(0L, java.time.temporal.ChronoUnit.DAYS.between(day, today)).toInt()
+        } catch (e: Exception) {
+            -1
+        }
+    }
+
+    fun isEngineStale(version: String?, nowMs: Long, maxDays: Int = ENGINE_STALE_DAYS): Boolean =
+        versionAgeDays(version, nowMs) > maxDays
 }

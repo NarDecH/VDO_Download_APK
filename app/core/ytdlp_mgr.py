@@ -11,15 +11,46 @@ need, into the same bin folder, with UI progress events.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
 import threading
+import time
 import urllib.request
 import zipfile
+from datetime import date, datetime, timezone
 
 FFMPEG_URL = "https://github.com/BtbN/FFmpeg-Builds/releases/latest/download/ffmpeg-master-latest-win64-lgpl.zip"
 YTDLP_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+
+# v1.9.23: a bundled engine ages with the app and yt-dlp extractors break
+# within weeks of a site change - warn instead of letting the user wonder why
+# every site suddenly answers "Unsupported URL" (field log 2026-11: the
+# Android engine had not been updated since 2024.09.27).
+ENGINE_STALE_DAYS = 120
+
+
+def version_age_days(version: str, now: float | None = None) -> int:
+    """Age of a calver engine version ("2026.08.19") in days, -1 when unknown.
+
+    Pure so scripts/test_units.py can pin the boundary without an engine.
+    A future date (clock skew) counts as 0, never negative.
+    """
+    m = re.match(r"^(\d{4})\.(\d{1,2})\.(\d{1,2})", str(version or "").strip())
+    if not m:
+        return -1
+    try:
+        then = date(int(m.group(1)), int(m.group(2)), int(m.group(3)))
+    except ValueError:
+        return -1
+    now_dt = datetime.fromtimestamp(time.time() if now is None else now, tz=timezone.utc)
+    return max(0, (now_dt.date() - then).days)
+
+
+def is_engine_stale(version: str, now: float | None = None, max_days: int = ENGINE_STALE_DAYS) -> bool:
+    """True when the engine is older than max_days (unknown versions never warn)."""
+    return version_age_days(version, now) > max_days
 
 
 def app_bin_dir(data_dir: str) -> str:
@@ -41,6 +72,8 @@ class EngineManager:
         self._lock = threading.Lock()
         self.ytdlp_path: str | None = None
         self.ytdlp_version: str = "?"
+        self.ytdlp_age_days: int = -1
+        self.ytdlp_stale: bool = False
 
     # ---------------------------------------------------------------- yt-dlp
     def ensure_ytdlp(self) -> str:
@@ -64,6 +97,7 @@ class EngineManager:
             self.ytdlp_version = self._version(target)
             self.log.log("yt-dlp ready: %s (v%s)" % (target, self.ytdlp_version),
                          event="engine_ready", engine="yt-dlp", version=self.ytdlp_version, path=target)
+            self._note_engine_age()
             return target
 
     def _version(self, path: str) -> str:
@@ -84,6 +118,7 @@ class EngineManager:
             txt = (out.stdout + out.stderr).strip()[-2000:]
             self.log.dl("yt-dlp -U output:\n%s" % txt)
             self.ytdlp_version = self._version(path)
+            self._note_engine_age()
             ok = "is up to date" in txt.lower() or "updated" in txt.lower() or out.returncode == 0
             self.log.log("yt-dlp update finished (v%s)" % self.ytdlp_version,
                          event="engine_update_done", engine="yt-dlp", version=self.ytdlp_version, ok=bool(ok))
@@ -91,6 +126,16 @@ class EngineManager:
         except Exception as e:
             self.log.exception("engine update", e)
             return {"ok": False, "message": repr(e)}
+
+    def _note_engine_age(self) -> None:
+        """Refresh the age/stale flags and warn when the engine is old."""
+        self.ytdlp_age_days = version_age_days(self.ytdlp_version)
+        self.ytdlp_stale = is_engine_stale(self.ytdlp_version)
+        if self.ytdlp_stale:
+            self.log.log("yt-dlp engine is %d days old (v%s) - update recommended"
+                         % (self.ytdlp_age_days, self.ytdlp_version),
+                         level="warning", event="engine_outdated", engine="yt-dlp",
+                         version=self.ytdlp_version, age_days=self.ytdlp_age_days)
 
     # ---------------------------------------------------------------- ffmpeg
     def ffmpeg_path(self) -> str | None:

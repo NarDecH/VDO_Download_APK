@@ -2,6 +2,36 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.25] — 2026-11-13
+
+### การเปลี่ยนแปลง
+- scripts/release.py รับ --notes-file (บรรทัดละ bullet) กันข้อความ changelog หายเพราะ shell quoting
+- เพิ่ม unit test บังคับ version resource ของ exe ให้ตรง APP_VERSION และบันทึกกรณี 1.9.17–1.9.23 ใน docs/research.md
+
+
+## [1.9.24] — 2026-11-11
+
+### การเปลี่ยนแปลง
+- อัปเดต Kotlin เป็น 2.4.21 และย้ายการตั้งค่า jvmTarget ไปใช้ DSL ใหม่ (compilerOptions) แทน kotlinOptions ที่ถูกถอดใน Kotlin 2.4
+
+
+## [1.9.23] — 2026-11-09
+
+### การเปลี่ยนแปลง
+- เตือนเมื่อเอนจิน yt-dlp เก่าเกิน 120 วัน ทั้งฝั่ง desktop (แผง About) และ Android (หน้าต่างเช็กเวอร์ชัน) พร้อม event engine_outdated ใน log
+- analyze_events.py คำนวณอายุเอนจินจากเลข calver เอง จึงจับได้แม้ใน log รุ่นเก่าที่ไม่มี event ใหม่ และรายงานเป็น finding แรก
+
+
+## [1.9.22] — 2026-11-04
+
+### การเปลี่ยนแปลง
+- แก้ชื่อไฟล์ดาวน์โหลดตรงชนกัน (เติม hash ของ URL) และไม่สร้างคิวซ้ำระหว่างที่ลิงก์เดิมยังรออยู่
+- เพิ่ม log ผลจบของ DownloadManager (download_done/download_failed พร้อมขนาดและ reason code)
+- ลด log noise — download_progress ทุก 2 วิ/ขั้น 5% และ page_loaded ที่ซ้ำ 3-5 ครั้งต่อการโหลด
+- แท็บพบวิดีโอเรียง master/HD ก่อน SD และแถว embed เปิดหน้าเว็บแทนการส่ง yt-dlp
+- อัปเดต youtubedl-android 0.17.3 เป็น 0.17.4 (yt-dlp ใหม่กว่า)
+
+
 ## [1.9.21] — 2026-10-16
 
 ### การเปลี่ยนแปลง

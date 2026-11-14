@@ -163,8 +163,10 @@ class StreamDownloadService : Service() {
                     // downloads no longer overwrite each other's progress
                     val pct = progress.toInt().coerceIn(0, 99)
                     DownloadJobs.update(pid, pct)
-                    // v1.6.1: at most one download_progress per second per job
-                    if (pct != loggedPct && StreamArgs.progressLogDue(lastProgressLogMs, System.currentTimeMillis())) {
+                    // v1.9.22: one download_progress per 2s / 5% step, never
+                    // backwards (v1.6.1's 1s limiter still logged ~550 events
+                    // for one long HLS job)
+                    if (StreamArgs.shouldLogProgress(loggedPct, lastProgressLogMs, pct, System.currentTimeMillis())) {
                         loggedPct = pct
                         lastProgressLogMs = System.currentTimeMillis()
                         FileLog.event("download_progress", mapOf("url" to url.take(200), "percent" to pct, "pid" to pid))

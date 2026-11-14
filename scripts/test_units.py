@@ -269,6 +269,61 @@ def test_unique_stem() -> bool:
     return True
 
 
+# ------------------------------------ stale engine warning (v1.9.23)
+def test_engine_version_age() -> bool:
+    import datetime as _dt
+    import tempfile
+
+    from core.ytdlp_mgr import ENGINE_STALE_DAYS, EngineManager, is_engine_stale, version_age_days
+
+    now = _dt.datetime(2026, 11, 9, 12, 0, tzinfo=_dt.timezone.utc).timestamp()
+    assert version_age_days("2026.11.09", now) == 0
+    assert version_age_days("2026.08.19", now) == 82
+    assert version_age_days("2026.11.10", now) == 0, "future dates clamp to 0"
+    assert version_age_days("2026.11.08.1", now) == 1
+    assert version_age_days("nightly", now) == -1
+    assert version_age_days("", now) == -1
+    assert version_age_days(None, now) == -1
+    assert version_age_days("2026.13.40", now) == -1
+
+    # boundary: exactly ENGINE_STALE_DAYS is still fresh, one day more is stale
+    today = _dt.date(2026, 11, 9)
+    fresh = today - _dt.timedelta(days=ENGINE_STALE_DAYS)
+    stale = today - _dt.timedelta(days=ENGINE_STALE_DAYS + 1)
+    fresh_v = "%04d.%02d.%02d" % (fresh.year, fresh.month, fresh.day)
+    stale_v = "%04d.%02d.%02d" % (stale.year, stale.month, stale.day)
+    assert not is_engine_stale(fresh_v, now), fresh_v
+    assert is_engine_stale(stale_v, now), stale_v
+    assert not is_engine_stale("nightly", now), "unknown version never warns"
+
+    # the manager refreshes the flags and emits engine_outdated exactly then
+    class _Log:
+        def __init__(self):
+            self.events = []
+
+        def log(self, msg, **kw):
+            self.events.append((msg, kw))
+
+        def exception(self, *a):
+            pass
+
+    # _note_engine_age() uses the real clock, and version_age_days compares in
+    # UTC - derive the fresh date the same way so a local-midnight run cannot
+    # land one day off (seen 2026-11-10 00:1x +07)
+    utc_today = _dt.datetime.now(_dt.timezone.utc).date()
+    fresh_now_v = "%04d.%02d.%02d" % (utc_today.year, utc_today.month, utc_today.day)
+    eng = EngineManager(tempfile.mkdtemp(prefix="vg-engine-"), _Log())
+    eng.ytdlp_version = "2024.09.27"
+    eng._note_engine_age()
+    assert eng.ytdlp_stale and eng.ytdlp_age_days > ENGINE_STALE_DAYS
+    assert any(kw.get("event") == "engine_outdated" for _, kw in eng.log.events)
+    eng.ytdlp_version = fresh_now_v
+    eng._note_engine_age()
+    assert not eng.ytdlp_stale
+    assert sum(1 for _, kw in eng.log.events if kw.get("event") == "engine_outdated") == 1
+    return True
+
+
 def test_title_base_policy() -> bool:
     """Page/URL titles name media+manifests; site pages keep yt-dlp's title."""
     from core.downloader import DownloadManager
@@ -681,6 +736,47 @@ def test_analyze_events_clean_log_has_no_known_problem() -> bool:
     return True
 
 
+def test_analyze_events_engine_age() -> bool:
+    """v1.9.23: the analyzer flags a stale engine both from the engine_outdated
+    event and - for logs from v1.9.22 and older - from the calver itself."""
+    import datetime as _dt
+
+    import analyze_events
+    from core.ytdlp_mgr import ENGINE_STALE_DAYS as DESKTOP_STALE
+
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    assert analyze_events.ENGINE_STALE_DAYS == DESKTOP_STALE, "analyzer threshold drifted"
+    kotlin = open(os.path.join(
+        root, "android/app/src/main/java/com/vdograbber/app/StreamArgs.kt"),
+        encoding="utf-8").read()
+    assert ("ENGINE_STALE_DAYS = %d" % DESKTOP_STALE) in kotlin, "Android copy drifted"
+
+    today = _dt.date.today()
+    old_v = "%04d.%02d.%02d" % (today.year - 1, today.month, today.day)
+    fresh_v = "%04d.%02d.%02d" % (today.year, today.month, today.day)
+
+    def run(records):
+        s = analyze_events.summarize(records)
+        return s, "\n".join(analyze_events.diagnose(s, records))
+
+    s, text = run([{"ts": 1, "event": "engine_ready", "version": old_v}])
+    assert s["engine_age_days"] >= 365 and s["engine_stale"] is True, s
+    assert "เก่า" in text and "อัปเดต" in text, text
+
+    s, text = run([{"ts": 1, "event": "engine_ready", "version": fresh_v}])
+    assert s["engine_age_days"] == 0 and s["engine_stale"] is False, s
+    assert "เก่า" not in text, text
+
+    # engine_outdated alone (no engine_ready to read a version from)
+    s, text = run([{"ts": 1, "event": "engine_outdated", "version": "2024.09.27",
+                    "age_days": DESKTOP_STALE + 5}])
+    assert s["engine_stale"] is True and s["engine_age_days"] == DESKTOP_STALE + 5, s
+    assert "2024.09.27" in text, text
+    out = analyze_events.render_text(s, [], ["x"], [])
+    assert "(เก่า %d วัน)" % (DESKTOP_STALE + 5) in out, out
+    return True
+
+
 def test_analyze_events_origin_split_and_filter() -> bool:
     """v1.9.8: selftest vs real-user split - origin tag on events + the
     --origin CLI filter (legacy rows without the field count as app)."""
@@ -926,6 +1022,25 @@ def test_updater_version_compare() -> bool:
     return True
 
 
+# ------------------------------------------- release metadata (v1.9.24)
+def test_version_info_matches_app_version() -> bool:
+    """Windows resource tuples must equal APP_VERSION.
+
+    1.9.17-1.9.23 shipped exes whose numeric File/Product version stayed at
+    1.9.16 while the strings tracked the release: release.py replaced the old
+    tuple by literal text, which became a silent no-op once they diverged.
+    """
+    from core.logger import APP_VERSION
+
+    text = open(os.path.join(ROOT, "scripts", "version_info.txt"), encoding="utf-8").read()
+    trio = ", ".join(APP_VERSION.split(".") + ["0"])
+    assert f"filevers=({trio})" in text, f"filevers tuple is not ({trio})"
+    assert f"prodvers=({trio})" in text, f"prodvers tuple is not ({trio})"
+    assert f"'FileVersion', '{APP_VERSION}.0'" in text
+    assert f"'ProductVersion', '{APP_VERSION}.0'" in text
+    return True
+
+
 def test_updater_asset_selection_and_swap_bat() -> bool:
     """The updater targets the same asset name CI attaches and writes a swap
     .bat that replaces the frozen exe then restarts it."""
@@ -1134,6 +1249,8 @@ def main() -> int:
         "page_fallback_obfuscated": test_page_fallback_obfuscated,
         "sanitize_filename": test_sanitize_filename,
         "unique_stem": test_unique_stem,
+        "engine_version_age": test_engine_version_age,
+        "analyze_events_engine_age": test_analyze_events_engine_age,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,
@@ -1151,6 +1268,7 @@ def main() -> int:
         "toolbar_clip_button": test_toolbar_has_clipboard_button_parity,
         "toolbar_favorites_button": test_toolbar_has_favorites_button,
         "updater_version_compare": test_updater_version_compare,
+        "version_info_matches_app": test_version_info_matches_app_version,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
         "updater_swap_choreography": test_updater_swap_choreography_sandbox,
         "updater_mock_flow": test_updater_mock_flow,

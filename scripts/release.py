@@ -5,6 +5,7 @@ Encodes the release checklist that used to live in AGENTS.md as code:
 
   python scripts/release.py 1.4.0 --yes \
       --notes "หัวข้อ A; หัวข้อ B"        # bump + checks + commit + tag + push
+      --notes-file notes.txt              # or one bullet per line, shell-safe
   python scripts/release.py 1.4.0 --verify-only
                                       # wait for CI, check assets/checksums/APK
 
@@ -85,12 +86,14 @@ def bump_version(new: str, notes: list[str]) -> int:
     write("app/core/logger.py", logger.replace(f'APP_VERSION = "{old}"', f'APP_VERSION = "{new}"'))
 
     vi = read("scripts/version_info.txt")
-    trio = ",".join(new.split(".") + ["0"])
+    trio = ", ".join(new.split(".") + ["0"])
+    # v1.9.24: match the tuples by shape, not by the old version string. The
+    # old-value replace silently did nothing once filevers/prodvers drifted
+    # (they sat at 1.9.16 while the strings moved to 1.9.23), so the exe
+    # reported a stale resource version and verify_bump could not see it.
+    vi = re.sub(r"filevers=\(\d+, \d+, \d+, 0\)", f"filevers=({trio})", vi)
+    vi = re.sub(r"prodvers=\(\d+, \d+, \d+, 0\)", f"prodvers=({trio})", vi)
     vi = vi.replace(
-        "filevers=(%s)" % ",".join(old.split(".") + ["0"]),
-        "filevers=(%s)" % trio).replace(
-        "prodvers=(%s)" % ",".join(old.split(".") + ["0"]),
-        "prodvers=(%s)" % trio).replace(
         "'FileVersion', '%s.0'" % old, "'FileVersion', '%s.0'" % new).replace(
         "'ProductVersion', '%s.0'" % old, "'ProductVersion', '%s.0'" % new)
     write("scripts/version_info.txt", vi)
@@ -124,6 +127,8 @@ def verify_bump(new: str, vc: int) -> None:
         (f"VDO Grabber {new} starting") in read("android/app/src/main/java/com/vdograbber/app/MainActivity.kt"),
         ("## [%s]" % new) in read("docs/changelog.md"),
         ("'%s.0'" % new) in read("scripts/version_info.txt"),
+        ("filevers=(%s)" % ", ".join(new.split(".") + ["0"])) in read("scripts/version_info.txt"),
+        ("prodvers=(%s)" % ", ".join(new.split(".") + ["0"])) in read("scripts/version_info.txt"),
     ]
     if not all(checks):
         die(f"bump incomplete: {checks}")
@@ -153,7 +158,7 @@ def run_checks(skip_gradle: bool) -> None:
 
 
 # --------------------------------------------------------------------- git
-def git_ready() -> None:
+def git_ready(require_main: bool = True) -> None:
     rc, out = run(["git", "status", "--porcelain"])
     if rc != 0:
         die("not a git repo?")
@@ -161,7 +166,10 @@ def git_ready() -> None:
     if dirty:
         die("working tree has uncommitted changes:\n" + "\n".join(dirty))
     rc, out = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    if out.strip() != "main":
+    # v1.9.26: desktop.yml smoke-tests `--dry-run` on pull requests, where the
+    # checkout is a detached HEAD ("HEAD"). The main-only guard matters for a
+    # real bump+tag, and --dry-run touches no files, so only enforce it there.
+    if require_main and out.strip() != "main":
         die(f"release from main only (on {out.strip()})")
 
 
@@ -303,6 +311,8 @@ def main() -> int:
     ap.add_argument("--yes", action="store_true", help="do not ask for confirmation")
     ap.add_argument("--notes", action="append", default=[],
                     help="changelog bullet (repeat; 'a; b' splits into two)")
+    ap.add_argument("--notes-file", action="append", default=[],
+                    help="UTF-8 file with one changelog bullet per line (repeatable)")
     ap.add_argument("--skip-gradle", action="store_true")
     ap.add_argument("--bump-only", action="store_true")
     ap.add_argument("--verify-only", action="store_true")
@@ -314,12 +324,20 @@ def main() -> int:
         die("version must look like 1.4.0")
 
     notes = [n for chunk in args.notes for n in chunk.split(";")]
+    # v1.9.24: a ';' outside the quotes in a shell turned the rest of a --notes
+    # argument into a command and the bullet vanished silently - a file keeps
+    # multi-line Thai notes intact.
+    for notes_path in args.notes_file:
+        for line in read(notes_path).splitlines():
+            line = line.strip()
+            if line and not line.startswith("#"):
+                notes.append(line[1:].strip() if line.startswith("-") else line)
     if args.verify_only:
         verify_release(version, wait=True)
         print("RELEASE VERIFIED")
         return 0
 
-    git_ready()
+    git_ready(require_main=not args.dry_run)
     vc = next_version_code()
     print(f"plan: v{version} (versionCode {vc}) notes={notes}")
     if args.dry_run:
