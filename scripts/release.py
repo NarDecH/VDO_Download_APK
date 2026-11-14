@@ -158,7 +158,7 @@ def run_checks(skip_gradle: bool) -> None:
 
 
 # --------------------------------------------------------------------- git
-def git_ready() -> None:
+def git_ready(require_main: bool = True) -> None:
     rc, out = run(["git", "status", "--porcelain"])
     if rc != 0:
         die("not a git repo?")
@@ -166,7 +166,10 @@ def git_ready() -> None:
     if dirty:
         die("working tree has uncommitted changes:\n" + "\n".join(dirty))
     rc, out = run(["git", "rev-parse", "--abbrev-ref", "HEAD"])
-    if out.strip() != "main":
+    # v1.9.26: desktop.yml smoke-tests `--dry-run` on pull requests, where the
+    # checkout is a detached HEAD ("HEAD"). The main-only guard matters for a
+    # real bump+tag, and --dry-run touches no files, so only enforce it there.
+    if require_main and out.strip() != "main":
         die(f"release from main only (on {out.strip()})")
 
 
@@ -334,7 +337,7 @@ def main() -> int:
         print("RELEASE VERIFIED")
         return 0
 
-    git_ready()
+    git_ready(require_main=not args.dry_run)
     vc = next_version_code()
     print(f"plan: v{version} (versionCode {vc}) notes={notes}")
     if args.dry_run:
