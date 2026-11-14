@@ -6,7 +6,10 @@ on:
     paths: ["android/**", ".github/workflows/android.yml"]
     tags: ["v*"]
   pull_request:
-    paths: ["android/**", ".github/workflows/android.yml"]
+    # main requires the "build" check before a merge, so any PR that can change
+    # what the Android job installs has to trigger it too - otherwise
+    # dependabot PRs for requirements.txt / workflows stay permanently blocked
+    paths: ["android/**", ".github/workflows/android.yml", "requirements.txt", ".github/workflows/**"]
   workflow_dispatch:
 
 permissions:
