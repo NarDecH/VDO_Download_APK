@@ -2,6 +2,19 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.25] — 2026-11-13
+
+### การเปลี่ยนแปลง
+- scripts/release.py รับ --notes-file (บรรทัดละ bullet) กันข้อความ changelog หายเพราะ shell quoting
+- เพิ่ม unit test บังคับ version resource ของ exe ให้ตรง APP_VERSION และบันทึกกรณี 1.9.17–1.9.23 ใน docs/research.md
+
+
+## [1.9.24] — 2026-11-11
+
+### การเปลี่ยนแปลง
+- อัปเดต Kotlin เป็น 2.4.21 และย้ายการตั้งค่า jvmTarget ไปใช้ DSL ใหม่ (compilerOptions) แทน kotlinOptions ที่ถูกถอดใน Kotlin 2.4
+
+
 ## [1.9.23] — 2026-11-09
 
 ### การเปลี่ยนแปลง
