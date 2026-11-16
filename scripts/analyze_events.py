@@ -44,6 +44,7 @@ KNOWN_EVENTS = [
     "download_no_file_probe", "download_done", "download_error",
     "download_failed", "download_canceled", "download_stuck",
     "engine_download_start", "download_no_ffmpeg", "download_fallback",
+    "cookie_source", "download_login_required",
 ]
 
 # Problems we know how to name (field-log lessons).
@@ -54,6 +55,7 @@ PROBLEM_EVENTS = {
     "download_error": "engine/download error (see the reason column)",
     "download_stuck": "direct download queued but never started - watchdog gave up",
     "engine_outdated": "yt-dlp engine older than 120 days - extractors may be stale",
+    "download_login_required": "site wants a login - cookie not configured or expired",
 }
 
 
@@ -171,6 +173,24 @@ def summarize(records: list[dict]) -> dict:
             engine_age_days = -1
         engine_version = outdated[-1].get("version") or engine_version
 
+    # v1.9.26: cookie/login triage. The same login wall means two different
+    # things: with no cookie source configured it is a setup problem (user
+    # never chose a cookies.txt/browser), while a wall hit WITH a cookie
+    # source attached is an expired session / an account without access.
+    # Desktop records cookie_source on the row, Android records cookie.
+    login_rows = [r for r in records if r.get("event") == "download_login_required"]
+
+    def cookie_mode(rec: dict) -> str:
+        return str(rec.get("cookie_source") or rec.get("cookie") or "").strip().lower()
+
+    login_no_cookie = [r for r in login_rows if cookie_mode(r) in ("", "none")]
+    login_with_cookie = [r for r in login_rows if cookie_mode(r) not in ("", "none")]
+    cookie_sources: dict[str, int] = {}
+    for rec in records:
+        if rec.get("event") == "cookie_source":
+            mode = str(rec.get("mode") or "?").strip().lower()
+            cookie_sources[mode] = cookie_sources.get(mode, 0) + 1
+
     return {
         "total": len(records),
         "counts": counts,
@@ -183,6 +203,11 @@ def summarize(records: list[dict]) -> dict:
         "engine_outdated_count": len(outdated),
         "first_ts": next((t for t in (_ts(r) for r in records) if t is not None), None),
         "last_ts": next((t for t in (_ts(r) for r in reversed(records)) if t is not None), None),
+        "login_required_count": len(login_rows),
+        "login_required_no_cookie": len(login_no_cookie),
+        "login_required_with_cookie": len(login_with_cookie),
+        "login_required_modes": sorted({cookie_mode(r) for r in login_with_cookie}),
+        "cookie_sources": cookie_sources,
     }
 
 
@@ -195,6 +220,16 @@ def diagnose(summary: dict, records: list[dict]) -> list[str]:
         out.append("เอนจิน yt-dlp เก่า %d วัน (v%s) - extractor อาจล้ำสมัย "
                    "ควรกดอัปเดตเอนจินก่อนสรุปว่าเว็บไม่รองรับ (Unsupported URL)"
                    % (summary["engine_age_days"], summary["engine_version"] or "?"))
+    if summary.get("login_required_count"):
+        if summary.get("login_required_no_cookie"):
+            out.append("จำเป็นต้องล็อกอิน %d ครั้ง แต่ยังไม่ได้ตั้ง cookie (ไม่มี cookie_source ในงานที่ล้ม) - "
+                       "ไปที่ ตั้งค่า → Cookie เลือกไฟล์ cookies.txt หรือเบราว์เซอร์ที่ล็อกอินอยู่ แล้วดาวน์โหลดอีกครั้ง"
+                       % summary["login_required_no_cookie"])
+        if summary.get("login_required_with_cookie"):
+            seen = ", ".join(summary.get("login_required_modes") or []) or "?"
+            out.append("cookie ถูกส่งเข้าเอนจินแล้ว (%s) แต่ยังเจอ login wall %d ครั้ง - cookie อาจหมดอายุ "
+                       "หรือบัญชีไม่มีสิทธิ์ ต้อง export cookies.txt ใหม่/ล็อกอินในเบราว์เซอร์นั้นอีกครั้ง"
+                       % (seen, summary["login_required_with_cookie"]))
     if summary["blob_urls"]:
         out.append("พบ blob: URL %d รายการ - เอนจินเข้าถึงไม่ได้ตามธรรมชาติ "
                    "(มีอยู่แค่ในหน้าเว็บ) ต้องใช้ลิงก์ไฟล์/ลิงก์สตรีมแทน" % len(summary["blob_urls"]))
@@ -250,6 +285,12 @@ def render_text(summary: dict, records: list[dict], findings: list[str],
         lines.append("engine: yt-dlp %s%s" % (
             summary["engine_version"] or "(version unknown!)",
             "   (เก่า %d วัน)" % age if age > ENGINE_STALE_DAYS else ""))
+    if summary.get("login_required_count") or summary.get("cookie_sources"):
+        cs = ", ".join("%s=%d" % kv for kv in sorted((summary.get("cookie_sources") or {}).items())) or "-"
+        lines.append("cookie: %s   login-required: %d (no cookie %d, with cookie %d)"
+                     % (cs, summary.get("login_required_count", 0),
+                        summary.get("login_required_no_cookie", 0),
+                        summary.get("login_required_with_cookie", 0)))
     lines.append("")
     lines.append("-- findings --")
     for f in findings:

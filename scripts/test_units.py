@@ -777,6 +777,53 @@ def test_analyze_events_engine_age() -> bool:
     return True
 
 
+def test_analyze_events_login_required_cookie_triage() -> bool:
+    """v1.9.26: a login wall with no cookie source is a setup problem; the
+    same wall with a cookie attached means an expired/unauthorised session."""
+    import analyze_events
+
+    assert "download_login_required" in analyze_events.KNOWN_EVENTS
+    assert "cookie_source" in analyze_events.KNOWN_EVENTS
+    assert "download_login_required" in analyze_events.PROBLEM_EVENTS
+
+    def run(records):
+        s = analyze_events.summarize(records)
+        return s, "\n".join(analyze_events.diagnose(s, records))
+
+    # 1) never configured: desktop row without a cookie source
+    s, text = run([{"ts": 1, "event": "download_login_required",
+                    "url": "https://x.com/a/status/1", "cookie_source": "none",
+                    "reason": "Sign in to confirm you're not a bot"}])
+    assert s["login_required_count"] == 1, s
+    assert s["login_required_no_cookie"] == 1 and s["login_required_with_cookie"] == 0, s
+    assert "ยังไม่ได้ตั้ง cookie" in text and "ตั้งค่า" in text, text
+    assert "หมดอายุ" not in text, text
+
+    # 2) cookie was attached (Android-shaped field) -> expired session advice
+    s, text = run([
+        {"ts": 1, "event": "cookie_source", "mode": "webview", "host": "x.com"},
+        {"ts": 2, "event": "download_login_required", "url": "https://x.com/a/status/2",
+         "cookie": "webview", "reason": "login required"},
+    ])
+    assert s["cookie_sources"] == {"webview": 1}, s
+    assert s["login_required_with_cookie"] == 1 and s["login_required_no_cookie"] == 0, s
+    assert s["login_required_modes"] == ["webview"], s
+    assert "หมดอายุ" in text and "export" in text, text
+    assert "ยังไม่ได้ตั้ง cookie" not in text, text
+
+    # 3) mixed log: both findings appear, row counter is complete
+    s, text = run([
+        {"ts": 1, "event": "download_login_required", "cookie_source": ""},
+        {"ts": 2, "event": "download_login_required", "cookie_source": "file"},
+    ])
+    assert s["login_required_count"] == 2, s
+    assert "ยังไม่ได้ตั้ง cookie" in text and "หมดอายุ" in text, text
+
+    out = analyze_events.render_text(s, [], ["x"], [])
+    assert "login-required: 2 (no cookie 1, with cookie 1)" in out, out
+    return True
+
+
 def test_analyze_events_origin_split_and_filter() -> bool:
     """v1.9.8: selftest vs real-user split - origin tag on events + the
     --origin CLI filter (legacy rows without the field count as app)."""
@@ -1301,6 +1348,7 @@ def main() -> int:
         "unique_stem": test_unique_stem,
         "engine_version_age": test_engine_version_age,
         "analyze_events_engine_age": test_analyze_events_engine_age,
+        "analyze_events_login_cookie": test_analyze_events_login_required_cookie_triage,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,
