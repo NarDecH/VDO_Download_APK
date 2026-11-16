@@ -136,6 +136,12 @@ class MainActivity : AppCompatActivity() {
                 if (intent?.action != StreamDownloadService.ACTION_DL_STATE) return
                 val ok = intent.getBooleanExtra(StreamDownloadService.EXTRA_DL_OK, false)
                 val file = intent.getStringExtra(StreamDownloadService.EXTRA_DL_FILE).orEmpty()
+                // v1.9.26: a login wall comes with Thai guidance from the
+                // service (cookie is attached automatically on the next try)
+                val hint = intent.getStringExtra(StreamDownloadService.EXTRA_DL_HINT).orEmpty()
+                if (hint.isNotBlank()) {
+                    Toast.makeText(this@MainActivity, hint, Toast.LENGTH_LONG).show()
+                }
                 onDlState(ok, file)
             }
         }, android.content.IntentFilter(StreamDownloadService.ACTION_DL_STATE),
@@ -1013,7 +1019,10 @@ class MainActivity : AppCompatActivity() {
                 Downloader.Route.DIRECT_FILE -> {
                     if (Downloader.enqueue(this, url, title) == Downloader.DUPLICATE_ID) started = false
                 }
-                Downloader.Route.STREAM, Downloader.Route.PAGE -> StreamDownloadService.start(this, url, title)
+                // v1.9.26: hand the page URL along so the service can export
+                // the WebView cookies for that host before calling yt-dlp
+                Downloader.Route.STREAM, Downloader.Route.PAGE ->
+                    StreamDownloadService.start(this, url, title, pageUrl = web.url ?: url)
                 null -> FileLog.app("INFO", "dl", "unusable URL - not downloaded: $url")
             }
             Toast.makeText(

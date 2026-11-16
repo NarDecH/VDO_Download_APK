@@ -692,6 +692,27 @@ class Api:
             result = {"ok": False, "error": repr(e)}
         return result
 
+    def choose_cookie_file(self) -> dict:
+        """Native picker for a Netscape cookies.txt (v1.9.26).
+
+        The file itself is never read here and never logged - yt-dlp gets the
+        path via --cookies, so session secrets stay out of app.log/events.
+        """
+        result = {"ok": False, "path": ""}
+        try:
+            files = _APP.browser.create_file_dialog(
+                webview.OPEN_DIALOG, allow_multiple=False,
+                file_types=("Cookies files (*.txt;*.cookies)", "All files (*.*)"))
+            if files:
+                path = files[0] if isinstance(files, (list, tuple)) else files
+                _APP.settings.set("cookies_file", path)
+                _APP.logm.log("cookie file selected", event="cookie_file_selected")
+                result = {"ok": True, "path": path}
+        except Exception as e:
+            _APP.logm.exception("cookie picker", e)
+            result = {"ok": False, "error": repr(e)}
+        return result
+
     # ----------------------------------------------------------------- logs
     def get_log_tail(self, name: str, lines: int = 200) -> str:
         return _APP.logm.tail(name, int(lines))

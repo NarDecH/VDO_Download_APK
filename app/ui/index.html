@@ -161,6 +161,20 @@ footer{padding:6px 16px;border-top:1px solid var(--line);color:var(--faint);font
       <input type="number" id="sMaxConc" min="1" max="8">
       <label>User-Agent ของ yt-dlp (เว้นว่าง = ค่าเริ่มต้น)</label>
       <input type="text" id="sUA" placeholder="Mozilla/5.0 …">
+      <label>Cookie สำหรับเว็บที่ต้องล็อกอิน (yt-dlp)</label>
+      <div class="row"><input type="text" id="sCookieFile" placeholder="C:\\path\\cookies.txt"><button class="act" style="flex:0" onclick="pickCookieFile()">เลือก…</button></div>
+      <label>หรืออ่านจากเบราว์เซอร์ที่ล็อกอินอยู่</label>
+      <select id="sCookieBrowser">
+        <option value="">ไม่ใช้</option>
+        <option value="chrome">Chrome</option>
+        <option value="edge">Edge</option>
+        <option value="firefox">Firefox</option>
+        <option value="brave">Brave</option>
+        <option value="chromium">Chromium</option>
+        <option value="vivaldi">Vivaldi</option>
+        <option value="opera">Opera</option>
+      </select>
+      <div class="hint">ใช้กับ X/Twitter, Instagram หรือโพสต์ที่ต้องล็อกอิน — ไฟล์ต้องเป็น Netscape cookies.txt (ถ้ามีไฟล์จะใช้ไฟล์ก่อน ไม่ใช้เบราว์เซอร์) · เก็บในเครื่องเท่านั้น ไม่ส่งออก</div>
       <div class="hint">ตรวจสอบการอัปเดต yt-dlp เป็นระยะ เพราะเว็บฝั่ง upstream เปลี่ยนบ่อย</div>
       <div style="margin-top:10px"><button class="act grn" onclick="saveSettings()">💾 บันทึกการตั้งค่า</button>
       <button class="act" onclick="updateEngine()">⬆ อัปเดต yt-dlp</button></div>
@@ -297,7 +311,7 @@ function esc(s){ return (s||'').replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','
 function friendlyError(e){
   if (!e) return '';
   if (/Unsupported URL/i.test(e)) return 'ไม่รู้จักลิงก์นี้ — แอปลองสแกนหาสตรีมในหน้าให้แล้ว ถ้ายังไม่ได้ ให้เปิดหน้านี้ในหน้าต่างเบราว์เซอร์ของแอป เล่นวิดีโอรอสักครู่ แล้วกด ⬇ ดาวน์โหลดบนแถบเครื่องมือ';
-  if (/Private video|Sign in to confirm|login required/i.test(e)) return 'วิดีโอนี้ต้องล็อกอินหรือเป็นส่วนตัว — แอปยังไม่รองรับ cookie profile';
+  if (/Private video|Sign in to confirm|login required|cookies/i.test(e)) return 'วิดีโอนี้ต้องล็อกอิน — ไปที่ ตั้งค่า → Cookie เลือกไฟล์ cookies.txt หรือเบราว์เซอร์ที่ล็อกอินอยู่ แล้วกดดาวน์โหลดอีกครั้ง';
   if (/HTTP Error 40[34]/i.test(e)) return 'ลิงก์หมดอายุหรือถูกลบแล้ว (403/404) — เล่นวิดีโอแล้วกดสแกนใหม่';
   return e.slice(0, 160);
 }
@@ -366,6 +380,8 @@ function renderSettings(s){
   document.getElementById('sDownDir').value = s.download_dir || '';
   document.getElementById('sMaxConc').value = s.max_concurrent || 3;
   document.getElementById('sUA').value = s.user_agent || '';
+  document.getElementById('sCookieFile').value = s.cookies_file || '';
+  document.getElementById('sCookieBrowser').value = s.cookies_browser || '';
   document.getElementById('sLogLevel').value = s.log_level || 'DEBUG';
   document.getElementById('sStartPage').value = s.start_page || '';
   document.getElementById('sUpdHours').value = (s.update_check_interval_hours ?? 12);
@@ -458,6 +474,7 @@ function clearMedia(){
   });
 }
 function pickDir(){ py().choose_download_dir().then(r => { if(r && r.ok) document.getElementById('sDownDir').value = r.path; }); }
+function pickCookieFile(){ py().choose_cookie_file().then(r => { if(r && r.ok) document.getElementById('sCookieFile').value = r.path; }); }
 
 // ---------- favorite websites (v1.9.21) ----------------------------------
 async function renderFavorites(){
@@ -659,6 +676,8 @@ function saveSettings(){
   py().set_setting('download_dir', document.getElementById('sDownDir').value.trim());
   py().set_setting('max_concurrent', parseInt(document.getElementById('sMaxConc').value) || 3);
   py().set_setting('user_agent', document.getElementById('sUA').value.trim());
+  py().set_setting('cookies_file', document.getElementById('sCookieFile').value.trim());
+  py().set_setting('cookies_browser', document.getElementById('sCookieBrowser').value);
   py().set_setting('log_level', document.getElementById('sLogLevel').value);
   py().set_setting('auto_detect', document.getElementById('sAutoDetect').checked);
   py().set_setting('notify_done', document.getElementById('sNotify').checked);

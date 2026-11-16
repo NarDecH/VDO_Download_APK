@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.IBinder
 import android.provider.MediaStore
+import android.webkit.CookieManager
 import androidx.core.app.NotificationCompat
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -108,6 +109,9 @@ class StreamDownloadService : Service() {
 
         val url = intent?.getStringExtra(EXTRA_URL).orEmpty()
         val title = intent?.getStringExtra(EXTRA_TITLE).orEmpty()
+        // v1.9.26: the page the media was found on - its host owns the WebView
+        // session cookies that yt-dlp needs for login-gated sites (X/Twitter)
+        val pageUrl = intent?.getStringExtra(EXTRA_PAGE_URL).orEmpty().ifEmpty { url }
         if (url.isEmpty()) { stopSelfResult(startId); return START_NOT_STICKY }
 
         // v1.5.0: process id is per-job (a second download may already be
@@ -150,9 +154,12 @@ class StreamDownloadService : Service() {
             // while the UI already had its own 500 ms ticker.
             var lastProgressLogMs = 0L
             var lastLineLogMs = 0L
+            var cookiePath = ""
             try {
+                cookiePath = writeCookieFile(jobDir, pageUrl)
                 val req = YoutubeDLRequest(url).apply {
                     StreamArgs.optionsArgs(jobDir, titleBase).forEach { addOption(it) }
+                    StreamArgs.cookieArgs(cookiePath).forEach { addOption(it) }
                     addOption("-f", "bv*+ba/b")
                 }
                 val result = YoutubeDL.getInstance().execute(req, pid) { progress, _eta, line ->
@@ -245,8 +252,19 @@ class StreamDownloadService : Service() {
                     "url" to url, "engine" to "ytdl-android",
                     "error" to errorMsg.take(200), "reason" to cause))
                 FileLog.app("ERROR", "dl", "stream download failed: $errorMsg")
+                // v1.9.26: an account/permission wall is not a broken site -
+                // log it explicitly and tell the user what to do next
+                if (StreamArgs.isLoginRequired(errorMsg)) {
+                    FileLog.event("download_login_required", mapOf(
+                        "url" to url.take(200), "reason" to cause,
+                        "cookie" to if (cookiePath.isEmpty()) "none" else "webview"))
+                    FileLog.app("WARNING", "dl", "stream download needs a login: $url")
+                }
                 finishNotification(false, cause)
-                notifyMainActivity(false, "")
+                notifyMainActivity(
+                    false, "",
+                    if (StreamArgs.isLoginRequired(errorMsg)) getString(R.string.login_required_hint) else "",
+                )
                 // Unsupported-URL player pages: hand the page to the WebView so
                 // the in-page detector can catch the real stream while it plays
                 // (desktop parity - plan-android-hls.md / v1.1.4 desktop flow)
@@ -350,16 +368,40 @@ class StreamDownloadService : Service() {
      * this app receives it. Never throws: a dead/missing receiver must not
      * take the download worker down.
      */
-    private fun notifyMainActivity(ok: Boolean, file: String) {
+    private fun notifyMainActivity(ok: Boolean, file: String, hint: String = "") {
         try {
             sendBroadcast(
                 Intent(ACTION_DL_STATE)
                     .setPackage(packageName)
                     .putExtra(EXTRA_DL_OK, ok)
-                    .putExtra(EXTRA_DL_FILE, file.take(120)),
+                    .putExtra(EXTRA_DL_FILE, file.take(120))
+                    .putExtra(EXTRA_DL_HINT, hint.take(200)),
             )
         } catch (e: Exception) {
             FileLog.app("WARNING", "dl", "notify main activity failed: $e")
+        }
+    }
+
+    /**
+     * v1.9.26: export the WebView's cookies for the page host into the
+     * job dir as a Netscape cookies.txt, so yt-dlp can download login-gated
+     * media (X/Twitter, Instagram, members-only). Returns "" when there is
+     * nothing to write; values never reach the logs.
+     */
+    private fun writeCookieFile(jobDir: File, pageUrl: String): String {
+        return try {
+            val host = Uri.parse(pageUrl).host.orEmpty()
+            val text = StreamArgs.netscapeCookieLines(CookieManager.getInstance().getCookie(pageUrl), host)
+            if (text.isEmpty()) "" else {
+                val f = File(jobDir, "cookies.txt")
+                f.writeText(text)
+                val n = text.lineSequence().count { it.isNotBlank() } - 1
+                FileLog.event("cookie_source", mapOf("mode" to "webview", "host" to host, "cookies" to n))
+                f.absolutePath
+            }
+        } catch (e: Exception) {
+            FileLog.app("WARNING", "dl", "cookie export failed: $e")
+            ""
         }
     }
 
@@ -468,6 +510,8 @@ class StreamDownloadService : Service() {
         private const val RC_MAIN = 44
         const val EXTRA_URL = "url"
         const val EXTRA_TITLE = "title"
+        /** v1.9.26: page whose WebView cookies are exported for yt-dlp. */
+        const val EXTRA_PAGE_URL = "pageUrl"
         /** v1.5.0: per-job cancel - absent means "cancel every running job". */
         const val EXTRA_PID = "pid"
         const val ACTION_CANCEL = "com.vdograbber.app.CANCEL"
@@ -483,6 +527,8 @@ class StreamDownloadService : Service() {
         const val ACTION_DL_STATE = "com.vdograbber.app.DL_STATE"
         const val EXTRA_DL_OK = "ok"
         const val EXTRA_DL_FILE = "file"
+        /** v1.9.26: Thai guidance shown when a download needs a login. */
+        const val EXTRA_DL_HINT = "hint"
 
         /** v1.4.0: true from onStartCommand until onDestroy (all stop paths). */
         @Volatile var isRunning = false
@@ -535,11 +581,12 @@ class StreamDownloadService : Service() {
         }
 
         /** Start a stream download (no-op when [url] is blank). */
-        fun start(context: Context, url: String, title: String, titleBase: String = "") {
+        fun start(context: Context, url: String, title: String, titleBase: String = "", pageUrl: String = "") {
             if (url.isBlank()) return
             val i = Intent(context, StreamDownloadService::class.java)
                 .putExtra(EXTRA_URL, url)
                 .putExtra(EXTRA_TITLE, title)
+            if (pageUrl.isNotBlank()) i.putExtra(EXTRA_PAGE_URL, pageUrl)
             if (titleBase.isNotBlank()) i.putExtra(EXTRA_TITLE_BASE, titleBase)
             context.startForegroundService(i)
         }

@@ -39,6 +39,38 @@ MEDIA_EXT_RE = re.compile(r"\.(mp4|webm|mkv|m3u8|mpd|flv|mov|avi|mp3|m4a|aac|ts|
 def is_usable_download_url(url: str) -> bool:
     return not str(url or "").lower().startswith("blob:")
 
+
+# v1.9.26: login-gated sites (X/Twitter, Instagram, members-only pages) only
+# download when yt-dlp gets a cookie source. Two modes: an explicit Netscape
+# cookies.txt, or "read the installed browser profile" handled by yt-dlp.
+# Cookie VALUES are never logged - only which source was used.
+COOKIE_BROWSERS = ("chrome", "edge", "firefox", "brave", "chromium", "vivaldi", "opera")
+
+LOGIN_REQUIRED_RE = re.compile(
+    r"sign in to confirm|login required|private video|age[- ]restricted|"
+    r"requires? authentication|use --cookies|confirm you'?re not a bot|"
+    r"this video is only available|http error 401", re.I)
+
+
+def cookie_args(cookies_file: str = "", cookies_browser: str = "") -> list[str]:
+    """yt-dlp cookie options for the configured source (empty when unset).
+
+    An explicit cookies.txt wins over browser mode: it is the user's direct
+    choice and keeps working when the browser profile is locked.
+    """
+    path = str(cookies_file or "").strip()
+    if path and os.path.isfile(path):
+        return ["--cookies", path]
+    browser = str(cookies_browser or "").strip().lower()
+    if browser in COOKIE_BROWSERS:
+        return ["--cookies-from-browser", browser]
+    return []
+
+
+def is_login_required(text: str) -> bool:
+    """True when the engine failed because the page wants a logged-in session."""
+    return bool(LOGIN_REQUIRED_RE.search(str(text or "")))
+
 # Windows-invalid filename characters (plus control chars) -> replaced by spaces
 _INVALID_FS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -87,6 +119,8 @@ class Job:
         self.ext = ext or ""              # source extension sniffed from the URL
         self.title_base = title_base or ""  # filename stem decided up-front
         self.page_title = page_title or ""
+        self.cookie_source = ""        # "file" | "browser" | "" - set when the job starts
+        self.login_required = False    # v1.9.26: engine asked for an account
         self.status = "queued"        # queued running merging done error canceled paused
         self.percent = 0.0
         self.speed = ""
@@ -107,6 +141,7 @@ class Job:
             "total": self.total, "filepath": self.filepath, "error": self.error,
             "created": self.created, "finished": self.finished, "out_dir": self.out_dir,
             "ext": self.ext, "title_base": self.title_base,
+            "login_required": self.login_required,
         }
 
 
@@ -270,6 +305,7 @@ class DownloadManager:
         """Probe a URL with yt-dlp -J and return a compact format list."""
         ytdlp = self.engines.ensure_ytdlp()
         cmd = [ytdlp, "--no-playlist", "--no-warnings", "-J", url]
+        cmd += cookie_args(self.settings.get("cookies_file"), self.settings.get("cookies_browser"))
         if referrer:
             cmd += ["--referer", referrer]
         ua = self.settings.get("user_agent")
@@ -483,6 +519,14 @@ class DownloadManager:
             # (yt-dlp exited with code 2). The real option is spelled
             # --concurrent-fragments / -N (present since yt-dlp 2020).
             cmd += ["--concurrent-fragments", "4"]
+        if not job.cookie_source:
+            cargs = cookie_args(self.settings.get("cookies_file"), self.settings.get("cookies_browser"))
+            if cargs:
+                cmd += cargs
+                job.cookie_source = "file" if cargs[0] == "--cookies" else "browser"
+                self.log.log("download #%s reads cookies from %s" % (
+                    job.id, "cookies.txt" if job.cookie_source == "file" else cargs[1]),
+                    event="cookie_source", id=job.id, mode=job.cookie_source)
         cmd.append(job.url)
 
         self.log.dl("=" * 70)
@@ -534,8 +578,9 @@ class DownloadManager:
                 job.status = "error"
                 job.error = ("yt-dlp finished (exit 0) but no file appeared in the "
                              "download folder - see the no-file probe in the log")
-                self.log.log("download done but no file #%s" % job.id,
-                             level="error", event="download_no_file", id=job.id, url=job.url)
+                self.log.log("download done but no file #%s (path=%r)" % (job.id, job.filepath),
+                             level="error", event="download_no_file", id=job.id, url=job.url,
+                             filepath=job.filepath, out_dir=job.out_dir)
                 self._probe_no_file(job, ytdlp)
                 self.push_ui("download_update", job.public())
                 return
@@ -558,6 +603,16 @@ class DownloadManager:
             job.error = job.error or "yt-dlp exited with code %s" % rc
             self.log.log("download error #%s: %s" % (job.id, job.error),
                          level="error", event="download_error", id=job.id, url=job.url, error=job.error)
+            # v1.9.26: tell the user (and the log) that the page wants an
+            # account, so a missing cookie source is not read as a broken site
+            if is_login_required(job.error):
+                job.login_required = True
+                self.log.log("download #%s needs a login (cookie source: %s)"
+                             % (job.id, job.cookie_source or "none"),
+                             level="warning", event="download_login_required",
+                             id=job.id, url=job.url,
+                             cookie_source=job.cookie_source or "none",
+                             reason=job.error[:200])
             # "Unsupported URL" on a player page: scan the HTML for the real
             # stream / embed and retry once with the candidate we find.
             retriable = allow_fallback and (
@@ -614,7 +669,9 @@ class DownloadManager:
         Android service runs (event download_no_file_probe)."""
         try:
             probe = subprocess.run(
-                [ytdlp, "--no-playlist", "--no-warnings", "-F", job.url],
+                [ytdlp, "--no-playlist", "--no-warnings", "-F"]
+                + cookie_args(self.settings.get("cookies_file"), self.settings.get("cookies_browser"))
+                + [job.url],
                 capture_output=True, text=True, timeout=120, encoding="utf-8", errors="replace",
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
             tail = [ln for ln in (probe.stdout or "").strip().splitlines() if ln][-12:]
@@ -714,9 +771,45 @@ class DownloadManager:
         elif "[download] 100%" in line and job.total == 0:
             job.percent = 100.0
 
+    @staticmethod
+    def _match_by_ascii_skeleton(directory: str, wanted: str) -> str:
+        """Find the one file in `directory` whose name equals `wanted` after
+        every non-ASCII run is collapsed to "?".
+
+        v1.9.26: yt-dlp's Destination line can arrive with replacement
+        characters for non-BMP glyphs (X/NASA title has ✈️), so the parsed
+        path never string-matches the real file and a finished download was
+        reported as "no file". Only an unambiguous single match is accepted.
+        """
+        base = os.path.basename(str(wanted or ""))
+        if not base or not directory:
+            return ""
+        # The engine drops non-ASCII glyphs from stdout entirely (the ✈️ is
+        # simply absent from the Destination line), so compare the printable
+        # ASCII skeleton only - spaces included, which keeps the match tight.
+        def skeleton(name: str) -> str:
+            return re.sub(r"[^!-~]", "", name)
+
+        want = skeleton(base)
+        if not want:
+            return ""
+        hits = []
+        try:
+            for name in os.listdir(directory):
+                if skeleton(name) == want:
+                    hits.append(name)
+        except OSError:
+            return ""
+        return os.path.join(directory, hits[0]) if len(hits) == 1 else ""
+
     def _guess_output_file(self, job: Job) -> str:
         if job.filepath and os.path.exists(job.filepath):
             return job.filepath
+        repaired = self._match_by_ascii_skeleton(job.out_dir, job.filepath)
+        if repaired:
+            self.log.log("download path repaired #%s -> %s" % (job.id, os.path.basename(repaired)),
+                         event="download_path_repaired", id=job.id, url=job.url)
+            return repaired
         # 1) known stem: our title-based template may have produced
         #    `stem.ext` / `stem (2).ext` without yt-dlp ever printing the path
         stem = sanitize_filename(job.title_base)

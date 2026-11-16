@@ -25,6 +25,41 @@ object StreamArgs {
      *  Used to log WHY a download produced no file (layout / geo / DRM). */
     fun probeArgs(): List<String> = listOf("-F", "--no-playlist")
 
+    /** v1.9.26: hand yt-dlp a Netscape cookie file (absent path = no cookies).
+     *  Needed for login-gated sites (X/Twitter, Instagram, members-only). */
+    fun cookieArgs(path: String?): List<String> =
+        if (path.isNullOrBlank()) emptyList() else listOf("--cookies", path)
+
+    /** v1.9.26: build a Netscape cookies.txt body from a WebView Cookie
+     *  header ("k=v; k2=v2"). Returns "" when there is nothing to write, so
+     *  the service can skip the flag entirely. Values are written to the
+     *  app-private job dir only - never logged. */
+    fun netscapeCookieLines(header: String?, host: String, expires: Long = 0L): String {
+        val domain = host.trim().removePrefix(".").lowercase()
+        if (domain.isEmpty()) return ""
+        val out = StringBuilder("# Netscape HTTP Cookie File\n")
+        header.orEmpty().split(";").forEach { part ->
+            val eq = part.indexOf('=')
+            if (eq <= 0) return@forEach
+            val name = part.substring(0, eq).trim()
+            val value = part.substring(eq + 1).trim()
+            if (name.isEmpty()) return@forEach
+            out.append('.').append(domain).append("\tTRUE\t/\tFALSE\t")
+                .append(expires).append('\t').append(name).append('\t').append(value).append('\n')
+        }
+        // a trailing newline makes lineSequence() report one empty line, so
+        // count only real lines: header alone means "no cookies"
+        return if (out.lineSequence().count { it.isNotBlank() } <= 1) "" else out.toString()
+    }
+
+    /** v1.9.26: true when the engine reports an account/permission wall -
+     *  drives the download_login_required event + the Thai hint. */
+    fun isLoginRequired(text: String?): Boolean = Regex(
+        "(?i)sign in to confirm|login required|private video|age[- ]restricted|" +
+            "requires? authentication|use --cookies|confirm you'?re not a bot|" +
+            "this video is only available|http error 401",
+    ).containsMatchIn(text.orEmpty())
+
     /** v1.6.1: args for a --version probe - the engine reports its real
      *  version in one fast line. Needed because YoutubeDL.version() only
      *  returns what updateYoutubeDL() stored in SharedPreferences, i.e. null

@@ -1,6 +1,7 @@
 package com.vdograbber.app
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -281,5 +282,42 @@ class StreamArgsTest {
         } finally {
             jobA.deleteRecursively(); jobB.deleteRecursively()
         }
+    }
+
+    @Test
+    fun `cookie args only appear when a cookie file is handed over`() {
+        assertEquals(emptyList<String>(), StreamArgs.cookieArgs(null))
+        assertEquals(emptyList<String>(), StreamArgs.cookieArgs(""))
+        assertEquals(listOf("--cookies", "/tmp/c.txt"), StreamArgs.cookieArgs("/tmp/c.txt"))
+    }
+
+    @Test
+    fun `netscape cookie file mirrors the webview header`() {
+        val text = StreamArgs.netscapeCookieLines("auth_token=abc; ct0=def==", "x.com")
+        val lines = text.trim().lines()
+        assertEquals("# Netscape HTTP Cookie File", lines[0])
+        assertEquals(".x.com\tTRUE\t/\tFALSE\t0\tauth_token\tabc", lines[1])
+        // only the FIRST '=' splits name/value, so base64-ish values survive
+        assertEquals(".x.com\tTRUE\t/\tFALSE\t0\tct0\tdef==", lines[2])
+        // nothing usable -> empty body (service then skips --cookies)
+        assertEquals("", StreamArgs.netscapeCookieLines(null, "x.com"))
+        assertEquals("", StreamArgs.netscapeCookieLines("only-flags;", "x.com"))
+        assertEquals("", StreamArgs.netscapeCookieLines("a=1", ""))
+        // a leading dot on the host never doubles up
+        assertEquals(
+            ".x.com\tTRUE\t/\tFALSE\t0\ta\t1",
+            StreamArgs.netscapeCookieLines("a=1", ".x.com").trim().lines()[1],
+        )
+    }
+
+    @Test
+    fun `login wall classifier matches yt-dlp account errors`() {
+        assertTrue(StreamArgs.isLoginRequired("ERROR: Sign in to confirm you're not a bot"))
+        assertTrue(StreamArgs.isLoginRequired("Login required"))
+        assertTrue(StreamArgs.isLoginRequired("HTTP Error 401: Unauthorized"))
+        assertTrue(StreamArgs.isLoginRequired("Private video"))
+        assertFalse(StreamArgs.isLoginRequired("Unsupported URL: https://x.com/"))
+        assertFalse(StreamArgs.isLoginRequired("HTTP Error 404"))
+        assertFalse(StreamArgs.isLoginRequired(null))
     }
 }

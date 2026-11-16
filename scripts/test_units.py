@@ -1041,6 +1041,56 @@ def test_version_info_matches_app_version() -> bool:
     return True
 
 
+def test_cookie_args_and_login_required() -> bool:
+    """v1.9.26: cookie source selection + the login-wall classifier."""
+    from core.downloader import COOKIE_BROWSERS, cookie_args, is_login_required
+
+    with tempfile.TemporaryDirectory() as d:
+        jar = os.path.join(d, "cookies.txt")
+        with open(jar, "w", encoding="utf-8") as fh:
+            fh.write("# Netscape HTTP Cookie File\n")
+        # an explicit file wins over the browser mode
+        assert cookie_args(jar, "chrome") == ["--cookies", jar], "file did not win"
+        # a missing file falls through to the browser mode
+        assert cookie_args(os.path.join(d, "gone.txt"), "edge") == ["--cookies-from-browser", "edge"]
+        # unknown/blank sources produce no flag at all
+        assert cookie_args("", "netscape") == []
+        assert cookie_args("", "") == []
+    assert "chrome" in COOKIE_BROWSERS
+
+    for good in ("ERROR: Sign in to confirm you're not a bot",
+                 "Private video",
+                 "[twitter] Login required",
+                 "This video is only available to registered users",
+                 "HTTP Error 401: Unauthorized"):
+        assert is_login_required(good), good
+    for bad in ("Unsupported URL: https://x.com/",
+                "ERROR: Video unavailable",
+                "HTTP Error 404"):
+        assert not is_login_required(bad), bad
+    return True
+
+
+def test_download_path_skeleton_match() -> bool:
+    """v1.9.26: yt-dlp drops non-ASCII glyphs from its Destination line, so a
+    finished download must still be found by the printable-ASCII skeleton."""
+    from core.downloader import DownloadManager
+
+    with tempfile.TemporaryDirectory() as d:
+        real = os.path.join(d, "NASA - soon! ✈️  MAX POWER [123].mp4")
+        with open(real, "wb") as fh:
+            fh.write(b"x")
+        parsed = os.path.join(d, "NASA - soon!   MAX POWER [123].mp4")
+        assert DownloadManager._match_by_ascii_skeleton(d, parsed) == real
+        # two candidates with the same skeleton -> refuse to guess
+        with open(os.path.join(d, "NASA - soon! 🚀  MAX POWER [123].mp4"), "wb") as fh:
+            fh.write(b"y")
+        assert DownloadManager._match_by_ascii_skeleton(d, parsed) == ""
+        # a missing directory must not raise
+        assert DownloadManager._match_by_ascii_skeleton(os.path.join(d, "nope"), parsed) == ""
+    return True
+
+
 def test_updater_asset_selection_and_swap_bat() -> bool:
     """The updater targets the same asset name CI attaches and writes a swap
     .bat that replaces the frozen exe then restarts it."""
@@ -1269,6 +1319,8 @@ def main() -> int:
         "toolbar_favorites_button": test_toolbar_has_favorites_button,
         "updater_version_compare": test_updater_version_compare,
         "version_info_matches_app": test_version_info_matches_app_version,
+        "cookie_args_login_required": test_cookie_args_and_login_required,
+        "download_path_skeleton": test_download_path_skeleton_match,
         "updater_asset_and_swap": test_updater_asset_selection_and_swap_bat,
         "updater_swap_choreography": test_updater_swap_choreography_sandbox,
         "updater_mock_flow": test_updater_mock_flow,
