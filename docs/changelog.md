@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.26] — 2026-11-16
+
+### การเปลี่ยนแปลง
+- รองรับ cookie สำหรับเว็บที่ต้องล็อกอิน (X/Twitter, Instagram, เนื้อหาสมาชิก): เดสก์ท็อปเลือกไฟล์ cookies.txt หรือให้ yt-dlp อ่านจากเบราว์เซอร์, Android แนบ cookie ของ WebView อัตโนมัติ พร้อม event cookie_source / download_login_required และคำแนะนำในแอป
+- แก้การตรวจหาไฟล์ที่ดาวน์โหลดเสร็จเมื่อชื่อไฟล์มีอิโมจิ (event download_path_repaired) และลบไฟล์ cookie ชั่วคราวบน Android เมื่อจบงาน
+- เพิ่มหัวข้อวิธี export cookies.txt ใน docs/readme
+
+
 ## [1.9.25] — 2026-11-13
 
 ### การเปลี่ยนแปลง
