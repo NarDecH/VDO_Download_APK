@@ -145,6 +145,14 @@ cd android &amp;&amp; ./gradlew assembleDebug</code></pre>
 <div class="warn"><b>ไม่รองรับ DRM</b> (Widevine/Netflix ฯลฯ) และเนื้อหาหลังล็อกอินบางประเภท ·
 บน Android ไฟล์ตรง (mp4/webm/mp3) ใช้ได้เต็มที่ ส่วน HLS/DASH แนะนำเดสก์ท็อป ·
 YouTube เปลี่ยนบ่อย ให้กด "อัปเดต yt-dlp" ในแท็บตั้งค่าเมื่อเจอปัญหา</div>
+<h2><span class="n">08</span>Cookie สำหรับเว็บที่ต้องล็อกอิน</h2>
+<p><b>เดสก์ท็อป:</b> เปิด <code>ตั้งค่า → Cookie</code> แล้วเลือกไฟล์ <code>cookies.txt</code> (รูปแบบ Netscape)
+หรือเลือกเบราว์เซอร์ที่ล็อกอินอยู่ให้ yt-dlp อ่าน cookie เอง ไม่ต้อง export ·
+<b>Android:</b> ไม่ต้อง export — แอปแนบ cookie ของ WebView ให้อัตโนมัติเมื่อดาวน์โหลดจากหน้าที่ล็อกอิน</p>
+<p>วิธี export: ติดตั้งส่วนขยาย <b>Get cookies.txt LOCALLY</b> ในเบราว์เซอร์ → ล็อกอินเว็บเป้าหมายและเปิดหน้าโพสต์
+→ กด Export จากส่วนขยาย · ไฟล์ต้องเริ่มด้วย <code># Netscape HTTP Cookie File</code></p>
+<div class="warn">ไฟล์ cookie เปรียบเหมือนรหัสผ่าน — เก็บไว้เฉพาะเครื่องตัวเอง อย่าแชร์หรือ commit ·
+แอปไม่เขียนค่า cookie ลง log · Android ลบไฟล์ชั่วคราวทิ้งเมื่อดาวน์โหลดจบ · cookie หมดอายุเมื่อออกจากระบบ ต้อง export ใหม่</div>
 <p>โปรดใช้ตามกฎหมายลิขสิทธิ์ของเนื้อหาที่ดาวน์โหลด · ซอร์สโค้ด MIT</p>
 
 </div>
