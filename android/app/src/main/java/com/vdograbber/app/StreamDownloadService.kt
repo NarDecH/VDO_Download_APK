@@ -201,6 +201,13 @@ class StreamDownloadService : Service() {
                     FileLog.app("ERROR", "dl", "stream download error: $e")
                 }
             }
+            // v1.9.26: the exported cookie jar is session material - never
+            // leave it behind in engine-work after the job ends
+            if (cookiePath.isNotEmpty()) {
+                try { File(cookiePath).delete() } catch (e: Exception) {
+                    FileLog.app("WARNING", "dl", "cookie cleanup failed: $e")
+                }
+            }
             DownloadJobs.remove(pid) // gone from the sheet/chip whatever the outcome
 
             if (DownloadJobs.consumeCancelled(pid)) {
