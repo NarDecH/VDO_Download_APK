@@ -2,6 +2,15 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.27] — 2026-11-17
+
+### การเปลี่ยนแปลง
+- analyze_events: แยก "ต้องล็อกอิน" ว่าเกิดจากยังไม่ได้ตั้ง cookie หรือ cookie หมดอายุ/บัญชีไม่มีสิทธิ์ พร้อมบอกวิธีแก้ที่ตรงสาเหตุ
+- analyze_events: อ่าน cookie_source (desktop) และ cookie (Android) ต่อรายการ + สรุปจำนวน cookie_source ในรายงาน
+- analyze_events: เพิ่ม event download_login_required/cookie_source ในตาราง event และรายการ problem events
+- test: เพิ่ม unit test analyze_events_login_cookie (รวม 46 tests)
+
+
 ## [1.9.26] — 2026-11-16
 
 ### การเปลี่ยนแปลง
