@@ -3,10 +3,12 @@ name: Desktop selftest + exe
 on:
   push:
     branches: [main]
-    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "requirements.txt", ".github/workflows/desktop.yml"]
+    # scripts/analyze_events.py + test_units.py included: an analyzer change
+    # must run the unit tests that cover it, instead of skipping CI entirely
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "scripts/analyze_events.py", "scripts/test_units.py", "requirements.txt", ".github/workflows/desktop.yml"]
     tags: ["v*"]
   pull_request:
-    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "requirements.txt", ".github/workflows/desktop.yml"]
+    paths: ["app/**", "scripts/build_exe.py", "scripts/version_info.txt", "scripts/release.py", "scripts/analyze_events.py", "scripts/test_units.py", "requirements.txt", ".github/workflows/desktop.yml"]
   workflow_dispatch:
 
 permissions:
