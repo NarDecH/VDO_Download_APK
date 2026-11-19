@@ -21,6 +21,7 @@ android/.idea/
 *.apk.idsig
 
 # OS / editor
+.freebuff/
 .DH_*
 Thumbs.db
 desktop.ini
