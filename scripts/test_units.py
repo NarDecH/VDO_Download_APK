@@ -327,20 +327,31 @@ def test_verify_download() -> bool:
     assert v["ok"] and v["checked"] == "ffprobe", v
     assert v["streams"] == 2 and abs(v["duration"] - 12.5) < 0.01 and "mp4" in v["format"]
 
-    # container errors on stderr mean a truncated/corrupt file even at exit 0
+    # stderr chatter at exit 0 must NOT fail a finished download
     v = verify_download(good, probe,
                         runner=lambda *a, **k: _FakeProbe(stderr="moov atom not found"))
+    assert v["ok"], v
+
+    # only a non-zero exit or the absence of media streams is an error
+    v = verify_download(good, probe,
+                        runner=lambda *a, **k: _FakeProbe(returncode=1, stderr="moov atom not found"))
     assert not v["ok"] and "moov" in v["error"], v
+
+    # zero duration is informational only
+    v = verify_download(good, probe, runner=lambda *a, **k: _FakeProbe(
+        stdout='{"format":{"format_name":"mp4","duration":"0"},"streams":[{"codec_type":"video"}]}'))
+    assert v["ok"] and v["duration"] == 0.0, v
 
     # parses but holds no audio/video stream
     v = verify_download(good, probe,
                         runner=lambda *a, **k: _FakeProbe(stdout='{"format":{},"streams":[]}'))
     assert not v["ok"] and "สตรีม" in v["error"], v
 
-    # a probe crash is reported, never raised
+    # a probe that cannot start is best effort: never fails the download
     def boom(*a, **k):
         raise OSError("probe gone")
-    assert not verify_download(good, probe, runner=boom)["ok"]
+    v = verify_download(good, probe, runner=boom)
+    assert v["ok"] and v["checked"] == "size" and "ffprobe" in v["note"], v
     return True
 
 

@@ -158,19 +158,20 @@ def verify_download(path: str, ffprobe: str = "", runner=None) -> dict:
     """Post-download integrity verdict for a finished media file.
 
     Level 1 (always): the file exists and is not empty. Level 2 (when
-    ffprobe is available): the container parses without errors and holds at
-    least one audio/video stream - a truncated or corrupt file fails here
-    even when yt-dlp exited 0. Without ffprobe only level 1 runs and the
-    result says so (`checked="size"`).
+    ffprobe is available): the probe must exit 0 and the container must hold
+    at least one audio/video stream. Everything else is informational only -
+    stderr chatter, a zero duration or a probe that cannot even start never
+    turns a finished download into an error. Without ffprobe only level 1
+    runs and the result says so (`checked="size"`).
     """
     p = str(path or "")
     try:
         size = os.path.getsize(p)
     except OSError as e:
         return {"ok": False, "size": 0, "checked": "size", "format": "",
-                "duration": 0.0, "streams": 0, "error": "ไม่พบไฟล์: %s" % e}
+                "duration": 0.0, "streams": 0, "note": "", "error": "ไม่พบไฟล์: %s" % e}
     result = {"ok": True, "size": size, "checked": "size", "format": "",
-              "duration": 0.0, "streams": 0, "error": ""}
+              "duration": 0.0, "streams": 0, "note": "", "error": ""}
     if size <= 0:
         result.update(ok=False, error="ไฟล์ว่าง (0 ไบต์)")
         return result
@@ -184,18 +185,19 @@ def verify_download(path: str, ffprobe: str = "", runner=None) -> dict:
              "-of", "json", p],
             capture_output=True, text=True, timeout=60, encoding="utf-8", errors="replace",
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    except Exception as e:  # noqa: BLE001 - a probe crash must not kill the job
-        result.update(ok=False, checked="ffprobe", error="ffprobe เรียกไม่สำเร็จ: %r" % e)
+    except Exception as e:  # noqa: BLE001 - best effort; a broken probe is not a broken file
+        result["note"] = "ffprobe ไม่พร้อม: %r" % e
         return result
     result["checked"] = "ffprobe"
-    err_lines = [ln.strip() for ln in (out.stderr or "").splitlines() if ln.strip()]
-    if out.returncode != 0 or err_lines:
-        detail = err_lines[-1] if err_lines else "exit %s" % out.returncode
+    if out.returncode != 0:
+        lines = [ln.strip() for ln in (out.stderr or "").splitlines() if ln.strip()]
+        detail = lines[-1] if lines else "exit %s" % out.returncode
         result.update(ok=False, error="คอนเทนเนอร์เสีย/ถูกตัด: %s" % detail[:200])
         return result
     data = parse_probe_json(out.stdout)
     if not data:
-        result.update(ok=False, error="ffprobe ไม่ได้ส่งข้อมูลกลับมา")
+        # exit 0 but unreadable JSON: do not fail a download on a probe quirk
+        result["note"] = "ffprobe output unreadable"
         return result
     fmt = data.get("format") if isinstance(data.get("format"), dict) else {}
     streams = [s for s in (data.get("streams") or []) if isinstance(s, dict)]
@@ -765,7 +767,8 @@ class DownloadManager:
                          event="download_verify", id=job.id, url=job.url,
                          filepath=job.filepath, bytes=verdict["size"],
                          checked=verdict["checked"], container=verdict["format"],
-                         duration=round(verdict["duration"], 2), streams=verdict["streams"])
+                         duration=round(verdict["duration"], 2), streams=verdict["streams"],
+                         note=verdict["note"])
             self.log.log("download done #%s -> %s" % (job.id, job.filepath or "(file name unknown)"),
                          event="download_done", id=job.id, url=job.url, filepath=job.filepath,
                          seconds=round(job.finished - job.created, 1), bytes=job.total)

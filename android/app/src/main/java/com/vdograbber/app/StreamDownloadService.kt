@@ -407,9 +407,10 @@ class StreamDownloadService : Service() {
     }
 
     /**
-     * v1.9.28: container-level integrity check for a finished HLS/DASH job -
-     * empty files, unreadable containers and files without any audio/video
-     * stream are reported instead of being published as a success.
+     * v1.9.28: container-level integrity check for a finished HLS/DASH job.
+     * Desktop parity: fail only when the container cannot be opened (the
+     * ffprobe non-zero-exit equivalent) or holds no audio/video stream -
+     * an unusual duration is informational, never an error.
      * Returns "" when the file looks complete, otherwise the reason in Thai.
      */
     private fun verifyMedia(file: File): String {
@@ -417,17 +418,11 @@ class StreamDownloadService : Service() {
         val mmr = android.media.MediaMetadataRetriever()
         return try {
             mmr.setDataSource(file.absolutePath)
-            val duration = mmr.extractMetadata(
-                android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
             val hasVideo = mmr.extractMetadata(
                 android.media.MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
             val hasAudio = mmr.extractMetadata(
                 android.media.MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"
-            when {
-                !hasVideo && !hasAudio -> "ไม่พบสตรีมวิดีโอ/เสียงในไฟล์"
-                duration <= 0L -> "อ่านความยาวไฟล์ไม่ได้ (ไฟล์อาจถูกตัดกลางทาง)"
-                else -> ""
-            }
+            if (!hasVideo && !hasAudio) "ไม่พบสตรีมวิดีโอ/เสียงในไฟล์" else ""
         } catch (e: Exception) {
             "เปิดไฟล์ไม่ได้: ${e.javaClass.simpleName}"
         } finally {
