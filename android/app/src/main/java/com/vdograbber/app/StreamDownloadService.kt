@@ -239,7 +239,22 @@ class StreamDownloadService : Service() {
                     stopSelfResult(startId)
                     return@launch
                 }
-                val published = publishFile(file, title)
+                // v1.9.28: exit 0 is not proof of a playable file - check the
+                // final container before publishing it as a success
+                val verdict = verifyMedia(file)
+                if (verdict.isNotEmpty()) {
+                    FileLog.event("download_verify_failed", mapOf(
+                        "url" to url.take(200), "file" to file.name,
+                        "bytes" to file.length(), "error" to verdict.take(200)))
+                    FileLog.app("ERROR", "dl", "stream download file is incomplete: $verdict")
+                    finishNotification(false, verdict)
+                    notifyMainActivity(false, "")
+                    stopSelfResult(startId)
+                    return@launch
+                }
+                FileLog.event("download_verify", mapOf(
+                    "url" to url.take(200), "file" to file.name, "bytes" to file.length()))
+                val published = publishFile(file)
                 FileLog.event("download_done", mapOf("url" to url, "engine" to "ytdl-android", "file" to (published?.first ?: file.name)))
                 FileLog.app("INFO", "dl", "stream download done: ${published?.first ?: file.name}")
                 finishNotification(
@@ -319,18 +334,13 @@ class StreamDownloadService : Service() {
      * (`name (2).mp4`); returns (display name, content URI) for the
      * finished-notification's open action, or null when publish failed.
      */
-    private fun publishFile(file: File?, title: String): Pair<String, Uri>? {
+    private fun publishFile(file: File?): Pair<String, Uri>? {
         if (file == null || !file.exists()) return null
         val ext = file.extension.ifEmpty { "mp4" }
-        val stem = StreamArgs.sanitizeFilename(title)
-        // when yt-dlp already named/deduped it after the title, keep that name
-        // (dedupe target must be the DOWNLOADS name space, not the per-job dir;
-        // the MediaStore insert below is what makes the name visible there)
-        val displayName = when {
-            stem.isEmpty() -> file.name
-            file.name.startsWith(stem) -> file.name
-            else -> file.name
-        }
+        // v1.9.28: every job writes into its own fresh engine dir, so its name
+        // can still collide with an earlier download that is already visible
+        // in Downloads/VDOGrabber - dedupe in the PUBLISHING namespace.
+        val displayName = freePublishedName(file.name)
         try {
             val values = android.content.ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, displayName)
@@ -355,6 +365,73 @@ class StreamDownloadService : Service() {
             // worst case: the raw file remains in Downloads/VDOGrabber
             FileLog.app("WARNING", "dl", "publish failed (file kept): $e")
             return null
+        }
+    }
+
+    /**
+     * v1.9.28: first free name in Downloads/VDOGrabber for a finished file -
+     * `name.mp4`, then `name (2).mp4`, `name (3).mp4`, ... MediaStore has no
+     * uniqueness constraint, so without this check a second download of the
+     * same title shows up twice under the same name.
+     */
+    private fun freePublishedName(name: String): String {
+        val dot = name.lastIndexOf('.')
+        val stem = if (dot > 0) name.substring(0, dot) else name
+        val ext = if (dot > 0) name.substring(dot) else ""
+        fun taken(candidate: String): Boolean = try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ? AND " +
+                    "${MediaStore.MediaColumns.RELATIVE_PATH} = ?"
+                val args = arrayOf(
+                    candidate,
+                    Environment.DIRECTORY_DOWNLOADS + "/VDOGrabber/",
+                )
+                contentResolver.query(
+                    MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                    arrayOf(MediaStore.MediaColumns._ID), selection, args, null,
+                )?.use { it.count > 0 } ?: false
+            } else {
+                val dir = File(
+                    Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+                    "VDOGrabber",
+                )
+                File(dir, candidate).exists()
+            }
+        } catch (e: Exception) {
+            false // a failed check must never block publishing
+        }
+        if (!taken(name)) return name
+        var n = 2
+        while (taken("$stem ($n)$ext")) n++
+        return "$stem ($n)$ext"
+    }
+
+    /**
+     * v1.9.28: container-level integrity check for a finished HLS/DASH job -
+     * empty files, unreadable containers and files without any audio/video
+     * stream are reported instead of being published as a success.
+     * Returns "" when the file looks complete, otherwise the reason in Thai.
+     */
+    private fun verifyMedia(file: File): String {
+        if (!file.exists() || file.length() <= 0L) return "ไฟล์ว่าง (0 ไบต์)"
+        val mmr = android.media.MediaMetadataRetriever()
+        return try {
+            mmr.setDataSource(file.absolutePath)
+            val duration = mmr.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
+            val hasVideo = mmr.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) == "yes"
+            val hasAudio = mmr.extractMetadata(
+                android.media.MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes"
+            when {
+                !hasVideo && !hasAudio -> "ไม่พบสตรีมวิดีโอ/เสียงในไฟล์"
+                duration <= 0L -> "อ่านความยาวไฟล์ไม่ได้ (ไฟล์อาจถูกตัดกลางทาง)"
+                else -> ""
+            }
+        } catch (e: Exception) {
+            "เปิดไฟล์ไม่ได้: ${e.javaClass.simpleName}"
+        } finally {
+            try { mmr.release() } catch (_: Exception) {}
         }
     }
 

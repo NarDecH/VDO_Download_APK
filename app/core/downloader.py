@@ -117,6 +117,100 @@ def unique_stem(directory: str, stem: str, ext: str) -> str:
     return os.path.join(directory, "%s (%d)%s" % (stem, n, ext))
 
 
+def _stem_key(directory: str, stem: str) -> str:
+    """Case-normalized identity of a would-be output stem (reservation key)."""
+    return os.path.normcase(os.path.abspath(os.path.join(directory, stem)))
+
+
+def unique_download_stem(directory: str, stem: str, reserved: set[str] | None = None) -> str:
+    """First stem in `directory` whose output files nothing already claims.
+
+    The download template does not know the final extension up front, so any
+    `stem.<ext>` file, a `(n)` variant or an in-progress `.part` fragment
+    counts as taken. A second download of the same title therefore becomes
+    `stem (2)`, then `stem (3)`, ... instead of being skipped by the engine's
+    "has already been downloaded" rule. `reserved` holds `_stem_key()` values
+    of stems other queued jobs already claimed this session.
+    """
+    stem = str(stem or "").strip()
+    if not stem:
+        return ""
+    taken = reserved or set()
+
+    def used(candidate: str) -> bool:
+        if _stem_key(directory, candidate) in taken:
+            return True
+        pat = re.compile(re.escape(candidate) + r"(?: \(\d+\))?\..*$", re.I)
+        try:
+            return any(pat.fullmatch(name) for name in os.listdir(directory or "."))
+        except OSError:
+            return False
+
+    if not used(stem):
+        return stem
+    n = 2
+    while used("%s (%d)" % (stem, n)):
+        n += 1
+    return "%s (%d)" % (stem, n)
+
+
+def verify_download(path: str, ffprobe: str = "", runner=None) -> dict:
+    """Post-download integrity verdict for a finished media file.
+
+    Level 1 (always): the file exists and is not empty. Level 2 (when
+    ffprobe is available): the container parses without errors and holds at
+    least one audio/video stream - a truncated or corrupt file fails here
+    even when yt-dlp exited 0. Without ffprobe only level 1 runs and the
+    result says so (`checked="size"`).
+    """
+    p = str(path or "")
+    try:
+        size = os.path.getsize(p)
+    except OSError as e:
+        return {"ok": False, "size": 0, "checked": "size", "format": "",
+                "duration": 0.0, "streams": 0, "error": "ไม่พบไฟล์: %s" % e}
+    result = {"ok": True, "size": size, "checked": "size", "format": "",
+              "duration": 0.0, "streams": 0, "error": ""}
+    if size <= 0:
+        result.update(ok=False, error="ไฟล์ว่าง (0 ไบต์)")
+        return result
+    probe = str(ffprobe or "")
+    if not probe or not os.path.isfile(probe):
+        return result
+    try:
+        out = (runner or subprocess.run)(
+            [probe, "-v", "error", "-show_entries",
+             "format=format_name,duration:stream=codec_type",
+             "-of", "json", p],
+            capture_output=True, text=True, timeout=60, encoding="utf-8", errors="replace",
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    except Exception as e:  # noqa: BLE001 - a probe crash must not kill the job
+        result.update(ok=False, checked="ffprobe", error="ffprobe เรียกไม่สำเร็จ: %r" % e)
+        return result
+    result["checked"] = "ffprobe"
+    err_lines = [ln.strip() for ln in (out.stderr or "").splitlines() if ln.strip()]
+    if out.returncode != 0 or err_lines:
+        detail = err_lines[-1] if err_lines else "exit %s" % out.returncode
+        result.update(ok=False, error="คอนเทนเนอร์เสีย/ถูกตัด: %s" % detail[:200])
+        return result
+    data = parse_probe_json(out.stdout)
+    if not data:
+        result.update(ok=False, error="ffprobe ไม่ได้ส่งข้อมูลกลับมา")
+        return result
+    fmt = data.get("format") if isinstance(data.get("format"), dict) else {}
+    streams = [s for s in (data.get("streams") or []) if isinstance(s, dict)]
+    media = [s for s in streams if s.get("codec_type") in ("video", "audio")]
+    try:
+        duration = float(fmt.get("duration") or 0)
+    except (TypeError, ValueError):
+        duration = 0.0
+    result.update(format=str(fmt.get("format_name") or ""),
+                  duration=duration, streams=len(media))
+    if not media:
+        result.update(ok=False, error="ไม่พบสตรีมวิดีโอ/เสียงในไฟล์")
+    return result
+
+
 class Job:
     _attrs = ("url", "title", "kind", "format_id", "page_url", "referrer",
               "ext", "title_base", "page_title")
@@ -134,6 +228,7 @@ class Job:
         self.out_dir = out_dir
         self.ext = ext or ""              # source extension sniffed from the URL
         self.title_base = title_base or ""  # filename stem decided up-front
+        self.stem = ""                 # v1.9.28: deduped stem reserved at run time
         self.page_title = page_title or ""
         self.cookie_source = ""        # "file" | "browser" | "" - set when the job starts
         self.login_required = False    # v1.9.26: engine asked for an account
@@ -171,6 +266,7 @@ class DownloadManager:
         self.history: list[str] = []
         self._sem = threading.Semaphore(int(settings.get("max_concurrent") or 3))
         self._lock = threading.Lock()
+        self._reserved_stems: set[str] = set()  # stems claimed by queued/running jobs
 
     # ------------------------------------------------------------------ api
     @staticmethod
@@ -439,10 +535,28 @@ class DownloadManager:
         metadata title + id. Literal `%` in the stem must be doubled or
         yt-dlp would parse it as a template field.
         """
-        stem = sanitize_filename(job.title_base)
+        stem = job.stem or sanitize_filename(job.title_base)
         if stem:
             return os.path.join(job.out_dir, stem.replace("%", "%%") + ".%(ext)s")
         return os.path.join(job.out_dir, "%(title).120B [%(id)s].%(ext)s")
+
+    def _resolve_stem(self, job: Job) -> str:
+        """Reserve the job's output stem once, before the engine runs.
+
+        Resolved under the manager lock so two jobs with the same title cannot
+        both pick `clip` (the second engine run would then be answered with
+        "has already been downloaded" and report the first job's file).
+        """
+        if job.stem:
+            return job.stem
+        base = sanitize_filename(job.title_base)
+        if not base:
+            return ""
+        with self._lock:
+            stem = unique_download_stem(job.out_dir, base, self._reserved_stems)
+            if stem:
+                self._reserved_stems.add(_stem_key(job.out_dir, stem))
+        return stem
 
     @staticmethod
     def _newest_match(directory: str, stem: str) -> str:
@@ -528,6 +642,10 @@ class DownloadManager:
                              level="warning", event="download_no_ffmpeg", id=job.id)
                 job.format_id = job.format_id if job.format_id and "*" not in job.format_id and "+" not in job.format_id else ""
 
+        # v1.9.28: pick the free file name before yt-dlp starts, so a repeated
+        # title lands as `name (2).ext` instead of being skipped as already
+        # downloaded. The same stem survives pause/resume and fallback retries.
+        job.stem = self._resolve_stem(job)
         out_tmpl = self._out_template(job)
         cmd = [ytdlp, "--no-playlist", "--no-warnings", "--newline", "--progress-template", PROGRESS_TEMPLATE,
                "--no-mtime", "-o", out_tmpl]
@@ -626,6 +744,28 @@ class DownloadManager:
             if self._looks_like_html(job.filepath):
                 self._handle_html_payload(job, allow_fallback)
                 return
+            # v1.9.28: a finished engine run is not proof of a playable file -
+            # verify the container/streams before reporting success
+            ff_dir = self.engines.ffmpeg_path()
+            verdict = verify_download(
+                job.filepath, os.path.join(ff_dir, "ffprobe.exe") if ff_dir else "")
+            if not verdict["ok"]:
+                job.status = "error"
+                job.error = "ไฟล์ที่ดาวน์โหลดมาไม่สมบูรณ์: %s" % verdict["error"]
+                self.log.log("download verify failed #%s: %s" % (job.id, verdict["error"]),
+                             level="error", event="download_verify_failed",
+                             id=job.id, url=job.url, filepath=job.filepath,
+                             bytes=verdict["size"], checked=verdict["checked"],
+                             error=verdict["error"][:300])
+                self.push_ui("download_update", job.public())
+                return
+            self.log.log("download verified #%s: %s (%s, %d bytes, %.1fs, %d streams)"
+                         % (job.id, job.filepath, verdict["checked"], verdict["size"],
+                            verdict["duration"], verdict["streams"]),
+                         event="download_verify", id=job.id, url=job.url,
+                         filepath=job.filepath, bytes=verdict["size"],
+                         checked=verdict["checked"], container=verdict["format"],
+                         duration=round(verdict["duration"], 2), streams=verdict["streams"])
             self.log.log("download done #%s -> %s" % (job.id, job.filepath or "(file name unknown)"),
                          event="download_done", id=job.id, url=job.url, filepath=job.filepath,
                          seconds=round(job.finished - job.created, 1), bytes=job.total)
@@ -843,7 +983,7 @@ class DownloadManager:
             return repaired
         # 1) known stem: our title-based template may have produced
         #    `stem.ext` / `stem (2).ext` without yt-dlp ever printing the path
-        stem = sanitize_filename(job.title_base)
+        stem = job.stem or sanitize_filename(job.title_base)
         if stem:
             hit = self._newest_match(job.out_dir, stem)
             if hit:

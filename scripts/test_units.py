@@ -269,6 +269,81 @@ def test_unique_stem() -> bool:
     return True
 
 
+# ------------------------------ v1.9.28 download naming + integrity check
+def test_unique_download_stem() -> bool:
+    import tempfile
+    from core.downloader import _stem_key, unique_download_stem
+
+    d = tempfile.mkdtemp(prefix="vg-dlstem-")
+    assert unique_download_stem(d, "clip") == "clip"
+    open(os.path.join(d, "clip.mp4"), "wb").close()
+    assert unique_download_stem(d, "clip") == "clip (2)"
+    open(os.path.join(d, "clip (2).mkv"), "wb").close()
+    assert unique_download_stem(d, "clip") == "clip (3)"
+    # an in-progress yt-dlp fragment claims the whole stem family
+    open(os.path.join(d, "movie.f137.mp4.part"), "wb").close()
+    assert unique_download_stem(d, "movie") == "movie (2)"
+    # a stem another queued job already reserved this session
+    assert unique_download_stem(d, "trailer", {_stem_key(d, "trailer")}) == "trailer (2)"
+    # unrelated stems and empty input stay untouched
+    assert unique_download_stem(d, "other") == "other"
+    assert unique_download_stem(d, "") == ""
+    return True
+
+
+class _FakeProbe:
+    def __init__(self, returncode=0, stdout="", stderr=""):
+        self.returncode = returncode
+        self.stdout = stdout
+        self.stderr = stderr
+
+
+def test_verify_download() -> bool:
+    import json as _json
+    import tempfile
+    from core.downloader import verify_download
+
+    d = tempfile.mkdtemp(prefix="vg-verify-")
+    assert not verify_download(os.path.join(d, "missing.mp4"))["ok"]
+
+    empty = os.path.join(d, "empty.mp4")
+    open(empty, "wb").close()
+    assert not verify_download(empty)["ok"]
+
+    good = os.path.join(d, "good.mp4")
+    with open(good, "wb") as fh:
+        fh.write(b"\x00\x00\x00\x18ftypisom" + b"\x00" * 64)
+    # without ffprobe only the size level runs, and the result says so
+    v = verify_download(good, "")
+    assert v["ok"] and v["checked"] == "size" and v["size"] > 0
+
+    probe = os.path.join(d, "ffprobe.exe")
+    open(probe, "wb").close()
+    payload = _json.dumps({
+        "format": {"format_name": "mov,mp4,m4a,3gp,3g2,mj2", "duration": "12.5"},
+        "streams": [{"codec_type": "video"}, {"codec_type": "audio"}],
+    })
+    v = verify_download(good, probe, runner=lambda *a, **k: _FakeProbe(stdout=payload))
+    assert v["ok"] and v["checked"] == "ffprobe", v
+    assert v["streams"] == 2 and abs(v["duration"] - 12.5) < 0.01 and "mp4" in v["format"]
+
+    # container errors on stderr mean a truncated/corrupt file even at exit 0
+    v = verify_download(good, probe,
+                        runner=lambda *a, **k: _FakeProbe(stderr="moov atom not found"))
+    assert not v["ok"] and "moov" in v["error"], v
+
+    # parses but holds no audio/video stream
+    v = verify_download(good, probe,
+                        runner=lambda *a, **k: _FakeProbe(stdout='{"format":{},"streams":[]}'))
+    assert not v["ok"] and "สตรีม" in v["error"], v
+
+    # a probe crash is reported, never raised
+    def boom(*a, **k):
+        raise OSError("probe gone")
+    assert not verify_download(good, probe, runner=boom)["ok"]
+    return True
+
+
 # ------------------------------------ stale engine warning (v1.9.23)
 def test_engine_version_age() -> bool:
     import datetime as _dt
@@ -1407,6 +1482,8 @@ def main() -> int:
         "page_fallback_obfuscated": test_page_fallback_obfuscated,
         "sanitize_filename": test_sanitize_filename,
         "unique_stem": test_unique_stem,
+        "unique_download_stem": test_unique_download_stem,
+        "verify_download": test_verify_download,
         "engine_version_age": test_engine_version_age,
         "analyze_events_engine_age": test_analyze_events_engine_age,
         "analyze_events_login_cookie": test_analyze_events_login_required_cookie_triage,

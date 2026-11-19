@@ -258,23 +258,20 @@ object Downloader {
     /**
      * v1.9.22 field log (2026-10-23): six taps on the qualities of ONE page
      * produced six jobs pointing at the SAME destination - DownloadManager
-     * then keeps one file and silently drops the rest. When the plain
-     * title-based name is taken, tag it with a short hash of the URL
-     * (deterministic, so a re-download of the same URL is recognisable) and
-     * only then fall back to `(2)`, `(3)`, ...
+     * then keeps one file and silently drops the rest. v1.9.28: duplicates
+     * now get the classic number suffix the user asked for - `Title (2).mp4`,
+     * `Title (3).mp4`, ... - instead of a hard-to-read URL hash tag. The
+     * captured `taken` set (files on disk + pending jobs) keeps it stable.
      */
-    fun uniqueDisplayName(url: String, title: String, taken: Set<String>): String {
+    fun uniqueDisplayName(@Suppress("UNUSED_PARAMETER") url: String, title: String, taken: Set<String>): String {
         val base = displayName(url, title)
         if (base !in taken) return base
         val dot = base.lastIndexOf('.')
         val stem = if (dot > 0) base.substring(0, dot) else base
         val ext = if (dot > 0) base.substring(dot) else ""
-        val tag = Integer.toHexString(url.hashCode())
-        val candidate = "$stem - $tag$ext"
-        if (candidate !in taken) return candidate
         var n = 2
-        while ("$stem - $tag ($n)$ext" in taken) n++
-        return "$stem - $tag ($n)$ext"
+        while ("$stem ($n)$ext" in taken) n++
+        return "$stem ($n)$ext"
     }
 
     /**

@@ -977,7 +977,16 @@ class MainActivity : AppCompatActivity() {
      */
     private fun logDirectOutcome(id: Long, url: String) {
         val r = Downloader.resultOf(this, id) ?: return
-        if (r.ok) {
+        if (r.ok && r.bytes <= 0L) {
+            // v1.9.28: DownloadManager can report SUCCESSFUL for an empty
+            // payload - that is not a usable video, so name it as a failure
+            FileLog.event("download_verify_failed", mapOf(
+                "url" to url.take(300), "engine" to "downloadmanager",
+                "file" to r.name.take(120), "bytes" to 0L,
+                "error" to "empty file (0 bytes)",
+            ))
+            FileLog.app("ERROR", "dl", "direct download is empty: ${r.name}")
+        } else if (r.ok) {
             FileLog.event("download_done", mapOf(
                 "url" to url.take(300), "engine" to "downloadmanager",
                 "file" to r.name.take(120), "bytes" to r.bytes,

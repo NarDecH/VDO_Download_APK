@@ -45,6 +45,7 @@ KNOWN_EVENTS = [
     "download_failed", "download_canceled", "download_stuck",
     "engine_download_start", "download_no_ffmpeg", "download_fallback",
     "cookie_source", "download_login_required", "probe_start", "probe_done", "probe_error",
+    "download_verify", "download_verify_failed",
 ]
 
 # Problems we know how to name (field-log lessons).
@@ -57,6 +58,7 @@ PROBLEM_EVENTS = {
     "engine_outdated": "yt-dlp engine older than 120 days - extractors may be stale",
     "download_login_required": "site wants a login - cookie not configured or expired",
     "probe_error": "format probe failed - engine returned no JSON (see the reason column)",
+    "download_verify_failed": "finished file failed the integrity check (empty/truncated/corrupt)",
 }
 
 

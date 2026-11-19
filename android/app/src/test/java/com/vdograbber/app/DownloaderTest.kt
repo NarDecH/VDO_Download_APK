@@ -100,23 +100,18 @@ class DownloaderTest {
     }
 
     @Test
-    fun `uniqueDisplayName separates qualities of one page`() {
+    fun `uniqueDisplayName numbers duplicates of one page`() {
         val a = Downloader.uniqueDisplayName("https://c/720.mp4?x=1", "Reel", emptySet())
         val b = Downloader.uniqueDisplayName("https://c/360.mp4?x=2", "Reel", setOf(a))
         val c = Downloader.uniqueDisplayName("https://c/1080.mp4", "Reel", setOf(a, b))
         assertEquals("Reel.mp4", a)
-        assertTrue("second name must differ: $b", b != a && b.startsWith("Reel - ") && b.endsWith(".mp4"))
-        assertTrue("third name must differ too: $c", c != a && c != b)
-        // deterministic: the same URL always gets the same suffix
-        assertEquals(b, Downloader.uniqueDisplayName("https://c/360.mp4?x=2", "Reel", setOf(a)))
+        assertEquals("Reel (2).mp4", b)
+        assertEquals("Reel (3).mp4", c)
     }
 
     @Test
-    fun `uniqueDisplayName falls back to a counter when the hash is taken`() {
-        val first = Downloader.uniqueDisplayName("https://c/a.mp4", "Clip", emptySet())
-        val second = Downloader.uniqueDisplayName("https://c/b.mp4", "Clip", setOf(first))
-        val again = Downloader.uniqueDisplayName("https://c/b.mp4", "Clip", setOf(first, second))
-        assertTrue(second.startsWith("Clip - "))
-        assertTrue("counter suffix expected: $again", again.endsWith(" (2).mp4"))
+    fun `uniqueDisplayName skips numbers already taken on disk`() {
+        val name = Downloader.uniqueDisplayName("https://c/b.mp4", "Clip", setOf("Clip.mp4", "Clip (2).mp4"))
+        assertEquals("Clip (3).mp4", name)
     }
 }

@@ -15,6 +15,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import subprocess
 import sys
 import threading
 import time
@@ -958,6 +959,25 @@ def selftest() -> int:
 
     # --- tiny local media server (two ports = two origins for iframe tests) -
     mp4 = (b"\x00\x00\x00\x18ftypmp42\x00\x00\x00\x00mp42isom" + b"\x00" * (256 * 1024 - 24))
+    # v1.9.28: a finished download is now integrity-checked with ffprobe, so
+    # synthetic zero bytes would (correctly) fail. When ffmpeg is installed,
+    # serve a real one-second clip instead; without it the check is size-only
+    # and the dummy payload still exercises the download path.
+    ff_dir = app.engines.ffmpeg_path()
+    if ff_dir:
+        sample = os.path.join(app.data_dir, "selftest-source.mp4")
+        try:
+            subprocess.run(
+                [os.path.join(ff_dir, "ffmpeg.exe"), "-y", "-v", "error",
+                 "-f", "lavfi", "-i", "testsrc=size=160x120:rate=10", "-t", "1",
+                 "-pix_fmt", "yuv420p", sample],
+                timeout=60, creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+            with open(sample, "rb") as f:
+                mp4 = f.read()
+            os.remove(sample)
+        except Exception as e:  # noqa: BLE001 - fall back to the dummy payload
+            app.logm.log("selftest: could not build media sample: %r" % e,
+                         level="warning", event="selftest_sample_error", error=repr(e))
     m3u8 = b"#EXTM3U\n#EXT-X-VERSION:3\n#EXTINF:4.0,\nseg0.ts\n#EXT-X-ENDLIST\n"
 
     class H(BaseHTTPRequestHandler):
