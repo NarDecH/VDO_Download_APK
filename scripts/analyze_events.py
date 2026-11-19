@@ -44,7 +44,7 @@ KNOWN_EVENTS = [
     "download_no_file_probe", "download_done", "download_error",
     "download_failed", "download_canceled", "download_stuck",
     "engine_download_start", "download_no_ffmpeg", "download_fallback",
-    "cookie_source", "download_login_required",
+    "cookie_source", "download_login_required", "probe_start", "probe_done", "probe_error",
 ]
 
 # Problems we know how to name (field-log lessons).
@@ -56,6 +56,7 @@ PROBLEM_EVENTS = {
     "download_stuck": "direct download queued but never started - watchdog gave up",
     "engine_outdated": "yt-dlp engine older than 120 days - extractors may be stale",
     "download_login_required": "site wants a login - cookie not configured or expired",
+    "probe_error": "format probe failed - engine returned no JSON (see the reason column)",
 }
 
 

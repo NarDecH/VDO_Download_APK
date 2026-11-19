@@ -71,6 +71,22 @@ def is_login_required(text: str) -> bool:
     """True when the engine failed because the page wants a logged-in session."""
     return bool(LOGIN_REQUIRED_RE.search(str(text or "")))
 
+
+def parse_probe_json(stdout: str) -> dict | None:
+    """yt-dlp -J payload as a dict, or None when there is no usable result.
+
+    A failed extraction can still print `null` (valid JSON) or nothing at
+    all, so the caller must handle None instead of calling .get() on it.
+    """
+    text = str(stdout or "").strip()
+    if not text:
+        return None
+    try:
+        data = json.loads(text)
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
 # Windows-invalid filename characters (plus control chars) -> replaced by spaces
 _INVALID_FS_RE = re.compile(r'[<>:"/\\|?*\x00-\x1f]')
 
@@ -303,6 +319,13 @@ class DownloadManager:
 
     def get_formats(self, url: str, referrer: str = "") -> dict:
         """Probe a URL with yt-dlp -J and return a compact format list."""
+        if str(url or "").strip().lower().startswith("blob:"):
+            # v1.9.27: blob: URLs exist only inside the page, so yt-dlp answers
+            # with `null` and the old code crashed in info.get().
+            self.log.log("probe skipped: blob URL", level="debug",
+                         event="probe_error", url=url, error="blob_url")
+            return {"ok": False, "formats": [],
+                    "error": "ลิงก์ blob: ใช้ไม่ได้ - เอนจินเข้าถึงไม่ได้ เลือกลิงก์ไฟล์/สตรีมแทน"}
         ytdlp = self.engines.ensure_ytdlp()
         cmd = [ytdlp, "--no-playlist", "--no-warnings", "-J", url]
         cmd += cookie_args(self.settings.get("cookies_file"), self.settings.get("cookies_browser"))
@@ -316,10 +339,18 @@ class DownloadManager:
             out = subprocess.run(cmd, capture_output=True, text=True, timeout=120,
                                  encoding="utf-8", errors="replace",
                                  creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-            info = json.loads(out.stdout)
         except Exception as e:
             self.log.log("probe failed: %r" % e, level="error", event="probe_error", url=url, error=repr(e))
             return {"ok": False, "error": repr(e), "formats": []}
+        info = parse_probe_json(out.stdout)
+        if info is None:
+            lines = (out.stderr or "").strip().splitlines()
+            detail = lines[-1].strip() if lines else "yt-dlp ไม่ได้ส่งข้อมูลกลับมา"
+            self.log.log("probe failed: %s" % detail, level="error", event="probe_error",
+                         url=url, error=detail, returncode=out.returncode)
+            msg = ("ต้องล็อกอินก่อน - ไปที่ ตั้งค่า → Cookie แล้วลองใหม่"
+                   if is_login_required(detail) else "ค้นหาไม่สำเร็จ: %s" % detail[:160])
+            return {"ok": False, "error": msg, "formats": []}
 
         formats = []
         for f in info.get("formats") or []:

@@ -1118,6 +1118,67 @@ def test_cookie_args_and_login_required() -> bool:
     return True
 
 
+def test_probe_json_and_blob_guard() -> bool:
+    """v1.9.27: a failed `-J` probe prints `null` or nothing, which used to
+    reach info.get() and raise AttributeError. get_formats must answer with
+    an error dict (blob: URLs never even reach the engine)."""
+    import core.downloader as dl
+    from core.downloader import DownloadManager, parse_probe_json
+
+    assert parse_probe_json("null") is None
+    assert parse_probe_json("") is None and parse_probe_json("  \n") is None
+    assert parse_probe_json("[1, 2]") is None
+    assert parse_probe_json('{"formats": []}') == {"formats": []}
+
+    class _Settings:
+        def get(self, key, default=None):
+            return default
+
+    class _Log:
+        def __init__(self):
+            self.events = []
+
+        def log(self, msg, **kw):
+            self.events.append(kw.get("event"))
+
+    class _Engines:
+        def ensure_ytdlp(self):
+            return "yt-dlp.exe"
+
+    dm = DownloadManager(_Settings(), None, _Log())
+    blob = dm.get_formats("blob:https://x.com/1234")
+    assert blob["ok"] is False and blob["formats"] == [], blob
+    assert "blob:" in blob["error"], blob
+
+    class _Out:
+        returncode = 1
+        stdout = "null\n"
+        stderr = "ERROR: [twitter] 1234: Sign in to confirm you're not a bot\n"
+
+    logm = _Log()
+    real = dl.subprocess.run
+    try:
+        dl.subprocess.run = lambda *a, **k: _Out()
+        r = DownloadManager(_Settings(), _Engines(), logm).get_formats("https://x.com/a/status/1")
+    finally:
+        dl.subprocess.run = real
+    assert r["ok"] is False and "ล็อกอิน" in r["error"], r
+    assert "probe_error" in logm.events, logm.events
+
+    class _Out2(_Out):
+        stdout = ""
+        stderr = "ERROR: Unsupported URL: https://x.com/\n"
+
+    real = dl.subprocess.run
+    try:
+        dl.subprocess.run = lambda *a, **k: _Out2()
+        r2 = DownloadManager(_Settings(), _Engines(), _Log()).get_formats("https://x.com/")
+    finally:
+        dl.subprocess.run = real
+    assert r2["ok"] is False and "ค้นหาไม่สำเร็จ" in r2["error"], r2
+    return True
+
+
 def test_download_path_skeleton_match() -> bool:
     """v1.9.26: yt-dlp drops non-ASCII glyphs from its Destination line, so a
     finished download must still be found by the printable-ASCII skeleton."""
@@ -1349,6 +1410,7 @@ def main() -> int:
         "engine_version_age": test_engine_version_age,
         "analyze_events_engine_age": test_analyze_events_engine_age,
         "analyze_events_login_cookie": test_analyze_events_login_required_cookie_triage,
+        "probe_json_blob_guard": test_probe_json_and_blob_guard,
         "title_base_policy": test_title_base_policy,
         "out_template_and_newest_match": test_out_template_and_newest_match,
         "exclusion_matcher": test_exclusion_matcher,
