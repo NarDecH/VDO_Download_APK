@@ -2,6 +2,15 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.28] — 2026-11-19
+
+### การเปลี่ยนแปลง
+- ตรวจความสมบูรณ์ของไฟล์วิดีโอหลังดาวน์โหลด: desktop ใช้ ffprobe และ Android ใช้ MediaMetadataRetriever พร้อม event download_verify / download_verify_failed — fail เฉพาะ ffprobe exit ไม่ใช่ 0 หรือไม่พบสตรีมวิดีโอ/เสียง
+- กันชื่อไฟล์ซ้ำอัตโนมัติ: ถ้ามีไฟล์ชื่อเดิมอยู่แล้วจะเติมเลขเป็น "ชื่อ (2).mp4", "ชื่อ (3).mp4" ทั้ง desktop และ Android (รวมโฟลเดอร์ Downloads/VDOGrabber) และคงชื่อเดิมไว้เมื่อ pause/resume
+- แก้ crash ตอนกดปุ่ม "รูปแบบ/คุณภาพ" กับลิงก์ blob: (probe คืน null) พร้อมเพิ่ม event probe_start/probe_done/probe_error ใน analyzer
+- selftest สร้างคลิปวิดีโอจริงด้วย ffmpeg เพื่อทดสอบการตรวจไฟล์ปลายทางแบบ end-to-end
+
+
 ## [1.9.27] — 2026-11-17
 
 ### การเปลี่ยนแปลง
