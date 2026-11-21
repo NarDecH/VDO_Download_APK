@@ -80,6 +80,12 @@ jobs:
 
       - name: Create AVD ahead of time (warm cache)
         if: steps.avd-cache.outputs.cache-hit != 'true'
+        # 2026-11-21: emulator 37.3.10 (shipped on the runner image) refuses
+        # `-accel off` on KVM-less runners unless TCG is explicitly allowed.
+        # The hosted runners never had /dev/kvm, so TCG is still what ran here
+        # before - the env var just restores that fallback.
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
@@ -99,6 +105,8 @@ jobs:
       - name: E2E on emulator (attempt 1)
         id: e2e1
         continue-on-error: true
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
@@ -120,6 +128,8 @@ jobs:
         # so a flaked second emulator (API level=1 half-boot, run 42745522015)
         # aborted the job before the third fresh attempt could run
         continue-on-error: true
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
@@ -134,6 +144,8 @@ jobs:
       - name: E2E on emulator (attempt 3 - fresh emulator after infra flake)
         id: e2e3
         if: steps.e2e1.outcome == 'failure' && steps.e2e2.outcome == 'failure'
+        env:
+          ANDROID_I_WANT_MY_TCG: "yes"
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
