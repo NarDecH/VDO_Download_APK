@@ -2,6 +2,14 @@
 
 รูปแบบอ้างอิง [Keep a Changelog](https://keepachangelog.com/th/1.1.0/) และใช้ [Semantic Versioning](https://semver.org/th/)
 
+## [1.9.29] — 2026-11-23
+
+### การเปลี่ยนแปลง
+- อัปเกรด Android toolchain เป็น AGP 9.5.1 + Gradle 9.6.0 (Kotlin 2.4.21) พร้อม flag การย้าย AGP 9 ครบชุด — ตรวจ JVM unit test และ assembleDebug ด้วย toolchain ใหม่ในเครื่องผ่าน (APK ครบ 4 ABI) ก่อนปล่อย
+- CI Android: คืน TCG ให้ emulator บน runner ที่ไม่มี KVM (ANDROID_I_WANT_MY_TCG=yes) หลัง emulator 37.3.10 ปฏิเสธ -accel off ทำให้ E2E ล้มทุก attempt
+- ไม่มีการเปลี่ยนแปลงพฤติกรรมในแอป — รุ่นนี้เป็นงานบำรุงรักษา build/CI ล้วน
+
+
 ## [1.9.28] — 2026-11-19
 
 ### การเปลี่ยนแปลง
