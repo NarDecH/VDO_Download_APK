@@ -32,6 +32,14 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
+      # compileSdk 37 (issue #11, step A): the runner images do not ship SDK
+      # Platform 37, so install it explicitly. Letting AGP auto-download moved
+      # the failure into whichever Gradle task ran first instead of this step.
+      - name: Install Android SDK Platform 37
+        # no `yes | sdkmanager --licenses`: run steps use pipefail and `yes`
+        # would exit 141 on SIGPIPE; runner images ship accepted licenses.
+        run: sdkmanager "platforms;android-37.0"
+
       - name: Run JVM unit tests (MediaStore LRU)
         working-directory: android
         run: |

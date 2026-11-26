@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.vdograbber.app"
-    compileSdk = 35
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.vdograbber.app"
