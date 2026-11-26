@@ -38,7 +38,18 @@ jobs:
       - name: Install Android SDK Platform 37
         # no `yes | sdkmanager --licenses`: run steps use pipefail and `yes`
         # would exit 141 on SIGPIPE; runner images ship accepted licenses.
-        run: sdkmanager "platforms;android-37.0"
+        run: |
+          # sdkmanager is not on PATH on the hosted image (exit 127 on
+          # d41b1b1), so resolve it from the SDK root the image exports.
+          sdk_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          sdkmanager="$sdk_root/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$sdkmanager" ]; then
+            sdkmanager="$(find "$sdk_root" -path '*/cmdline-tools/*/bin/sdkmanager' -type f -print -quit)"
+          fi
+          echo "SDK root: $sdk_root"
+          echo "sdkmanager: $sdkmanager"
+          ls -l "$sdkmanager"
+          "$sdkmanager" "platforms;android-37.0"
 
       - name: Run JVM unit tests (MediaStore LRU)
         working-directory: android
